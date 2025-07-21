@@ -1,5 +1,5 @@
-import { OpenDb, type AppIDB } from "@/backend/adpter/indexed-db/indexed-db";
-import { TodoRepositoryIndexedDB } from "@/backend/adpter/indexed-db/todo-repository";
+import { OpenDb, type AppIDB } from "@/backend/adapter/indexed-db/indexed-db";
+import { TodoRepositoryIndexedDB } from "@/backend/adapter/indexed-db/todo-repository";
 import { TodoService, type TodoRepository } from "@/backend/todo-service";
 import { Container } from "inversify";
 
@@ -27,7 +27,9 @@ async function resolve(container: Container) {
 
   container
     .bind<TodoRepository>(PrivateDependencies.TodoRepository)
-    .toConstantValue(new TodoRepositoryIndexedDB(container.get(PrivateDependencies.AppIDB)));
+    .toConstantValue(
+      new TodoRepositoryIndexedDB(container.get(PrivateDependencies.AppIDB))
+    );
 
   container.bind<TodoService>(Dependencies.TodoService).toConstantValue(
     new TodoService({
