@@ -15,4 +15,8 @@ export class TodoRepositoryIndexedDB implements TodoRepository {
   create = async (todo: TodoEntity) => {
     await this.db.add(Tables.Todo, todo);
   };
+
+  delete = async (id: string) => {
+    await this.db.delete(Tables.Todo, id);
+  };
 }

@@ -21,6 +21,7 @@ export type CreateTodoEntity = z.infer<typeof createTodoZodScheme>;
 export interface TodoRepository {
   listAll(): Promise<TodoEntity[]>;
   create(todo: TodoEntity): Promise<void>;
+  delete(id: string): Promise<void>;
 }
 
 export class TodoService {
@@ -35,6 +36,10 @@ export class TodoService {
   }
 
   listAll = () => this.repository.listAll();
+
+  delete = (id: string) => {
+    return this.repository.delete(id);
+  };
 
   create = async (partial: CreateTodoEntity) => {
     const validation = this.todoEntityValidator.validateAll({

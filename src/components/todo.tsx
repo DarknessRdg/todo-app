@@ -16,7 +16,7 @@ export function TodoListItem({ todo, onClick }: TodoListItemProps) {
       <CardContent className="px-4">
         <div className="flex gap-3">
           <Checkbox defaultChecked={todo.done} />
-          <TodoTitle title={todo.title} />
+          <TodoTitle title={todo.name} />
         </div>
       </CardContent>
     </Card>
