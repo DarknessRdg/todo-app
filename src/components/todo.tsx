@@ -41,8 +41,18 @@ export function TodoContent({
   className?: string;
 }) {
   return (
-    <Card className={cn("shadow-none", className)}>
+    <Card className={cn("py-2 shadow-none", className)}>
       <CardContent className="px-4">{children}</CardContent>
     </Card>
   );
+}
+
+export function TodoCheckerInput({
+  done,
+  onToggle
+}: {
+  done: boolean;
+  onToggle: (checked: boolean) => void;
+}) {
+  return <Checkbox className="rounded-full" checked={done} onCheckedChange={onToggle} />;
 }

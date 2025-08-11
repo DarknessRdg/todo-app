@@ -22,6 +22,7 @@ export interface TodoRepository {
   listAll(): Promise<TodoEntity[]>;
   create(todo: TodoEntity): Promise<void>;
   delete(id: string): Promise<void>;
+  updateDone(params: { id: string; done: boolean }): Promise<void>;
 }
 
 export class TodoService {
@@ -53,6 +54,10 @@ export class TodoService {
       console.log(todo);
       await this.repository.create(todo);
     });
+  };
+
+  updateDone = async (params: { id: string; done: boolean }) => {
+    return this.repository.updateDone(params);
   };
 
   validateField = (obj: CreateTodoEntity, field: keyof CreateTodoEntity) =>

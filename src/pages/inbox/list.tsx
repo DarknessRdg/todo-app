@@ -1,14 +1,9 @@
-import { TodoContent, TodoTitle } from "@/components/todo";
+import { TodoCheckerInput, TodoContent, TodoTitle } from "@/components/todo";
 import { useTodoList } from "./use-todo-list";
 import { EmptyList } from "@/pages/inbox/empty-list";
 import { Trash2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipText,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { TooltipText } from "@/components/ui/tooltip";
 import { Typography } from "@/components/ui/typography";
 import {
   AlertDialog,
@@ -22,18 +17,31 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useTodoDelete } from "@/pages/inbox/use-todo-delete";
+import { toast } from "@/components/ui/sonner";
+import { useTodoUpdate } from "@/pages/inbox/use-todo-update";
 
 export function TodoList() {
   const { todoList } = useTodoList();
+  const { check } = useTodoUpdate();
+
+  const checkClickHandler = (id: string) => {
+    return (done: boolean) => check.mutate({ id, done });
+  };
 
   if (!todoList || todoList.length === 0) return <EmptyList />;
 
   return (
     <div>
       {todoList.map((it) => (
-        <TodoContent>
+        <TodoContent key={it.id}>
           <div className="flex items-center justify-between">
-            <TodoTitle title={it.title} />
+            <div className="flex gap-2.5">
+              <TodoCheckerInput
+                done={it.done}
+                onToggle={checkClickHandler(it.id)}
+              />
+              <TodoTitle title={it.title} />
+            </div>
             <DeleteButton title={it.title} id={it.id} />
           </div>
         </TodoContent>
@@ -43,8 +51,14 @@ export function TodoList() {
 }
 
 function DeleteButton({ title, id }: { title: string; id: string }) {
-  const { deleteTodo } = useTodoDelete();
-  const deleteAction = () => deleteTodo(id);
+  const { deleteTodoAsync } = useTodoDelete();
+  const deleteAction = () => {
+    toast.promise(async () => await deleteTodoAsync(id), {
+      loading: "Deleting your todo...",
+      success: "Todo deleted !!!",
+      error: "Something wrong happened. Please try again.",
+    });
+  };
 
   return (
     <AlertDialog>
