@@ -5,6 +5,8 @@ import { QueryCountKey } from "@/pages/inbox/use-todo-count";
 import { QueryTodoKey } from "@/pages/inbox/use-todo-list";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
+const invalidateKeys = [QueryTodoKey, QueryCountKey];
+
 export function useTodoDelete() {
   const todoService = useContainer().get<TodoService>(Dependencies.TodoService);
 
@@ -13,8 +15,8 @@ export function useTodoDelete() {
   const { mutateAsync, isError, isPending, isSuccess } = useMutation({
     mutationFn: todoService.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: [QueryTodoKey, QueryCountKey],
+      invalidateKeys.forEach((key) => {
+        queryClient.invalidateQueries({ queryKey: [key] });
       });
     },
   });
