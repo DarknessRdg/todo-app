@@ -23,6 +23,7 @@ export interface TodoRepository {
   create(todo: TodoEntity): Promise<void>;
   delete(id: string): Promise<void>;
   updateDone(params: { id: string; done: boolean }): Promise<void>;
+  count(): Promise<number>;
 }
 
 export class TodoService {
@@ -51,7 +52,6 @@ export class TodoService {
     });
 
     return validation.onValidAsync(async (todo) => {
-      console.log(todo);
       await this.repository.create(todo);
     });
   };
@@ -59,6 +59,8 @@ export class TodoService {
   updateDone = async (params: { id: string; done: boolean }) => {
     return this.repository.updateDone(params);
   };
+
+  count = async () => this.repository.count();
 
   validateField = (obj: CreateTodoEntity, field: keyof CreateTodoEntity) =>
     this.createTodoEntityValidator.validateField(obj, field);
