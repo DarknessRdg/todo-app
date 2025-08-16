@@ -63,13 +63,15 @@ export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider };
 export function TooltipText({
   text,
   children,
+  asChild,
 }: {
+  asChild?: boolean;
   text: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <Tooltip>
-      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipTrigger asChild={asChild}>{children}</TooltipTrigger>
       <TooltipContent>
         <Typography variant="p">{text}</Typography>
       </TooltipContent>
