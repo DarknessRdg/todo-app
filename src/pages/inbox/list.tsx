@@ -12,8 +12,8 @@ export function TodoList() {
 
   if (count === 0) return <EmptyList />;
 
-  const doneCount = doneList?.length || 0;
-  const percentage = (doneCount / count) * 100;
+  // const doneCount = doneList?.length || 0;
+  // const percentage = (doneCount / count) * 100;
 
   return (
     <div>

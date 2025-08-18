@@ -16,9 +16,7 @@ export function useTodoCount() {
   } = useQuery({
     queryKey: [QueryCountKey],
     queryFn: async () => {
-      const c = await todoService.count();
-      console.log(c);
-      return c;
+      return await todoService.count();
     },
   });
 

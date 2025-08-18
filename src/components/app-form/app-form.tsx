@@ -97,6 +97,8 @@ function FormSubmit({
       onSubmit={(e) => {
         e.preventDefault();
         e.stopPropagation();
+
+        console.debug('form errors', form.getAllErrors())
         form.handleSubmit();
       }}
     />

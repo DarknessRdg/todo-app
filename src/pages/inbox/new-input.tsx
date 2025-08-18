@@ -1,5 +1,5 @@
 import type { CreateTodoEntity } from "@/backend/todo-service";
-import { useAppForm, useFieldContext } from "@/components/app-form/app-form";
+import { useAppForm, useFieldContext, useFormContext } from "@/components/app-form/app-form";
 import { TodoCheckerInput } from "@/components/todo";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -36,27 +36,46 @@ export function NewInput() {
 
   const { create, validateField } = useTodoCreate();
 
-  const createFromDefaultValues: CreateTodoEntity = {
-    title: "",
-    dueDate: new Date(),
-  };
-
   const form = useAppForm({
-    defaultValues: createFromDefaultValues,
+    defaultValues: {
+      title: "",
+      dueDate: new Date(),
+    } as CreateTodoEntity,
     onSubmit: ({ value, formApi }) => {
-      console.log("onsubimit from", value);
       create.mutate(value);
       toast.success("Todo created !");
       formApi.reset();
-    },
-    onSubmitInvalid: ({ value, formApi }) => {
-      console.log(value, "error");
-      console.log(formApi.getAllErrors());
-    },
+    }
   });
 
-  const inlineValidate = (field: keyof CreateTodoEntity) =>
-    validateField(form.state.values, field);
+
+  const resetFieldErrors = (field: keyof CreateTodoEntity) => {
+    form.setFieldMeta(field, (meta) => ({
+      ...meta,
+      errorMap: {}
+    }))
+  }
+
+  const inlineValidate = (field: keyof CreateTodoEntity) => {
+    const error = validateField(form.state.values, field);
+    if (!error) {
+      // tanstack register errors by 'on<>' validation type
+      // it stores in a map such as:
+      //
+      // {
+      //   title: {
+      //     onBlur: ["title-required"],
+      //     onChange: []
+      //   }
+      // }
+      //
+      // However, if our form validation passes `onChange` it should
+      // also erase the `onBlur` validation as it passed all the validation.
+      // That is why we need to reset all the errors if succeeded one validation.
+      resetFieldErrors(field)
+    }
+    return error
+  }
 
   const validateOnBlur = (fieldName: keyof CreateTodoEntity) => {
     return {
@@ -83,19 +102,14 @@ export function NewInput() {
 
   return (
     <form.AppForm>
-      <form
-        className="relative"
-        onSubmit={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          console.log("subimited", form.state.values);
-          form.handleSubmit();
-        }}>
+      <form.FormSubmit className="relative">
         <form.AppField
           name="title"
           validators={validateOnBlur("title")}
           children={(field) => (
             <field.Input
+              aria-invalid={!form.state.isFieldsValid}
+              disabled={form.state.isSubmitting}
               style={{ paddingRight: `${rightPadding}px` }}
               type="textarea"
               placeholder="Add new todo"
@@ -130,9 +144,18 @@ export function NewInput() {
             className="rounded-full"
           />
         </div>
-      </form>
+      </form.FormSubmit>
+      <div>
+        <Typography variant="p" className="text-destructive">{form.state.errors}</Typography>
+      </div>
     </form.AppForm>
   );
+}
+
+function FormErrors() {
+  const form = useFormContext()
+
+  const allErrors = form.getAllErrors().fields.map()
 }
 
 function DueDateButton({ initial }: { initial: Date }) {

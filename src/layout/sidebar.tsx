@@ -10,8 +10,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { Typography } from "@/components/ui/typography";
-import { Calendar1, CalendarDays, CalendarX, Home, Inbox } from "lucide-react";
+import { Calendar1, CalendarDays, CalendarX, Inbox } from "lucide-react";
 
 const items = [
   {
