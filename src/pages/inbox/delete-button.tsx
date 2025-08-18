@@ -10,6 +10,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/shadcn-io/spinner";
 import { toast } from "@/components/ui/sonner";
 import { TooltipText } from "@/components/ui/tooltip";
 import { Typography } from "@/components/ui/typography";
@@ -17,7 +18,7 @@ import { useTodoDelete } from "@/pages/inbox/use-todo-delete";
 import { Trash2Icon } from "lucide-react";
 
 export function DeleteButton({ title, id }: { title: string; id: string }) {
-  const { deleteTodoAsync } = useTodoDelete();
+  const { deleteTodoAsync, isPending } = useTodoDelete();
   const deleteAction = () => {
     toast.promise(async () => await deleteTodoAsync(id), {
       loading: "Deleting your todo...",
@@ -25,6 +26,9 @@ export function DeleteButton({ title, id }: { title: string; id: string }) {
       error: "Something wrong happened. Please try again.",
     });
   };
+
+  const DeleteIcon = () =>
+    isPending ? <Spinner variant="circle" /> : <Trash2Icon />;
 
   return (
     <AlertDialog>
@@ -34,7 +38,7 @@ export function DeleteButton({ title, id }: { title: string; id: string }) {
             variant="ghost"
             size="icon"
             className="text-destructive hover:text-destructive">
-            <Trash2Icon />
+            <DeleteIcon />
           </Button>
         </AlertDialogTrigger>
       </TooltipText>

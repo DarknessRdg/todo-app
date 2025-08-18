@@ -5,7 +5,6 @@ import { useTodoUpdate } from "@/pages/inbox/use-todo-update";
 import { DeleteButton } from "@/pages/inbox/delete-button";
 import type { TodoEntity } from "@/backend/todo-service";
 import { Typography } from "@/components/ui/typography";
-import { Progress } from "@/components/ui/progress";
 import { NewInput } from "@/pages/inbox/new-input";
 
 export function TodoList() {
@@ -47,7 +46,7 @@ export function TodoList() {
 
 function TodoListContainer({ todoList }: { todoList?: TodoEntity[] }) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col flex-nowrap gap-2">
       {todoList?.map((it) => (
         <TodoItem todo={it} key={it.id} />
       ))}
