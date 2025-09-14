@@ -17,6 +17,7 @@ const items = [
     title: "Inbox",
     url: "#",
     icon: Inbox,
+    active: true,
   },
   {
     title: "Today",
@@ -37,7 +38,7 @@ const items = [
 export function AppSidebar() {
   return (
     <Sidebar>
-      <SidebarContent>
+      <SidebarContent className="bg-sidebar mx-4 my-5 rounded-2xl border">
         <SidebarGroup>
           <SidebarGroupLabel>
             <Logo />
@@ -47,9 +48,9 @@ export function AppSidebar() {
             <SidebarMenu>
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
+                  <SidebarMenuButton asChild isActive={item.active}>
                     <a href={item.url}>
-                      <item.icon />
+                      <item.icon size={20} className="h-5" />
                       <span>{item.title}</span>
                     </a>
                   </SidebarMenuButton>
