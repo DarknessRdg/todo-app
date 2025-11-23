@@ -1,5 +1,5 @@
 import type { CreateTodoEntity } from "@/backend/todo-service";
-import { useAppForm, useFieldContext, useFormContext } from "@/components/app-form/app-form";
+import { useAppForm, useFieldContext } from "@/components/app-form/app-form";
 import { TodoCheckerInput } from "@/components/todo";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -77,9 +77,8 @@ export function NewInput() {
     return error
   }
 
-  const validateOnBlur = (fieldName: keyof CreateTodoEntity) => {
+  const inputValidations = (fieldName: keyof CreateTodoEntity) => {
     return {
-      onBlur: () => inlineValidate(fieldName),
       onChange: () => inlineValidate(fieldName),
     };
   };
@@ -105,7 +104,7 @@ export function NewInput() {
       <form.FormSubmit className="relative">
         <form.AppField
           name="title"
-          validators={validateOnBlur("title")}
+          validators={inputValidations("title")}
           children={(field) => (
             <field.Input
               aria-invalid={!form.state.isFieldsValid}
@@ -129,7 +128,7 @@ export function NewInput() {
           ref={rightGroupRef}>
           <form.AppField
             name="dueDate"
-            validators={validateOnBlur("dueDate")}
+            validators={inputValidations("dueDate")}
             children={(field) => (
               <DueDateButton initial={field.state.value as Date} />
             )}
@@ -150,12 +149,6 @@ export function NewInput() {
       </div>
     </form.AppForm>
   );
-}
-
-function FormErrors() {
-  const form = useFormContext()
-
-  const allErrors = form.getAllErrors().fields.map()
 }
 
 function DueDateButton({ initial }: { initial: Date }) {
