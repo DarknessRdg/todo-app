@@ -6,27 +6,28 @@ import { DeleteButton } from "@/pages/inbox/delete-button";
 import type { TodoEntity } from "@/backend/todo-service";
 import { Typography } from "@/components/ui/typography";
 import { NewInput } from "@/pages/inbox/new-input";
+import { Progress } from "@/components/ui/progress.tsx";
+import { useNavigate } from "react-router";
 
 export function TodoList() {
   const { todoList, doneList, count } = useTodoList();
 
   if (count === 0) return <EmptyList />;
 
-  // const doneCount = doneList?.length || 0;
-  // const percentage = (doneCount / count) * 100;
+  const doneCount = doneList?.length || 0;
+  const percentage = (doneCount / count) * 100;
 
   return (
     <div>
-      {/* <div className="mb-10">
+      <div className="mb-10">
         <Typography variant="h5" className="text-accent-foreground">
           Done{" "}
           <span className="ml-1">
-            {" "}
             {doneCount} / {count}
           </span>
         </Typography>
         <Progress value={percentage} className="w-12/12" />
-      </div> */}
+      </div>
       <div className="mb-5">
         <NewInput />
       </div>
@@ -56,21 +57,31 @@ function TodoListContainer({ todoList }: { todoList?: TodoEntity[] }) {
 
 function TodoItem({ todo }: { todo: TodoEntity }) {
   const { check } = useTodoUpdate();
+  const navigate = useNavigate();
 
   const checkClickHandler = (id: string) => {
     return (done: boolean) => check.mutate({ id, done });
   };
 
+  const openTodoDetails = (id: string) => {
+    navigate(`?todo=${id}`);
+  };
+
   return (
-    <TodoContent done={todo.done}>
+    <TodoContent done={todo.done} className="py-0">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
+        <div className="flex grow items-center gap-2.5">
           <TodoCheckerInput
             dialogMessage={todo.done ? "Undo?" : "Done?"}
             done={todo.done}
             onToggle={checkClickHandler(todo.id)}
           />
-          <TodoTitle title={todo.title} done={todo.done} />
+          <TodoTitle
+            title={todo.title}
+            done={todo.done}
+            className="grow py-4 hover:cursor-pointer"
+            onClick={() => openTodoDetails(todo.id)}
+          />
         </div>
         <DeleteButton title={todo.title} id={todo.id} />
       </div>

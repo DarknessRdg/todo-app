@@ -24,6 +24,7 @@ export interface TodoRepository {
   delete(id: string): Promise<void>;
   updateDone(params: { id: string; done: boolean }): Promise<void>;
   count(): Promise<number>;
+  getById(id: string): Promise<TodoEntity | undefined>;
 }
 
 export class TodoService {
@@ -64,4 +65,6 @@ export class TodoService {
 
   validateField = (obj: CreateTodoEntity, field: keyof CreateTodoEntity) =>
     this.createTodoEntityValidator.validateField(obj, field);
+
+  byId = (id: string) => this.repository.getById(id);
 }

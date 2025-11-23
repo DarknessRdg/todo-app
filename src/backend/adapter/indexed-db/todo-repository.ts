@@ -13,8 +13,8 @@ export class TodoRepositoryIndexedDB implements TodoRepository {
   };
 
   count = async () => {
-    return this.db.count(Tables.Todo)
-  }
+    return this.db.count(Tables.Todo);
+  };
 
   create = async (todo: TodoEntity) => {
     await this.db.add(Tables.Todo, todo);

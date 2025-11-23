@@ -1,15 +1,17 @@
 import { Card, CardContent, CardTitle } from "./ui/card";
-import { Checkbox } from "./ui/checkbox";
-import type { ReactNode } from "react";
+import { Checkbox, type CheckboxProps } from "./ui/checkbox";
+import { type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 import { TooltipText } from "@/components/ui/tooltip";
+import * as React from "react";
 
 export function TodoTitle({
   title,
   className,
   done,
-}: {
+  ...props
+}: React.ComponentProps<"div"> & {
   title: string;
   done: boolean;
   className?: string;
@@ -17,7 +19,8 @@ export function TodoTitle({
   return (
     <CardTitle
       className={cn(className, "data-[done=true]:line-through")}
-      data-done={done}>
+      data-done={done}
+      {...props}>
       {title}
     </CardTitle>
   );
@@ -27,13 +30,15 @@ export function TodoContent({
   children,
   done,
   className,
-}: {
+  ...props
+}: React.ComponentProps<"div"> & {
   done: boolean;
   children: ReactNode;
   className?: string;
 }) {
   return (
     <Card
+      {...props}
       data-done={done}
       className={cn(
         "hover:bg-secondary/40 data-[done=true]:bg-secondary text-secondary-foreground py-2 shadow-none",
@@ -50,12 +55,11 @@ export function TodoCheckerInput({
   disabled,
   dialogMessage = undefined,
   className,
-}: {
-  disabled?: boolean;
+  ...props
+}: Omit<CheckboxProps, "checked" | "onCheckedChange" | "onToggle"> & {
   done: boolean;
   dialogMessage?: string;
   onToggle?: (checked: boolean) => void;
-  className?: string;
 }) {
   const Message = ({ children }: React.PropsWithChildren) => {
     if (!dialogMessage) return children;
@@ -70,6 +74,7 @@ export function TodoCheckerInput({
   return (
     <Message>
       <Checkbox
+        {...props}
         disabled={disabled}
         className={cn(className, "size-5 rounded-full")}
         checked={done}

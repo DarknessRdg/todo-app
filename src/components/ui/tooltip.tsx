@@ -29,9 +29,12 @@ function Tooltip({
   );
 }
 
+
+type TooltipTriggerProps = React.ComponentProps<typeof TooltipPrimitive.Trigger>
+
 function TooltipTrigger({
   ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
+}: TooltipTriggerProps) {
   return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />;
 }
 
@@ -60,18 +63,18 @@ function TooltipContent({
 
 export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider };
 
+export type TooltipTextProps = TooltipTriggerProps & {
+  text: string;
+}
+
 export function TooltipText({
   text,
   children,
-  asChild,
-}: {
-  asChild?: boolean;
-  text: React.ReactNode;
-  children: React.ReactNode;
-}) {
+  ...props
+}: TooltipTextProps) {
   return (
     <Tooltip>
-      <TooltipTrigger asChild={asChild}>{children}</TooltipTrigger>
+      <TooltipTrigger {...props}>{children}</TooltipTrigger>
       <TooltipContent>
         <Typography variant="p">{text}</Typography>
       </TooltipContent>
