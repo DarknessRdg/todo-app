@@ -11,6 +11,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { Calendar1, CalendarDays, CalendarX, Inbox } from "lucide-react";
+import { cn } from "@/lib/utils.ts";
 
 const items = [
   {
@@ -35,10 +36,11 @@ const items = [
     icon: CalendarX,
   },
 ];
-export function AppSidebar() {
+export function AppSidebar({ className }: { className?: string } = {}) {
   return (
-    <Sidebar>
-      <SidebarContent className="bg-sidebar mx-4 my-5 rounded-2xl border">
+    <Sidebar className="border-none">
+      <SidebarContent
+        className={cn("bg-sidebar mx-4 my-5 rounded-2xl border", className)}>
         <SidebarGroup>
           <SidebarGroupLabel>
             <Logo />

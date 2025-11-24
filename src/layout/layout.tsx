@@ -9,7 +9,7 @@ export function AppLayout() {
       <AppSidebar />
       <Toaster />
 
-      <main className="grow-1 px-8 py-5">
+      <main className="grow-1 rounded-4xl border-l px-8 py-5">
         <Outlet />
       </main>
     </SidebarProvider>
