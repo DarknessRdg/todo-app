@@ -26,14 +26,9 @@ import {
   FolderIcon,
   SendIcon,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-
-const InputTextRightPaddingPx = 15;
+import { useState } from "react";
 
 export function NewInput() {
-  const rightGroupRef = useRef<HTMLDivElement>(null);
-  const [rightPadding, setRightPadding] = useState(0);
-
   const { create, validateField } = useTodoCreate();
 
   const form = useAppForm({
@@ -43,39 +38,26 @@ export function NewInput() {
     } as CreateTodoEntity,
     onSubmit: ({ value, formApi }) => {
       create.mutate(value);
-      toast.success("Todo created !");
+      toast.success("Captured", { description: value.title });
       formApi.reset();
-    }
+    },
   });
-
 
   const resetFieldErrors = (field: keyof CreateTodoEntity) => {
     form.setFieldMeta(field, (meta) => ({
       ...meta,
-      errorMap: {}
-    }))
-  }
+      errorMap: {},
+    }));
+  };
 
   const inlineValidate = (field: keyof CreateTodoEntity) => {
     const error = validateField(form.state.values, field);
     if (!error) {
-      // tanstack register errors by 'on<>' validation type
-      // it stores in a map such as:
-      //
-      // {
-      //   title: {
-      //     onBlur: ["title-required"],
-      //     onChange: []
-      //   }
-      // }
-      //
-      // However, if our form validation passes `onChange` it should
-      // also erase the `onBlur` validation as it passed all the validation.
-      // That is why we need to reset all the errors if succeeded one validation.
-      resetFieldErrors(field)
+      // Passing onChange should also clear a stale onBlur error, so reset all.
+      resetFieldErrors(field);
     }
-    return error
-  }
+    return error;
+  };
 
   const inputValidations = (fieldName: keyof CreateTodoEntity) => {
     return {
@@ -83,70 +65,59 @@ export function NewInput() {
     };
   };
 
-  useEffect(() => {
-    if (rightGroupRef.current) {
-      const observer = new ResizeObserver(() => {
-        if (rightGroupRef.current) {
-          setRightPadding(
-            rightGroupRef.current.offsetWidth + InputTextRightPaddingPx
-          );
-        }
-      });
-
-      observer.observe(rightGroupRef.current);
-
-      return () => observer.disconnect();
-    }
-  }, []);
-
   return (
     <form.AppForm>
-      <form.FormSubmit className="relative">
-        <form.AppField
-          name="title"
-          validators={inputValidations("title")}
-          children={(field) => (
-            <field.Input
-              aria-invalid={!form.state.isFieldsValid}
-              disabled={form.state.isSubmitting}
-              style={{ paddingRight: `${rightPadding}px` }}
-              type="textarea"
-              placeholder="Add new todo"
-              autoFocus
-              autoComplete="off"
-              className="relative h-11 pl-9"
-            />
-          )}
-        />
+      <form.FormSubmit>
+        <div className="bg-card focus-within:ring-ring/60 flex items-center gap-2.5 rounded-2xl px-3.5 transition-shadow focus-within:ring-2">
+          <TodoCheckerInput
+            done={false}
+            disabled
+            className="cursor-default opacity-70"
+          />
 
-        <div className="absolute inset-y-0 left-2 flex items-center">
-          <TodoCheckerInput done={false} className="hover:cursor-default" />
-        </div>
-
-        <div
-          className="absolute top-0 right-2 bottom-0 flex flex-row items-center gap-2"
-          ref={rightGroupRef}>
           <form.AppField
-            name="dueDate"
-            validators={inputValidations("dueDate")}
+            name="title"
+            validators={inputValidations("title")}
             children={(field) => (
-              <DueDateButton initial={field.state.value as Date} />
+              <field.Input
+                aria-invalid={!form.state.isFieldsValid}
+                disabled={form.state.isSubmitting}
+                placeholder="Capture a thought…"
+                autoFocus
+                autoComplete="off"
+                className="h-14 grow border-0 bg-transparent px-0 py-0 text-base shadow-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent"
+              />
             )}
           />
 
-          <SelectProjectsButton />
+          <div className="flex shrink-0 items-center gap-1.5">
+            <form.AppField
+              name="dueDate"
+              validators={inputValidations("dueDate")}
+              children={(field) => (
+                <DueDateButton initial={field.state.value as Date} />
+              )}
+            />
 
-          <form.SubmitButton
-            label={<SendIcon />}
-            variant="secondary"
-            size="icon"
-            className="rounded-full"
-          />
+            <SelectProjectsButton />
+
+            <span className="kbd mr-0.5 hidden sm:inline-flex">↵</span>
+
+            <form.SubmitButton
+              label={<SendIcon className="size-4" />}
+              size="icon"
+              className="size-9 shrink-0 rounded-full"
+              aria-label="Add task"
+            />
+          </div>
         </div>
       </form.FormSubmit>
-      <div>
-        <Typography variant="p" className="text-destructive">{form.state.errors}</Typography>
-      </div>
+
+      {form.state.errors.length > 0 && (
+        <Typography variant="p" className="text-destructive mt-2 px-1 text-sm">
+          {form.state.errors}
+        </Typography>
+      )}
     </form.AppForm>
   );
 }
@@ -164,41 +135,42 @@ function DueDateButton({ initial }: { initial: Date }) {
   const today = () => onChange(new Date());
 
   return (
-    <div className="flex flex-col gap-3">
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="secondary"
-            size="icon"
-            className="h-7 w-auto px-2"
-            type="button">
-            <CalendarIcon />
-            <Typography variant="p">
-              {field.state.value?.toLocaleDateString()}
-            </Typography>
-            <ChevronDownIcon />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto overflow-hidden p-0" align="start">
-          <div className="mb-3 flex flex-nowrap items-center justify-between px-4 pt-3">
-            <div>
-              <Typography variant="h6">Due date</Typography>
-              <Typography variant="muted">Task due date</Typography>
-            </div>
-            <Button size="sm" variant="outline" onClick={today}>
-              Today
-            </Button>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground hover:text-foreground h-8 gap-1.5 px-2"
+          type="button">
+          <CalendarIcon className="size-4" />
+          <span className="text-xs tabular-nums">
+            {field.state.value?.toLocaleDateString(undefined, {
+              month: "short",
+              day: "numeric",
+            })}
+          </span>
+          <ChevronDownIcon className="size-3.5 opacity-60" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto overflow-hidden p-0" align="end">
+        <div className="mb-3 flex flex-nowrap items-center justify-between px-4 pt-3">
+          <div>
+            <Typography variant="h6">Due date</Typography>
+            <Typography variant="muted">When it's due</Typography>
           </div>
-          <Calendar
-            mode="single"
-            selected={initial}
-            today={new Date()}
-            captionLayout="label"
-            onSelect={(date) => (date ? onChange(date) : null)}
-          />
-        </PopoverContent>
-      </Popover>
-    </div>
+          <Button size="sm" variant="outline" onClick={today}>
+            Today
+          </Button>
+        </div>
+        <Calendar
+          mode="single"
+          selected={initial}
+          today={new Date()}
+          captionLayout="label"
+          onSelect={(date) => (date ? onChange(date) : null)}
+        />
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -206,19 +178,17 @@ function SelectProjectsButton() {
   return (
     <Select>
       <SelectTrigger
-        className="bg-secondary text-secondary-foreground hover:bg-secondary/80 h-7 border-none shadow-xs"
+        className="text-muted-foreground hover:text-foreground h-8 gap-1.5 border-0 bg-transparent px-2 shadow-none"
         size="sm">
-        <FolderIcon className="text-secondary-foreground" />
-        <SelectValue placeholder="Project" />
+        <FolderIcon className="size-4" />
+        <SelectValue placeholder="Inbox" />
       </SelectTrigger>
       <SelectContent>
         <SelectGroup>
-          <SelectLabel>Fruits</SelectLabel>
-          <SelectItem value="apple">Apple</SelectItem>
-          <SelectItem value="banana">Banana</SelectItem>
-          <SelectItem value="blueberry">Blueberry</SelectItem>
-          <SelectItem value="grapes">Grapes</SelectItem>
-          <SelectItem value="pineapple">Pineapple</SelectItem>
+          <SelectLabel>Areas</SelectLabel>
+          <SelectItem value="personal">Personal</SelectItem>
+          <SelectItem value="work">Work</SelectItem>
+          <SelectItem value="learning">Learning</SelectItem>
         </SelectGroup>
       </SelectContent>
     </Select>

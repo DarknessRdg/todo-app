@@ -1,54 +1,99 @@
-import { TodoCheckerInput, TodoContent, TodoTitle } from "@/components/todo";
+import { TodoCheckerInput, TodoTitle } from "@/components/todo";
 import { useTodoList } from "./use-todo-list";
 import { EmptyList } from "@/pages/inbox/empty-list";
 import { useTodoUpdate } from "@/pages/inbox/use-todo-update";
 import { DeleteButton } from "@/pages/inbox/delete-button";
 import type { TodoEntity } from "@/backend/todo-service";
-import { Typography } from "@/components/ui/typography";
-import { NewInput } from "@/pages/inbox/new-input";
 import { Progress } from "@/components/ui/progress.tsx";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  DueBadge,
+  LabelChips,
+  PriorityBadge,
+  ProjectBadge,
+  SubtaskIndicator,
+  metaFor,
+  subtasksFor,
+} from "@/pages/inbox/todo-meta.tsx";
 import { useNavigate } from "react-router";
+import { useEffect, useRef, useState } from "react";
+import { ConfettiBurst } from "@/components/confetti-burst";
 
 export function TodoList() {
-  const { todoList, doneList, count } = useTodoList();
+  const { todoList, doneList, count, isLoading } = useTodoList();
+
+  if (isLoading) {
+    return (
+      <div className="text-muted-foreground flex items-center gap-2 py-10 text-sm">
+        <Spinner /> Loading…
+      </div>
+    );
+  }
 
   if (count === 0) return <EmptyList />;
 
-  const doneCount = doneList?.length || 0;
-  const percentage = (doneCount / count) * 100;
+  const doneCount = doneList?.length ?? 0;
+  const percentage = count > 0 ? (doneCount / count) * 100 : 0;
 
   return (
-    <div>
-      <div className="mb-10">
-        <Typography variant="h5" className="text-accent-foreground">
-          Done{" "}
-          <span className="ml-1">
-            {doneCount} / {count}
-          </span>
-        </Typography>
-        <Progress value={percentage} className="w-12/12" />
-      </div>
-      <div className="mb-5">
-        <NewInput />
-      </div>
-      <Typography variant="h6" className="mb-3">
-        To do
-      </Typography>
-      <TodoListContainer todoList={todoList} />
-      <div className="mt-10">
-        <Typography variant="h6" className="mb-3">
-          Complete
-        </Typography>
-        <TodoListContainer todoList={doneList} />
-      </div>
+    <div className="flex flex-col gap-8">
+      <Section label="To do" count={todoList?.length ?? 0}>
+        <TodoListContainer todoList={todoList} />
+      </Section>
+
+      {doneCount > 0 && (
+        <Section
+          label="Done"
+          count={doneCount}
+          trailing={
+            <Progress
+              value={percentage}
+              className="h-1.5 w-24"
+              aria-label={`${doneCount} of ${count} complete`}
+            />
+          }>
+          <TodoListContainer todoList={doneList} />
+        </Section>
+      )}
     </div>
   );
 }
 
-function TodoListContainer({ todoList }: { todoList?: TodoEntity[] }) {
+function Section({
+  label,
+  count,
+  trailing,
+  children,
+}: {
+  label: string;
+  count: number;
+  trailing?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="flex flex-col flex-nowrap gap-2">
-      {todoList?.map((it) => (
+    <section>
+      <div className="mb-3 flex items-center gap-2.5">
+        <h2 className="text-base font-semibold tracking-tight">{label}</h2>
+        <span className="count-chip">{count}</span>
+        {trailing ? <div className="ml-auto">{trailing}</div> : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function TodoListContainer({ todoList }: { todoList?: TodoEntity[] }) {
+  if (!todoList?.length) {
+    return (
+      <p className="text-muted-foreground/70 px-1 py-3 text-sm">
+        Nothing here yet.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {todoList.map((it) => (
         <TodoItem todo={it} key={it.id} />
       ))}
     </div>
@@ -59,8 +104,43 @@ function TodoItem({ todo }: { todo: TodoEntity }) {
   const { check } = useTodoUpdate();
   const navigate = useNavigate();
 
-  const checkClickHandler = (id: string) => {
-    return (done: boolean) => check.mutate({ id, done });
+  const meta = metaFor(todo.id);
+  const subtasks = subtasksFor(todo.id);
+  const subDone = subtasks.filter((s) => s.done).length;
+
+  // Optimistic done state: flip the checkbox instantly (so the completion
+  // animation plays in place), then let the row re-sort to the Done section
+  // once the animation has had a beat to be seen.
+  const [optimisticDone, setOptimisticDone] = useState<boolean | null>(null);
+  const done = optimisticDone ?? todo.done;
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // One-shot confetti on completion.
+  const [burstKey, setBurstKey] = useState(0);
+  const [showBurst, setShowBurst] = useState(false);
+
+  useEffect(() => {
+    if (optimisticDone !== null && todo.done === optimisticDone) {
+      setOptimisticDone(null);
+    }
+  }, [todo.done, optimisticDone]);
+
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  const onToggle = (next: boolean) => {
+    setOptimisticDone(next);
+    window.clearTimeout(timer.current);
+    if (next) {
+      setBurstKey((k) => k + 1);
+      setShowBurst(true);
+      window.setTimeout(() => setShowBurst(false), 800);
+    }
+    // Marking done: hold the row in place briefly so the pop + confetti are seen
+    // before it relocates. Reopening: apply immediately.
+    const delay = next ? 450 : 0;
+    timer.current = setTimeout(() => {
+      check.mutate({ id: todo.id, done: next });
+    }, delay);
   };
 
   const openTodoDetails = (id: string) => {
@@ -68,23 +148,45 @@ function TodoItem({ todo }: { todo: TodoEntity }) {
   };
 
   return (
-    <TodoContent done={todo.done} className="py-0">
-      <div className="flex items-center justify-between">
-        <div className="flex grow items-center gap-2.5">
-          <TodoCheckerInput
-            dialogMessage={todo.done ? "Undo?" : "Done?"}
-            done={todo.done}
-            onToggle={checkClickHandler(todo.id)}
-          />
+    <div
+      data-done={done}
+      className="group bg-card hover:bg-card-hover flex items-start gap-3 rounded-2xl px-4 py-3.5 transition-colors data-[done=true]:opacity-60">
+      <div className="relative mt-0.5">
+        <TodoCheckerInput
+          dialogMessage={done ? "Reopen" : "Complete"}
+          done={done}
+          onToggle={onToggle}
+        />
+        {showBurst && <ConfettiBurst key={burstKey} />}
+      </div>
+
+      <div className="min-w-0 grow">
+        <div className="flex items-start gap-2">
           <TodoTitle
             title={todo.title}
-            done={todo.done}
-            className="grow py-4 hover:cursor-pointer"
+            done={done}
+            className="grow cursor-pointer py-0.5 text-[0.95rem] leading-snug"
             onClick={() => openTodoDetails(todo.id)}
           />
+          <div className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+            <DeleteButton title={todo.title} id={todo.id} />
+          </div>
         </div>
-        <DeleteButton title={todo.title} id={todo.id} />
+
+        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+          <PriorityBadge priority={meta.priority} />
+          <ProjectBadge project={meta.project} />
+          <LabelChips labels={meta.labels} max={2} />
+          {todo.dueDate ? <DueBadge date={todo.dueDate} /> : null}
+          {subtasks.length > 0 ? (
+            <SubtaskIndicator
+              done={subDone}
+              total={subtasks.length}
+              className="ml-0.5"
+            />
+          ) : null}
+        </div>
       </div>
-    </TodoContent>
+    </div>
   );
 }

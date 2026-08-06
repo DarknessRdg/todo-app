@@ -23,6 +23,7 @@ export interface TodoRepository {
   create(todo: TodoEntity): Promise<void>;
   delete(id: string): Promise<void>;
   updateDone(params: { id: string; done: boolean }): Promise<void>;
+  updateDescription(params: { id: string; description: string }): Promise<void>;
   count(): Promise<number>;
   getById(id: string): Promise<TodoEntity | undefined>;
 }
@@ -59,6 +60,10 @@ export class TodoService {
 
   updateDone = async (params: { id: string; done: boolean }) => {
     return this.repository.updateDone(params);
+  };
+
+  updateDescription = async (params: { id: string; description: string }) => {
+    return this.repository.updateDescription(params);
   };
 
   count = async () => this.repository.count();

@@ -5,13 +5,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog.tsx";
 import { useTodoDetails } from "@/pages/inbox/use-todo-details.ts";
-import { TodoChecker } from "@/components/todo.tsx";
-import { Navigate } from "react-router";
-import { Badge } from "@/components/ui/badge.tsx";
-import { Typography } from "@/components/ui/typography.tsx";
-import type { TodoEntity } from "@/backend/todo-service.ts";
-import { useRef, useState } from "react";
-import { Textarea } from "@/components/ui/textarea.tsx";
+import { Navigate, useNavigate } from "react-router";
+import { TodoDetail } from "@/pages/inbox/detail-body.tsx";
+import { Button } from "@/components/ui/button";
+import { TooltipText } from "@/components/ui/tooltip";
+import { Maximize2 } from "lucide-react";
 
 type TodoModalContentProps = {
   id: string;
@@ -25,6 +23,7 @@ export function TodoModalContent({
   onClose = voidClose,
 }: TodoModalContentProps) {
   const { todo, isLoading } = useTodoDetails({ id });
+  const navigate = useNavigate();
 
   if (isLoading) {
     return <></>;
@@ -40,48 +39,33 @@ export function TodoModalContent({
     }
   };
 
+  const openFullScreen = () => navigate(`/todo/${todo.id}`);
+
   return (
     <Dialog defaultOpen={true} onOpenChange={onCloseNavigateBack}>
-      <DialogContent className="w-fit min-w-3/12 sm:max-w-10/12">
-        <DialogHeader className="gap-4">
-          <DialogTitle className="flex gap-2">
-            <TodoChecker done={todo.done} />
-            {todo.title}
-          </DialogTitle>
-          <div className="flex gap-2">
-            <Badge variant="secondary">
-              {todo.dueDate?.toLocaleDateString()}
-            </Badge>
-          </div>
-          <div className="flex flex-col gap-2">
-            <Typography variant="small">Description</Typography>
-            <DescriptionToggler todo={todo} />
-          </div>
+      <DialogContent className="flex h-[85vh] max-h-[85vh] w-[90vw] max-w-[min(1100px,90vw)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(1100px,90vw)]">
+        <DialogHeader className="sr-only">
+          <DialogTitle>{todo.title}</DialogTitle>
         </DialogHeader>
+
+        <div className="flex-1 overflow-y-auto px-8 py-7">
+          <TodoDetail
+            todo={todo}
+            headerActions={
+              <TooltipText text="Open full screen" asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground hover:text-foreground mr-8 size-8"
+                  onClick={openFullScreen}
+                  aria-label="Open full screen">
+                  <Maximize2 className="size-4" />
+                </Button>
+              </TooltipText>
+            }
+          />
+        </div>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function DescriptionToggler({ todo }: { todo: TodoEntity }) {
-  const [isEditing, setEditing] = useState<boolean>(false);
-  const ref = useRef<HTMLTextAreaElement | null>(null);
-
-  if (isEditing) {
-    return (
-      <Textarea
-        ref={ref}
-        defaultValue={todo.description}
-        onBlur={() => setEditing(false)}
-      />
-    );
-  }
-
-  return (
-    <div
-      className="min-h-9 rounded-lg border p-2 hover:cursor-text md:text-sm"
-      onClick={() => setEditing(true)}>
-      {ref?.current?.value || todo.description}
-    </div>
   );
 }

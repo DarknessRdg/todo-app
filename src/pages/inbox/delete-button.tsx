@@ -32,7 +32,7 @@ export function DeleteButton({ title, id }: { title: string; id: string }) {
 
   return (
     <AlertDialog>
-      <TooltipText text="Delete it?">
+      <TooltipText text="Delete it?" asChild>
         <AlertDialogTrigger asChild>
           <Button
             variant="ghost"

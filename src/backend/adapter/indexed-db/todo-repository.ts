@@ -41,6 +41,24 @@ export class TodoRepositoryIndexedDB implements TodoRepository {
     });
   };
 
+  updateDescription = async ({
+    id,
+    description,
+  }: {
+    id: string;
+    description: string;
+  }) => {
+    await this.onTransaction("readwrite", async (txRepo) => {
+      const todo = await txRepo.getById(id);
+
+      if (!todo) throw `Todo with given key does not exist: ${id}`;
+
+      todo.description = description;
+
+      txRepo.update(todo);
+    });
+  };
+
   update = async (todo: TodoEntity) => {
     await this.db.put(Tables.Todo, todo);
   };

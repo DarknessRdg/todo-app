@@ -1,5 +1,6 @@
 import { Route, Routes } from "react-router";
 import { Inbox } from "./pages/inbox/inbox";
+import { TodoPage } from "./pages/todo/todo-page";
 import { AppLayout } from "./layout/layout";
 import { createDIContainer } from "./di-container";
 import { ContainerContext } from "./di-container/hook";
@@ -26,6 +27,7 @@ export function AppRoutes() {
         <Routes>
           <Route element={<AppLayout />}>
             <Route index element={<Inbox />} />
+            <Route path="todo/:id" element={<TodoPage />} />
           </Route>
         </Routes>
       </ContainerContext.Provider>

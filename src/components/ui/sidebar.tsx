@@ -98,6 +98,17 @@ function SidebarProvider({
         event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
         (event.metaKey || event.ctrlKey)
       ) {
+        // Don't hijack the shortcut while the user is typing in an editable
+        // field (e.g. the rich text editor uses Ctrl/Cmd+B for bold).
+        const target = event.target as HTMLElement | null;
+        if (
+          target?.isContentEditable ||
+          target?.tagName === "INPUT" ||
+          target?.tagName === "TEXTAREA"
+        ) {
+          return;
+        }
+
         event.preventDefault();
         toggleSidebar();
       }
@@ -479,7 +490,7 @@ const sidebarMenuButtonVariants = cva(
         lg: "h-12 text-sm group-data-[collapsible=icon]:p-0!",
       },
       isActive: {
-        true: "bg-primary/90 hover:bg-primary hover:text-primary-foreground/95 active:bg-primary active:text-primary-foreground active:text-primary-foreground text-primary-foreground",
+        true: "bg-primary text-primary-foreground hover:text-primary-foreground hover:bg-primary/90",
         false: "",
       },
     },

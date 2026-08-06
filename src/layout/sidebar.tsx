@@ -1,67 +1,216 @@
 import { Logo } from "@/components/logo";
-import { Separator } from "@/components/ui/separator";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { Calendar1, CalendarDays, CalendarX, Inbox } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils.ts";
+import {
+  CalendarClock,
+  CalendarDays,
+  CheckCircle2,
+  ChevronRight,
+  Hash,
+  Inbox,
+  Plus,
+  Search,
+  Settings,
+  Sun,
+  Tag,
+  type LucideIcon,
+} from "lucide-react";
+import { useState } from "react";
 
-const items = [
+type View = {
+  title: string;
+  icon: LucideIcon;
+  count?: number;
+  active?: boolean;
+};
+
+// Views are filters over the same task set (business logic comes later).
+const views: View[] = [
+  { title: "Inbox", icon: Inbox, count: 12, active: true },
+  { title: "Today", icon: Sun, count: 3 },
+  { title: "Upcoming", icon: CalendarDays, count: 8 },
+  { title: "Overdue", icon: CalendarClock, count: 2 },
+  { title: "Completed", icon: CheckCircle2 },
+  { title: "Labels", icon: Tag },
+];
+
+type AreaNode = {
+  name: string;
+  count?: number;
+  defaultOpen?: boolean;
+  children?: AreaNode[];
+};
+
+// The hierarchy represents areas of life / projects — not tasks.
+const areas: AreaNode[] = [
   {
-    title: "Inbox",
-    url: "#",
-    icon: Inbox,
-    active: true,
+    name: "Personal",
+    defaultOpen: true,
+    children: [
+      { name: "Health", count: 4 },
+      { name: "Finance", count: 1 },
+      { name: "Home", count: 2 },
+    ],
   },
   {
-    title: "Today",
-    url: "#",
-    icon: Calendar1,
+    name: "Work",
+    defaultOpen: true,
+    children: [
+      {
+        name: "Project Alpha",
+        defaultOpen: true,
+        children: [
+          { name: "Backend", count: 6 },
+          { name: "Infrastructure", count: 3 },
+        ],
+      },
+    ],
   },
   {
-    title: "Upcoming",
-    url: "#",
-    icon: CalendarDays,
-  },
-  {
-    title: "Overdue",
-    url: "#",
-    icon: CalendarX,
+    name: "Learning",
+    children: [
+      { name: "AI", count: 2 },
+      { name: "Go" },
+      { name: "Architecture" },
+    ],
   },
 ];
+
 export function AppSidebar({ className }: { className?: string } = {}) {
   return (
     <Sidebar className="border-none">
       <SidebarContent
-        className={cn("bg-sidebar mx-4 my-5 rounded-2xl border", className)}>
+        className={cn(
+          "bg-sidebar mx-3 my-4 gap-0 rounded-xl border",
+          className
+        )}>
+        <SidebarHeader className="gap-3 px-3 pt-4 pb-2">
+          <Logo />
+          <button
+            type="button"
+            className="text-muted-foreground bg-muted hover:text-foreground flex h-9 items-center gap-2 rounded-lg px-2.5 text-sm transition-colors">
+            <Search className="size-4" />
+            <span>Search</span>
+            <span className="kbd ml-auto">/</span>
+          </button>
+        </SidebarHeader>
+
         <SidebarGroup>
-          <SidebarGroupLabel>
-            <Logo />
-          </SidebarGroupLabel>
-          <Separator className="mt-3 mb-5" />
+          <SidebarGroupLabel className="eyebrow">Views</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {items.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={item.active}>
-                    <a href={item.url}>
-                      <item.icon size={20} className="h-5" />
-                      <span>{item.title}</span>
-                    </a>
+              {views.map((view) => (
+                <SidebarMenuItem key={view.title}>
+                  <SidebarMenuButton
+                    isActive={view.active}
+                    className="h-9 gap-2.5">
+                    <view.icon className="size-4.5" />
+                    <span>{view.title}</span>
+                    {view.count ? (
+                      <span className="ml-auto text-xs tabular-nums opacity-90">
+                        {view.count}
+                      </span>
+                    ) : null}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        <SidebarGroup className="mt-1 flex-1">
+          <SidebarGroupLabel className="eyebrow flex items-center justify-between pr-1">
+            <span>Areas</span>
+            <button
+              type="button"
+              aria-label="New area"
+              className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex size-5 items-center justify-center rounded-md transition-colors">
+              <Plus className="size-3.5" />
+            </button>
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <div className="flex flex-col">
+              {areas.map((node) => (
+                <AreaTreeNode key={node.name} node={node} />
+              ))}
+            </div>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarFooter className="px-2 pb-3">
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex h-9 items-center gap-2 rounded-lg px-2.5 text-sm transition-colors">
+                <Settings className="size-4" />
+                Settings
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="right" align="end" className="w-56 p-2">
+              <p className="eyebrow px-2 pt-1 pb-2">Appearance</p>
+              <ThemeToggle />
+            </PopoverContent>
+          </Popover>
+        </SidebarFooter>
       </SidebarContent>
     </Sidebar>
+  );
+}
+
+function AreaTreeNode({ node }: { node: AreaNode }) {
+  const hasChildren = !!node.children?.length;
+  const [open, setOpen] = useState(node.defaultOpen ?? false);
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => hasChildren && setOpen((v) => !v)}
+        aria-expanded={hasChildren ? open : undefined}
+        className="text-foreground hover:bg-sidebar-accent group flex h-8 w-full items-center gap-1.5 rounded-lg px-2 text-sm transition-colors">
+        {hasChildren ? (
+          <ChevronRight
+            className={cn(
+              "size-3.5 shrink-0 transition-transform duration-200",
+              open && "rotate-90"
+            )}
+          />
+        ) : (
+          <Hash className="text-muted-foreground/70 size-3.5 shrink-0" />
+        )}
+        <span className="truncate">{node.name}</span>
+        {node.count ? (
+          <span className="text-muted-foreground ml-auto text-xs tabular-nums opacity-0 transition-opacity group-hover:opacity-100">
+            {node.count}
+          </span>
+        ) : null}
+      </button>
+
+      {hasChildren && open && (
+        <div className="tree-rail ml-[13px] pl-2">
+          {node.children!.map((child) => (
+            <AreaTreeNode key={child.name} node={child} />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

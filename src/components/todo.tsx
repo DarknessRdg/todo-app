@@ -1,6 +1,4 @@
-import { Card, CardContent, CardTitle } from "./ui/card";
 import { Checkbox, type CheckboxProps } from "./ui/checkbox";
-import { type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 import { TooltipText } from "@/components/ui/tooltip";
@@ -19,35 +17,16 @@ export function TodoTitle({
   className?: string;
 }) {
   return (
-    <CardTitle
-      className={cn(className, "data-[done=true]:line-through")}
+    <div
+      className={cn(
+        "text-foreground font-medium transition-colors",
+        "data-[done=true]:text-muted-foreground data-[done=true]:font-normal data-[done=true]:line-through",
+        className
+      )}
       data-done={done}
       {...props}>
       {title}
-    </CardTitle>
-  );
-}
-
-export function TodoContent({
-  children,
-  done,
-  className,
-  ...props
-}: React.ComponentProps<"div"> & {
-  done: boolean;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <Card
-      {...props}
-      data-done={done}
-      className={cn(
-        "hover:bg-secondary/40 data-[done=true]:bg-secondary text-secondary-foreground py-2 shadow-none",
-        className
-      )}>
-      <CardContent className="px-4">{children}</CardContent>
-    </Card>
+    </div>
   );
 }
 
