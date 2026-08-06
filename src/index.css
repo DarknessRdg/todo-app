@@ -176,7 +176,7 @@
 
   /* Confetti particle — flies out from the checkbox on completion */
   .confetti-piece {
-    animation: confetti-fly 0.7s cubic-bezier(0.2, 0.6, 0.3, 1) forwards;
+    animation: confetti-fly 1.3s cubic-bezier(0.2, 0.6, 0.3, 1) forwards;
   }
 }
 

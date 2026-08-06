@@ -7,8 +7,18 @@ import type { CSSProperties } from "react";
  * Colors stay on-system: ink, sage, and grays.
  */
 
-const COLORS = ["var(--color-ink)", "var(--color-sage)", "#a3a3a3", "#737373"];
-const PIECES = 14;
+// Max-saturation HSL (100% saturation) for the most vivid burst possible.
+const COLORS = [
+  "hsl(348 100% 50%)", // red
+  "hsl(24 100% 50%)", // orange
+  "hsl(54 100% 50%)", // yellow
+  "hsl(140 100% 45%)", // green
+  "hsl(190 100% 50%)", // cyan
+  "hsl(220 100% 52%)", // blue
+  "hsl(280 100% 55%)", // violet
+  "hsl(320 100% 52%)", // magenta
+];
+const PIECES = 18;
 
 export function ConfettiBurst({ className }: { className?: string }) {
   const pieces = useMemo(
@@ -32,7 +42,7 @@ export function ConfettiBurst({ className }: { className?: string }) {
   return (
     <span
       aria-hidden
-      className={`pointer-events-none absolute top-1/2 left-1/2 z-10 ${className ?? ""}`}>
+      className={`pointer-events-none absolute top-1/2 left-1/2 z-10 !opacity-100 ${className ?? ""}`}>
       {pieces.map((p, i) => (
         <span
           key={i}

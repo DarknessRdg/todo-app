@@ -133,7 +133,7 @@ function TodoItem({ todo }: { todo: TodoEntity }) {
     if (next) {
       setBurstKey((k) => k + 1);
       setShowBurst(true);
-      window.setTimeout(() => setShowBurst(false), 800);
+      window.setTimeout(() => setShowBurst(false), 1400);
     }
     // Marking done: hold the row in place briefly so the pop + confetti are seen
     // before it relocates. Reopening: apply immediately.
@@ -150,17 +150,19 @@ function TodoItem({ todo }: { todo: TodoEntity }) {
   return (
     <div
       data-done={done}
-      className="group bg-card hover:bg-card-hover flex items-start gap-3 rounded-2xl px-4 py-3.5 transition-colors data-[done=true]:opacity-60">
+      className="group bg-card hover:bg-card-hover flex items-start gap-3 rounded-2xl px-4 py-3.5 transition-colors">
       <div className="relative mt-0.5">
-        <TodoCheckerInput
-          dialogMessage={done ? "Reopen" : "Complete"}
-          done={done}
-          onToggle={onToggle}
-        />
+        <div className="data-[done=true]:opacity-60" data-done={done}>
+          <TodoCheckerInput
+            dialogMessage={done ? "Reopen" : "Complete"}
+            done={done}
+            onToggle={onToggle}
+          />
+        </div>
         {showBurst && <ConfettiBurst key={burstKey} />}
       </div>
 
-      <div className="min-w-0 grow">
+      <div className="min-w-0 grow data-[done=true]:opacity-60" data-done={done}>
         <div className="flex items-start gap-2">
           <TodoTitle
             title={todo.title}
