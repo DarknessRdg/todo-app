@@ -16,6 +16,7 @@ import { TooltipText } from "@/components/ui/tooltip";
 import { Typography } from "@/components/ui/typography";
 import { useTodoDelete } from "@/pages/inbox/use-todo-delete";
 import { Trash2Icon } from "lucide-react";
+import { testProp } from "@/lib/test-id";
 
 export function DeleteButton({ title, id }: { title: string; id: string }) {
   const { deleteTodoAsync, isPending } = useTodoDelete();
@@ -35,6 +36,7 @@ export function DeleteButton({ title, id }: { title: string; id: string }) {
       <TooltipText text="Delete it?" asChild>
         <AlertDialogTrigger asChild>
           <Button
+            {...testProp(`home.todo.${id}.delete.button`)}
             variant="ghost"
             size="icon"
             className="text-destructive hover:text-destructive">
@@ -42,7 +44,7 @@ export function DeleteButton({ title, id }: { title: string; id: string }) {
           </Button>
         </AlertDialogTrigger>
       </TooltipText>
-      <AlertDialogContent>
+      <AlertDialogContent {...testProp(`home.todo.${id}.delete.dialog`)}>
         <AlertDialogHeader>
           <AlertDialogTitle>
             Are sure you want to delete the ToDo?
@@ -61,8 +63,13 @@ export function DeleteButton({ title, id }: { title: string; id: string }) {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" onClick={deleteAction}>
+          <AlertDialogCancel {...testProp(`home.todo.${id}.delete.cancel`)}>
+            Cancel
+          </AlertDialogCancel>
+          <AlertDialogAction
+            {...testProp(`home.todo.${id}.delete.confirm`)}
+            variant="destructive"
+            onClick={deleteAction}>
             Delete
           </AlertDialogAction>
         </AlertDialogFooter>

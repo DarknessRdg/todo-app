@@ -1,5 +1,5 @@
 import { TodoCheckerInput, TodoTitle } from "@/components/todo";
-import { testProp } from "@/lib/test-id";
+import { testProp, type TestIdProps } from "@/lib/test-id";
 import { useTodoList } from "./use-todo-list";
 import { EmptyList } from "@/pages/inbox/empty-list";
 import { useTodoUpdate } from "@/pages/inbox/use-todo-update";
@@ -38,12 +38,16 @@ export function TodoList() {
 
   return (
     <div className="flex flex-col gap-8">
-      <Section label="To do" count={todoList?.length ?? 0}>
+      <Section
+        testId="home.todo.section.open"
+        label="To do"
+        count={todoList?.length ?? 0}>
         <TodoListContainer todoList={todoList} />
       </Section>
 
       {doneCount > 0 && (
         <Section
+          testId="home.todo.section.done"
           label="Done"
           count={doneCount}
           trailing={
@@ -65,14 +69,15 @@ function Section({
   count,
   trailing,
   children,
-}: {
+  testId,
+}: TestIdProps & {
   label: string;
   count: number;
   trailing?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <section>
+    <section {...testProp(testId)}>
       <div className="mb-3 flex items-center gap-2.5">
         <h2 className="text-base font-semibold tracking-tight">{label}</h2>
         <span className="count-chip">{count}</span>
@@ -155,6 +160,7 @@ function TodoItem({ todo }: { todo: TodoEntity }) {
       <div className="relative mt-0.5">
         <div className="data-[done=true]:opacity-60" data-done={done}>
           <TodoCheckerInput
+            testId={`home.todo.${todo.id}.check.button`}
             dialogMessage={done ? "Reopen" : "Complete"}
             done={done}
             onToggle={onToggle}

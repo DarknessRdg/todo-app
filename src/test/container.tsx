@@ -5,7 +5,7 @@ import { Container } from "inversify";
 import { MemoryRouter, useLocation, type Location } from "react-router";
 import { vi, type Mock } from "vitest";
 
-import type { TodoRepository } from "@/backend/todo-service";
+import type { TodoEntity, TodoRepository } from "@/backend/todo-service";
 import { TodoService } from "@/backend/todo-service";
 import { ContainerContext } from "@/di-container/hook";
 import { Dependencies } from "@/di-container";
@@ -40,6 +40,48 @@ export function mockTodoRepository(
     getById: vi.fn<TodoRepository["getById"]>().mockResolvedValue(undefined),
     ...overrides,
   };
+}
+
+/**
+ * A `mockTodoRepository` whose reads reflect its own writes, for specs that
+ * assert on what happens *after* a mutation invalidates a query. The plain mock
+ * replays a fixed list, so nothing ever appears to change.
+ *
+ * Still `vi.fn()`-backed, so calls remain assertable.
+ */
+export function inMemoryTodoRepository(
+  initial: TodoEntity[] = []
+): MockTodoRepository {
+  const rows: TodoEntity[] = initial.map((row) => ({ ...row }));
+  const find = (id: string) => rows.find((row) => row.id === id);
+
+  return mockTodoRepository({
+    listAll: vi.fn<TodoRepository["listAll"]>(async () =>
+      rows.map((row) => ({ ...row }))
+    ),
+    getById: vi.fn<TodoRepository["getById"]>(async (id) => {
+      const row = find(id);
+      return row === undefined ? undefined : { ...row };
+    }),
+    count: vi.fn<TodoRepository["count"]>(async () => rows.length),
+    create: vi.fn<TodoRepository["create"]>(async (todo) => {
+      rows.push({ ...todo });
+    }),
+    delete: vi.fn<TodoRepository["delete"]>(async (id) => {
+      const index = rows.findIndex((row) => row.id === id);
+      if (index >= 0) rows.splice(index, 1);
+    }),
+    updateDone: vi.fn<TodoRepository["updateDone"]>(async ({ id, done }) => {
+      const row = find(id);
+      if (row) row.done = done;
+    }),
+    updateDescription: vi.fn<TodoRepository["updateDescription"]>(
+      async ({ id, description }) => {
+        const row = find(id);
+        if (row) row.description = description;
+      }
+    ),
+  });
 }
 
 /**
