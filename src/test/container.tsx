@@ -2,6 +2,7 @@ import type { PropsWithChildren, ReactElement } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, type RenderOptions } from "@testing-library/react";
 import { Container } from "inversify";
+import { MemoryRouter, useLocation, type Location } from "react-router";
 import { vi, type Mock } from "vitest";
 
 import type { TodoRepository } from "@/backend/todo-service";
@@ -58,23 +59,47 @@ export function createTestContainer(repository: TodoRepository = mockTodoReposit
 /**
  * Renders through the same seams production uses: ContainerContext (which
  * `useContainer()` reads) and a QueryClientProvider with retries off.
+ *
+ * Pass `route` to mount inside a MemoryRouter — needed by anything that reads
+ * search params or navigates. `currentLocation` reports back the live URL.
  */
 export function renderWithContainer(
   ui: ReactElement,
-  options: RenderOptions & { container?: Container } = {}
+  // `diContainer`, not `container` — RTL's RenderOptions already owns that name
+  // for the host element, and the two silently collide.
+  options: RenderOptions & { diContainer?: Container; route?: string } = {}
 ) {
-  const { container: diContainer = createTestContainer(), ...renderOptions } =
-    options;
+  const {
+    diContainer = createTestContainer(),
+    route,
+    ...renderOptions
+  } = options;
 
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
 
+  let location: Location | undefined;
+
+  function LocationProbe() {
+    location = useLocation();
+    return null;
+  }
+
   function Wrapper({ children }: PropsWithChildren) {
-    return (
+    const tree = (
       <ContainerContext.Provider value={diContainer}>
         <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
       </ContainerContext.Provider>
+    );
+
+    if (route === undefined) return tree;
+
+    return (
+      <MemoryRouter initialEntries={[route]}>
+        <LocationProbe />
+        {tree}
+      </MemoryRouter>
     );
   }
 
@@ -82,5 +107,10 @@ export function renderWithContainer(
     ...render(ui, { wrapper: Wrapper, ...renderOptions }),
     diContainer,
     queryClient,
+    /** The live URL, e.g. `"/?todo=1"`. Only meaningful when `route` was passed. */
+    currentLocation: () =>
+      location === undefined
+        ? undefined
+        : `${location.pathname}${location.search}`,
   };
 }

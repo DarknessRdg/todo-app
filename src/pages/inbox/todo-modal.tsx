@@ -10,6 +10,7 @@ import { TodoDetail } from "@/pages/inbox/detail-body.tsx";
 import { Button } from "@/components/ui/button";
 import { TooltipText } from "@/components/ui/tooltip";
 import { Maximize2 } from "lucide-react";
+import { testProp } from "@/lib/test-id";
 
 type TodoModalContentProps = {
   id: string;
@@ -42,8 +43,17 @@ export function TodoModalContent({
   const openFullScreen = () => navigate(`/todo/${todo.id}`);
 
   return (
-    <Dialog defaultOpen={true} onOpenChange={onCloseNavigateBack}>
-      <DialogContent className="flex h-[85vh] max-h-[85vh] w-[90vw] max-w-[min(1100px,90vw)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(1100px,90vw)]">
+    <Dialog open={true} onOpenChange={onCloseNavigateBack}>
+      <DialogContent
+        {...testProp(`home.todo.${todo.id}.modal`)}
+        // Radix dismisses on pointerdown, which unmounts the backdrop before the
+        // click is dispatched — the click then hit-tests onto the row underneath
+        // and re-navigates to ?todo=<id>, so the modal blinks back open. Keep the
+        // backdrop up for the whole gesture and close on its click instead.
+        onPointerDownOutside={(event) => event.preventDefault()}
+        onInteractOutside={(event) => event.preventDefault()}
+        overlayProps={{ onClick: onClose }}
+        className="flex h-[85vh] max-h-[85vh] w-[90vw] max-w-[min(1100px,90vw)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(1100px,90vw)]">
         <DialogHeader className="sr-only">
           <DialogTitle>{todo.title}</DialogTitle>
         </DialogHeader>
