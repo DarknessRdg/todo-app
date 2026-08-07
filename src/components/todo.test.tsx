@@ -4,8 +4,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { TodoCheckerInput } from "@/components/todo";
 import { renderWithContainer } from "@/test/container";
+import { makeTodo } from "@/test/todo-factory";
 
-const checkButton = "home.todo.1234.check.button";
+// Derived from a generated id, so nothing here leans on a literal "1234".
+const checkButton = `home.todo.${makeTodo().id}.check.button`;
 
 describe("TodoCheckerInput", () => {
   it("when clicked while open, Then reports the completion", async () => {

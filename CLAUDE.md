@@ -171,6 +171,21 @@ module-level monkey-patching:
 - Use `vi.fn()` for the mock methods and assert on the calls (was `create` called
   with the right payload?) rather than on rendered markup.
 
+### Fixtures — generated, not literal
+
+Build entities with the factories in `src/test/todo-factory.ts` (`makeTodo`,
+`makeCreateTodo`), never hand-written object literals. Values are randomised with
+faker so a spec cannot quietly come to depend on a value it never declared.
+
+The rule that keeps this honest: **anything a test asserts on or branches on, it
+passes explicitly** — `makeTodo({ done: true })`. Reading a generated value back
+out of the factory to assert against defeats the purpose. The exception is
+pass-through assertions, where a random value proves *more* than a literal
+(`create` receiving the exact title it was handed).
+
+Runs stay reproducible: `src/test/setup.ts` seeds faker once per file and prints
+the seed, so `FAKER_SEED=<n> npx vitest run` replays a failure exactly.
+
 ### The harness
 
 Configured in `vite.config.ts` under `test`: `jsdom` environment,
