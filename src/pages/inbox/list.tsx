@@ -40,6 +40,7 @@ export function TodoList() {
     <div className="flex flex-col gap-8">
       <Section
         testId="home.todo.section.open"
+        countTestId="home.todo.section.open.count"
         label="To do"
         count={todoList?.length ?? 0}>
         <TodoListContainer todoList={todoList} />
@@ -48,6 +49,7 @@ export function TodoList() {
       {doneCount > 0 && (
         <Section
           testId="home.todo.section.done"
+          countTestId="home.todo.section.done.count"
           label="Done"
           count={doneCount}
           trailing={
@@ -70,9 +72,11 @@ function Section({
   trailing,
   children,
   testId,
+  countTestId,
 }: TestIdProps & {
   label: string;
   count: number;
+  countTestId?: string;
   trailing?: React.ReactNode;
   children: React.ReactNode;
 }) {
@@ -80,7 +84,9 @@ function Section({
     <section {...testProp(testId)}>
       <div className="mb-3 flex items-center gap-2.5">
         <h2 className="text-base font-semibold tracking-tight">{label}</h2>
-        <span className="count-chip">{count}</span>
+        <span {...testProp(countTestId)} className="count-chip">
+          {count}
+        </span>
         {trailing ? <div className="ml-auto">{trailing}</div> : null}
       </div>
       {children}

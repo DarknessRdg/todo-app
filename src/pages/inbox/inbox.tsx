@@ -4,6 +4,7 @@ import { RightRail } from "@/pages/inbox/right-rail.tsx";
 import { useNavigation } from "@/hooks/navigation.ts";
 import { NewInput } from "@/pages/inbox/new-input";
 import { useTodoList } from "@/pages/inbox/use-todo-list";
+import { testProp, type TestIdProps } from "@/lib/test-id";
 
 const QueryParamsKeys = {
   TodoId: "todo",
@@ -62,14 +63,24 @@ function HeroPanel({
   return (
     <section className="bg-accent text-accent-foreground rounded-2xl px-6 py-6 md:px-8">
       <div className="flex flex-wrap items-center gap-x-10 gap-y-6">
-        <HeroStat label="Open tasks" value={openCount} />
+        <HeroStat
+          testId="home.stats.open.count"
+          label="Open tasks"
+          value={openCount}
+        />
         <div className="bg-foreground/10 hidden h-10 w-px sm:block" />
-        <HeroStat label="Completed" value={doneCount} />
+        <HeroStat
+          testId="home.stats.done.count"
+          label="Completed"
+          value={doneCount}
+        />
 
         <div className="ml-auto flex items-center gap-3.5">
           <ProgressRing value={percentage} />
           <div>
-            <p className="text-2xl leading-none font-semibold tabular-nums">
+            <p
+              {...testProp("home.stats.percentage")}
+              className="text-2xl leading-none font-semibold tabular-nums">
               {percentage}%
             </p>
             <p className="text-muted-foreground mt-1 text-sm">tasks done</p>
@@ -80,10 +91,18 @@ function HeroPanel({
   );
 }
 
-function HeroStat({ label, value }: { label: string; value: number }) {
+function HeroStat({
+  label,
+  value,
+  testId,
+}: TestIdProps & { label: string; value: number }) {
   return (
     <div>
-      <p className="text-3xl leading-none font-semibold tabular-nums">{value}</p>
+      <p
+        {...testProp(testId)}
+        className="text-3xl leading-none font-semibold tabular-nums">
+        {value}
+      </p>
       <p className="text-muted-foreground mt-1.5 text-sm">{label}</p>
     </div>
   );
