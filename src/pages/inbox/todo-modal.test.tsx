@@ -1,4 +1,5 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import type { TodoEntity } from "@/backend/todo-service";
@@ -34,6 +35,7 @@ function renderInboxWithModalOpen(overrides: Partial<TodoEntity> = {}) {
     repository,
     modal: `home.todo.${todo.id}.modal`,
     rowTitle: `home.todo.${todo.id}.title`,
+    fullScreenButton: `home.todo.${todo.id}.modal.fullscreen.button`,
   };
 }
 
@@ -98,5 +100,33 @@ describe("todo detail modal", () => {
     expect(reopened).toBe(0);
     expect(screen.queryByTestId(modal)).not.toBeInTheDocument();
     expect(currentLocation()).toBe("/");
+  });
+
+  it("when I open the description's link popover inside it, Then the popover is usable", async () => {
+    const user = userEvent.setup();
+    const { modal } = renderInboxWithModalOpen({ description: "read the docs" });
+
+    await screen.findByTestId(modal);
+    await user.click(screen.getByTestId("todo.detail.description.read"));
+    await user.click(await screen.findByTestId("editor.toolbar.link.button"));
+
+    // A dialog makes everything outside it inert, so a popover portalled to the
+    // body lands outside the modal and cannot be typed into.
+    const url = await screen.findByTestId("editor.toolbar.link.url.input");
+    await user.type(url, "https://x.dev");
+
+    expect(url).toHaveValue("https://x.dev");
+  });
+
+  it("when I open it full screen, Then the url becomes the todo's own page", async () => {
+    const user = userEvent.setup();
+    const { modal, fullScreenButton, todo, currentLocation } =
+      renderInboxWithModalOpen();
+
+    await screen.findByTestId(modal);
+
+    await user.click(screen.getByTestId(fullScreenButton));
+
+    await waitFor(() => expect(currentLocation()).toBe(`/todo/${todo.id}`));
   });
 });

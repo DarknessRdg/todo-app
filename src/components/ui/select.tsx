@@ -3,6 +3,7 @@ import * as SelectPrimitive from "@radix-ui/react-select";
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { testProp, type TestIdProps } from "@/lib/test-id";
 import { cva, type VariantProps } from "class-variance-authority";
 
 function Select({
@@ -73,14 +74,17 @@ function SelectTrigger({
   className,
   size,
   children,
+  testId,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Trigger> &
-  VariantProps<typeof selectTriggerVariants>) {
+  VariantProps<typeof selectTriggerVariants> &
+  TestIdProps) {
   return (
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
       className={cn(selectTriggerVariants({ size, className }))}
-      {...props}>
+      {...props}
+      {...testProp(testId)}>
       {children}
       <SelectPrimitive.Icon asChild>
         <ChevronDownIcon className="size-4 opacity-50" />
@@ -138,8 +142,9 @@ function SelectLabel({
 function SelectItem({
   className,
   children,
+  testId,
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.Item>) {
+}: React.ComponentProps<typeof SelectPrimitive.Item> & TestIdProps) {
   return (
     <SelectPrimitive.Item
       data-slot="select-item"
@@ -147,7 +152,8 @@ function SelectItem({
         "focus:bg-accent focus:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-default items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2",
         className
       )}
-      {...props}>
+      {...props}
+      {...testProp(testId)}>
       <span className="absolute right-2 flex size-3.5 items-center justify-center">
         <SelectPrimitive.ItemIndicator>
           <CheckIcon className="size-4" />

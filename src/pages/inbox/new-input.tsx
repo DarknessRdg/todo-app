@@ -80,6 +80,7 @@ export function NewInput() {
             validators={inputValidations("title")}
             children={(field) => (
               <field.Input
+                testId="home.todo.create.input"
                 aria-invalid={!form.state.isFieldsValid}
                 disabled={form.state.isSubmitting}
                 placeholder="Capture a thought…"
@@ -104,6 +105,7 @@ export function NewInput() {
             <span className="kbd mr-0.5 hidden sm:inline-flex">↵</span>
 
             <form.SubmitButton
+              testId="home.todo.create.submit"
               label={<SendIcon className="size-4" />}
               size="icon"
               className="size-9 shrink-0 rounded-full"
@@ -114,7 +116,10 @@ export function NewInput() {
       </form.FormSubmit>
 
       {form.state.errors.length > 0 && (
-        <Typography variant="p" className="text-destructive mt-2 px-1 text-sm">
+        <Typography
+          testId="home.todo.create.error"
+          variant="p"
+          className="text-destructive mt-2 px-1 text-sm">
           {form.state.errors}
         </Typography>
       )}
@@ -138,6 +143,7 @@ function DueDateButton({ initial }: { initial: Date }) {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
+          testId="home.todo.create.duedate.button"
           variant="ghost"
           size="sm"
           className="text-muted-foreground hover:text-foreground h-8 gap-1.5 px-2"
@@ -158,7 +164,11 @@ function DueDateButton({ initial }: { initial: Date }) {
             <Typography variant="h6">Due date</Typography>
             <Typography variant="muted">When it's due</Typography>
           </div>
-          <Button size="sm" variant="outline" onClick={today}>
+          <Button
+            testId="home.todo.create.duedate.today"
+            size="sm"
+            variant="outline"
+            onClick={today}>
             Today
           </Button>
         </div>
@@ -178,6 +188,7 @@ function SelectProjectsButton() {
   return (
     <Select>
       <SelectTrigger
+        testId="home.todo.create.project.button"
         className="text-muted-foreground hover:text-foreground h-8 gap-1.5 border-0 bg-transparent px-2 shadow-none"
         size="sm">
         <FolderIcon className="size-4" />

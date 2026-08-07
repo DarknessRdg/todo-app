@@ -2,6 +2,7 @@ import * as React from "react"
 import * as PopoverPrimitive from "@radix-ui/react-popover"
 
 import { cn } from "@/lib/utils"
+import { testProp, type TestIdProps } from "@/lib/test-id";
 
 function Popover({
   ...props
@@ -19,10 +20,22 @@ function PopoverContent({
   className,
   align = "center",
   sideOffset = 4,
+  testId,
+  container,
   ...props
-}: React.ComponentProps<typeof PopoverPrimitive.Content>) {
+}: React.ComponentProps<typeof PopoverPrimitive.Content> &
+  TestIdProps & {
+    /**
+     * Where to portal the content. Defaults to `document.body`, which a modal
+     * dialog makes inert (`pointer-events: none`) — pass an element *inside*
+     * the dialog for popovers that have to work within one.
+     */
+    container?: React.ComponentProps<
+      typeof PopoverPrimitive.Portal
+    >["container"];
+  }) {
   return (
-    <PopoverPrimitive.Portal>
+    <PopoverPrimitive.Portal container={container}>
       <PopoverPrimitive.Content
         data-slot="popover-content"
         align={align}
@@ -32,6 +45,7 @@ function PopoverContent({
           className
         )}
         {...props}
+        {...testProp(testId)}
       />
     </PopoverPrimitive.Portal>
   )

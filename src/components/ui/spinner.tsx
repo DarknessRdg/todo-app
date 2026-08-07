@@ -1,5 +1,6 @@
 import React from "react";
 import { cn } from "@/lib/utils";
+import { testProp, type TestIdProps } from "@/lib/test-id";
 import { type VariantProps, cva } from "class-variance-authority";
 import { Loader2 } from "lucide-react";
 
@@ -40,9 +41,10 @@ export function Spinner({
   show,
   children,
   className,
-}: SpinnerContentProps) {
+  testId,
+}: SpinnerContentProps & TestIdProps) {
   return (
-    <span className={spinnerVariants({ show })}>
+    <span className={spinnerVariants({ show })} {...testProp(testId)}>
       <Loader2 className={cn(loaderVariants({ size }), className)} />
       {children}
     </span>

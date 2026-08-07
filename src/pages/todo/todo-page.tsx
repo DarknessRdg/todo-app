@@ -29,6 +29,7 @@ export function TodoPage() {
   return (
     <div className="mx-auto w-full max-w-5xl">
       <Button
+        testId="todo.page.back.button"
         variant="ghost"
         size="sm"
         onClick={() => navigate("/")}

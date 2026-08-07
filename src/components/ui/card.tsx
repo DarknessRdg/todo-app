@@ -1,8 +1,11 @@
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
+import { testProp, type TestIdProps } from "@/lib/test-id";
 
-function Card({ className, ...props }: React.ComponentProps<"div">) {
+type CardPartProps = React.ComponentProps<"div"> & TestIdProps;
+
+function Card({ className, testId, ...props }: CardPartProps) {
   return (
     <div
       data-slot="card"
@@ -11,11 +14,12 @@ function Card({ className, ...props }: React.ComponentProps<"div">) {
         className
       )}
       {...props}
+      {...testProp(testId)}
     />
   );
 }
 
-function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
+function CardHeader({ className, testId, ...props }: CardPartProps) {
   return (
     <div
       data-slot="card-header"
@@ -24,31 +28,34 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
         className
       )}
       {...props}
+      {...testProp(testId)}
     />
   );
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
+function CardTitle({ className, testId, ...props }: CardPartProps) {
   return (
     <div
       data-slot="card-title"
       className={cn("leading-none font-semibold", className)}
       {...props}
+      {...testProp(testId)}
     />
   );
 }
 
-function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
+function CardDescription({ className, testId, ...props }: CardPartProps) {
   return (
     <div
       data-slot="card-description"
       className={cn("text-muted-foreground text-sm", className)}
       {...props}
+      {...testProp(testId)}
     />
   );
 }
 
-function CardAction({ className, ...props }: React.ComponentProps<"div">) {
+function CardAction({ className, testId, ...props }: CardPartProps) {
   return (
     <div
       data-slot="card-action"
@@ -57,26 +64,29 @@ function CardAction({ className, ...props }: React.ComponentProps<"div">) {
         className
       )}
       {...props}
+      {...testProp(testId)}
     />
   );
 }
 
-function CardContent({ className, ...props }: React.ComponentProps<"div">) {
+function CardContent({ className, testId, ...props }: CardPartProps) {
   return (
     <div
       data-slot="card-content"
       className={cn("px-6", className)}
       {...props}
+      {...testProp(testId)}
     />
   );
 }
 
-function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
+function CardFooter({ className, testId, ...props }: CardPartProps) {
   return (
     <div
       data-slot="card-footer"
       className={cn("flex items-center px-6 [.border-t]:pt-6", className)}
       {...props}
+      {...testProp(testId)}
     />
   );
 }

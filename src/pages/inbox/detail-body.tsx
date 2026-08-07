@@ -17,6 +17,7 @@ import {
 } from "@/pages/inbox/todo-meta.tsx";
 import { CalendarIcon, CircleDot, FolderIcon, Plus, SignalHigh, Tag } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { testProp } from "@/lib/test-id";
 
 /* -------------------------------------------------------------------------- */
 /* Header                                                                      */
@@ -46,7 +47,9 @@ export function TodoDetailHeader({
         ) : null}
       </div>
 
-      <h1 className="font-display flex items-start gap-3 text-2xl leading-snug font-semibold tracking-tight">
+      <h1
+        {...testProp("todo.detail.title")}
+        className="font-display flex items-start gap-3 text-2xl leading-snug font-semibold tracking-tight">
         <span className="mt-1 shrink-0">
           <TodoChecker done={todo.done} />
         </span>
@@ -199,6 +202,7 @@ function DescriptionEditor({ todo }: { todo: TodoEntity }) {
   if (editing) {
     return (
       <RichTextEditor
+        testId="todo.detail.description.editor"
         content={todo.description}
         placeholder="Add a description…"
         editable
@@ -212,6 +216,7 @@ function DescriptionEditor({ todo }: { todo: TodoEntity }) {
   // turns into the editor on click.
   return (
     <div
+      {...testProp("todo.detail.description.read")}
       role="button"
       tabIndex={0}
       onClick={() => setEditing(true)}
@@ -262,7 +267,9 @@ function Subtasks({ todo }: { todo: TodoEntity }) {
     <section>
       <div className="mb-3 flex items-center gap-2.5">
         <span className="eyebrow">Subtasks</span>
-        <span className="text-muted-foreground text-xs tabular-nums">
+        <span
+          {...testProp("todo.detail.subtask.count")}
+          className="text-muted-foreground text-xs tabular-nums">
           {doneCount}/{subtasks.length}
         </span>
         <Progress value={percentage} className="ml-auto h-1.5 w-24" />
@@ -274,6 +281,7 @@ function Subtasks({ todo }: { todo: TodoEntity }) {
             key={subtask.id}
             className="hover:bg-muted/60 -mx-2 flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 transition-colors">
             <Checkbox
+              testId={`todo.detail.subtask.${subtask.id}.check`}
               checked={subtask.done}
               onCheckedChange={() => toggle(subtask.id)}
               className="size-5 rounded-full"

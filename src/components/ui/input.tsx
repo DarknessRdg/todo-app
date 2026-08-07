@@ -1,10 +1,11 @@
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
+import { testProp, type TestIdProps } from "@/lib/test-id";
 
-export type InputProps = React.ComponentProps<"input">
+export type InputProps = React.ComponentProps<"input"> & TestIdProps
 
-function Input({ className, type, ...props }: InputProps) {
+function Input({ className, type, testId, ...props }: InputProps) {
   return (
     <input
       type={type}
@@ -42,6 +43,7 @@ function Input({ className, type, ...props }: InputProps) {
         className
       )}
       {...props}
+      {...testProp(testId)}
     />
   );
 }

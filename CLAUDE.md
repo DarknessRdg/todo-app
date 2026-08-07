@@ -176,6 +176,15 @@ screen.getByRole("checkbox");
 root element as `data-test-id`. A component that cannot be targeted by test id is
 not finished. Compose the type — never redeclare the prop:
 
+This includes the vendored `src/components/ui/` primitives — `Button`, `Input`,
+`Checkbox`, `Badge`, `DialogContent`, `AlertDialogAction`, `SelectTrigger` and
+friends all take `testId`. Pass the prop (`testId="home.todo.create.submit"`)
+rather than spreading `testProp()` at the call site; only tag a raw DOM element
+directly, and re-apply `testId` when regenerating a shadcn component. The one
+component that cannot take the prop plainly is `RichTextEditor`: its editable
+element is rendered by ProseMirror, so the id rides along in Tiptap's
+`editorProps.attributes`.
+
 **Never write the `data-test-id` attribute by hand.** `src/lib/test-id.ts` owns
 both the type and the attribute spelling; components spread the result of
 `testProp()` so the attribute name can never be typo'd:
@@ -303,8 +312,20 @@ property — and call that out when it happens.
 | Sage | `#f6f7ed` | `--accent` — the **single tint**: hero stats panel, hover, Done badge. |
 | Ink | `#1f1f1f` | `--foreground` + `--primary` — text, the one dark action, selected/Urgent states. |
 
-Secondary text = `--muted-foreground` `#737373`. `--destructive` `#d64545` is the
-only non-monochrome color, reserved for delete.
+Secondary text = `--muted-foreground` `#737373`. Colour outside the ramp exists
+in exactly three places, all of them token-driven:
+
+| Token(s) | Where | Why it is allowed |
+|---|---|---|
+| `--destructive` `#d64545` | delete only | destruction must not read as an ordinary action |
+| `--link` `#2563eb` (`#7ba7f5` dark) | `.tiptap a` | a link that looks like body text is not a link |
+| `--code-keyword` / `-string` / `-number` / `-function` / `-comment` | `.tiptap .hljs-*` | syntax highlighting is information, not decoration |
+
+The code palette is deliberately desaturated to sit on the mist/ink surfaces —
+retune those five variables (in **both** `:root` and `.dark`) rather than adding
+hues elsewhere. **The chrome around code stays monochrome**: `pre` keeps its
+`bg-muted` fill, and colour appears only on the tokens inside it. Nothing outside
+this table gets a hue.
 
 ### Rules
 

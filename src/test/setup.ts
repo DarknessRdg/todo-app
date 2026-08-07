@@ -35,6 +35,20 @@ if (!window.matchMedia) {
   })) as unknown as typeof window.matchMedia;
 }
 
+// ProseMirror (under the rich text editor) measures the caret after every
+// transaction. jsdom has no layout, so Range geometry is missing entirely and
+// it throws asynchronously — specs still pass, but the run fills with uncaught
+// exceptions. Zero-sized answers are fine: nothing under test reads them.
+if (!Range.prototype.getClientRects) {
+  Range.prototype.getClientRects = () => [] as unknown as DOMRectList;
+  Range.prototype.getBoundingClientRect = () => new DOMRect();
+}
+
+// Same reason: a mousedown inside the editor asks which node is at the click.
+if (!document.elementFromPoint) {
+  document.elementFromPoint = () => null;
+}
+
 if (!window.ResizeObserver) {
   window.ResizeObserver = class {
     observe() {}

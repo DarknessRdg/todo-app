@@ -11,12 +11,14 @@ export function TodoTitle({
   title,
   className,
   done,
+  testId,
   ...props
-}: React.ComponentProps<"div"> & {
-  title: string;
-  done: boolean;
-  className?: string;
-}) {
+}: React.ComponentProps<"div"> &
+  TestIdProps & {
+    title: string;
+    done: boolean;
+    className?: string;
+  }) {
   return (
     <div
       className={cn(
@@ -25,7 +27,8 @@ export function TodoTitle({
         className
       )}
       data-done={done}
-      {...props}>
+      {...props}
+      {...testProp(testId)}>
       {title}
     </div>
   );
@@ -83,7 +86,7 @@ export function TodoCheckerInput({
         className={cn(className, "size-5 rounded-full")}
         checked={done}
         onCheckedChange={onToggle}
-        {...testProp(testId)}
+        testId={testId}
       />
     </Message>
   );

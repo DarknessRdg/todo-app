@@ -12,13 +12,15 @@ export function useTodoDetails({ id }: { id: string }) {
   const { isLoading, error, data } = useQuery({
     queryKey: [QueryTodoDetailsKey, id],
     queryFn: async () => {
-      return await todoService.byId(id);
+      // `undefined` is what TanStack Query uses to mean "no data yet", so a
+      // miss has to come back as null or it warns and treats it as a failure.
+      return (await todoService.byId(id)) ?? null;
     },
   });
 
   return {
     isLoading,
     error,
-    todo: data,
+    todo: data ?? undefined,
   };
 }

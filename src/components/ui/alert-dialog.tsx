@@ -2,6 +2,7 @@ import * as React from "react";
 import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
 
 import { cn } from "@/lib/utils";
+import { testProp, type TestIdProps } from "@/lib/test-id";
 import { buttonVariants, type ButtonProps } from "@/components/ui/button";
 
 function AlertDialog({
@@ -44,8 +45,9 @@ function AlertDialogOverlay({
 
 function AlertDialogContent({
   className,
+  testId,
   ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Content>) {
+}: React.ComponentProps<typeof AlertDialogPrimitive.Content> & TestIdProps) {
   return (
     <AlertDialogPortal>
       <AlertDialogOverlay />
@@ -56,6 +58,7 @@ function AlertDialogContent({
           className
         )}
         {...props}
+        {...testProp(testId)}
       />
     </AlertDialogPortal>
   );
@@ -124,12 +127,14 @@ function AlertDialogAction({
   className,
   variant,
   size,
+  testId,
   ...props
 }: React.ComponentProps<typeof AlertDialogPrimitive.Action> & ButtonProps) {
   return (
     <AlertDialogPrimitive.Action
       className={cn(buttonVariants({ variant, size }), className)}
       {...props}
+      {...testProp(testId)}
     />
   );
 }
@@ -138,12 +143,14 @@ function AlertDialogCancel({
   className,
   variant = "outline",
   size,
+  testId,
   ...props
 }: React.ComponentProps<typeof AlertDialogPrimitive.Cancel> & ButtonProps) {
   return (
     <AlertDialogPrimitive.Cancel
       className={cn(buttonVariants({ variant, size }), className)}
       {...props}
+      {...testProp(testId)}
     />
   );
 }

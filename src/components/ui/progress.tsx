@@ -2,12 +2,14 @@ import * as React from "react"
 import * as ProgressPrimitive from "@radix-ui/react-progress"
 
 import { cn } from "@/lib/utils"
+import { testProp, type TestIdProps } from "@/lib/test-id"
 
 function Progress({
   className,
   value,
+  testId,
   ...props
-}: React.ComponentProps<typeof ProgressPrimitive.Root>) {
+}: React.ComponentProps<typeof ProgressPrimitive.Root> & TestIdProps) {
   return (
     <ProgressPrimitive.Root
       data-slot="progress"
@@ -16,6 +18,7 @@ function Progress({
         className
       )}
       {...props}
+      {...testProp(testId)}
     >
       <ProgressPrimitive.Indicator
         data-slot="progress-indicator"

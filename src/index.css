@@ -21,6 +21,14 @@
     --accent-foreground: #1f1f1f;
     --destructive: #d64545;
     --destructive-foreground: #ffffff;
+    --link: #2563eb; /* the one blue — hyperlinks in rich text only */
+    /* Syntax highlighting — muted, editorial hues so code reads as code
+       without turning the monochrome canvas into a rainbow. */
+    --code-keyword: #5b53a6;
+    --code-string: #3f7a52;
+    --code-number: #a15c2e;
+    --code-function: #2f5fbf;
+    --code-comment: #8c8c8c;
     --border: #e7e7e7; /* soft divider / input hairline */
     --input: #a8a8a8; /* control hairline — checkbox needs real contrast on mist */
     --ring: #1f1f1f; /* ink focus */
@@ -65,6 +73,12 @@
     --accent-foreground: #f4f4f4;
     --destructive: #e5675f;
     --destructive-foreground: #ffffff;
+    --link: #7ba7f5; /* lifted for contrast on the near-black canvas */
+    --code-keyword: #a9a2f0;
+    --code-string: #86c99a;
+    --code-number: #d9a05b;
+    --code-function: #7ba7f5;
+    --code-comment: #8a8a8a;
     --border: #2a2a2a;
     --input: #5c5c5c; /* control hairline — checkbox needs real contrast on card */
     --ring: #f4f4f4;
@@ -102,6 +116,12 @@
     --color-accent-foreground: var(--accent-foreground);
     --color-destructive: var(--destructive);
     --color-destructive-foreground: var(--destructive-foreground);
+    --color-link: var(--link);
+    --color-code-keyword: var(--code-keyword);
+    --color-code-string: var(--code-string);
+    --color-code-number: var(--code-number);
+    --color-code-function: var(--code-function);
+    --color-code-comment: var(--code-comment);
     --color-border: var(--border);
     --color-input: var(--input);
     --color-ring: var(--ring);
@@ -242,6 +262,12 @@
   .tiptap blockquote {
     @apply border-muted-foreground/40 text-muted-foreground my-2 border-l-2 pl-3;
   }
+  .tiptap a {
+    @apply text-link underline underline-offset-2 transition-colors;
+  }
+  .tiptap a:hover {
+    @apply decoration-2;
+  }
   .tiptap code {
     @apply bg-muted rounded px-1 py-0.5 text-sm;
   }
@@ -250,6 +276,47 @@
   }
   .tiptap pre code {
     @apply bg-transparent p-0;
+  }
+  .tiptap pre {
+    @apply font-mono leading-relaxed whitespace-pre;
+  }
+
+  /* lowlight emits highlight.js class names; map them onto the code tokens. */
+  .tiptap .hljs-comment,
+  .tiptap .hljs-quote {
+    @apply text-code-comment italic;
+  }
+  .tiptap .hljs-keyword,
+  .tiptap .hljs-selector-tag,
+  .tiptap .hljs-literal,
+  .tiptap .hljs-type,
+  .tiptap .hljs-built_in {
+    @apply text-code-keyword;
+  }
+  .tiptap .hljs-string,
+  .tiptap .hljs-regexp,
+  .tiptap .hljs-symbol,
+  .tiptap .hljs-template-string {
+    @apply text-code-string;
+  }
+  .tiptap .hljs-number,
+  .tiptap .hljs-meta,
+  .tiptap .hljs-link {
+    @apply text-code-number;
+  }
+  .tiptap .hljs-title,
+  .tiptap .hljs-name,
+  .tiptap .hljs-section,
+  .tiptap .hljs-attr,
+  .tiptap .hljs-attribute,
+  .tiptap .hljs-variable {
+    @apply text-code-function;
+  }
+  .tiptap .hljs-emphasis {
+    @apply italic;
+  }
+  .tiptap .hljs-strong {
+    @apply font-semibold;
   }
   .tiptap p.is-editor-empty:first-child::before {
     @apply text-muted-foreground pointer-events-none float-left h-0 content-[attr(data-placeholder)];

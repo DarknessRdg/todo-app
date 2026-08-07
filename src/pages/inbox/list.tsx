@@ -178,7 +178,7 @@ function TodoItem({ todo }: { todo: TodoEntity }) {
       <div className="min-w-0 grow data-[done=true]:opacity-60" data-done={done}>
         <div className="flex items-start gap-2">
           <TodoTitle
-            {...testProp(`home.todo.${todo.id}.title`)}
+            testId={`home.todo.${todo.id}.title`}
             title={todo.title}
             done={done}
             className="grow cursor-pointer py-0.5 text-[0.95rem] leading-snug"

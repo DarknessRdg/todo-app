@@ -6,14 +6,17 @@ import type { ReactNode } from "react";
 import { Typography } from "@/components/ui/typography";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { uuidV7 } from "@/lib/uuid";
+import { testProp, type TestIdProps } from "@/lib/test-id";
 
 export const { fieldContext, useFieldContext, formContext, useFormContext } =
   createFormHookContexts();
 
-type InputProps = Omit<UiInputProps, "name" | "value" | "onChange" | "onBlur">;
+type InputProps = Omit<UiInputProps, "name" | "value" | "onChange" | "onBlur"> &
+  TestIdProps;
 
 function InputWithError({
   label,
+  testId,
   ...props
 }: InputProps & {
   label: ReactNode;
@@ -35,13 +38,14 @@ function InputWithError({
         onChange={(e) => field.handleChange(e.target.value)}
         onBlur={field.handleBlur}
         {...props}
+        {...testProp(testId)}
       />
       <ErrorMessage error={error} />
     </div>
   );
 }
 
-function InputOnly(props: InputProps) {
+function InputOnly({ testId, ...props }: InputProps) {
   const field = useFieldContext<any>();
 
   return (
@@ -51,6 +55,7 @@ function InputOnly(props: InputProps) {
       value={field.state.value}
       onChange={(e) => field.handleChange(e.target.value)}
       onBlur={field.handleBlur}
+      {...testProp(testId)}
     />
   );
 }
@@ -70,15 +75,17 @@ function ErrorMessage({ error }: { error: string | undefined }) {
 function SubmitButton({
   label,
   type = "submit",
+  testId,
   ...props
-}: ButtonProps & {
-  label: ReactNode;
-}) {
+}: ButtonProps &
+  TestIdProps & {
+    label: ReactNode;
+  }) {
   const form = useFormContext();
   return (
     <form.Subscribe selector={(state) => state.isSubmitting}>
       {(isSubmitting) => (
-        <Button disabled={isSubmitting} {...props} type={type}  >
+        <Button disabled={isSubmitting} {...props} type={type} {...testProp(testId)}>
           {label}
         </Button>
       )}
@@ -98,7 +105,6 @@ function FormSubmit({
         e.preventDefault();
         e.stopPropagation();
 
-        console.debug('form errors', form.getAllErrors())
         form.handleSubmit();
       }}
     />

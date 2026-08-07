@@ -1,8 +1,11 @@
+import { testProp } from "@/lib/test-id";
 import { ArrowUp, Feather } from "lucide-react";
 
 export function EmptyList() {
   return (
-    <div className="bg-card flex flex-col items-center justify-center rounded-2xl px-6 py-16 text-center">
+    <div
+      {...testProp("home.todo.empty")}
+      className="bg-card flex flex-col items-center justify-center rounded-2xl px-6 py-16 text-center">
       <div className="bg-background text-muted-foreground mb-4 flex size-11 items-center justify-center rounded-full">
         <Feather className="size-5" />
       </div>

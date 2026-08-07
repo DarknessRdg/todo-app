@@ -3,11 +3,14 @@ import * as CheckboxPrimitive from "@radix-ui/react-checkbox";
 import { CheckIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { testProp, type TestIdProps } from "@/lib/test-id";
 
-export type CheckboxProps =  React.ComponentProps<typeof CheckboxPrimitive.Root>;
+export type CheckboxProps = React.ComponentProps<typeof CheckboxPrimitive.Root> &
+  TestIdProps;
 
 function Checkbox({
   className,
+  testId,
   ...props
 }: CheckboxProps) {
   return (
@@ -36,7 +39,8 @@ function Checkbox({
         dark:aria-invalid:ring-destructive/40`,
         className
       )}
-      {...props}>
+      {...props}
+      {...testProp(testId)}>
       <CheckboxPrimitive.Indicator
         data-slot="checkbox-indicator"
         className="flex items-center justify-center text-current transition-none">

@@ -13,6 +13,7 @@ import { makeTodo } from "@/test/todo-factory";
 
 const openSection = "home.todo.section.open";
 const doneSection = "home.todo.section.done";
+const emptyState = "home.todo.empty";
 
 const rowTitle = (todo: TodoEntity) => `home.todo.${todo.id}.title`;
 const checkButton = (todo: TodoEntity) => `home.todo.${todo.id}.check.button`;
@@ -83,6 +84,25 @@ describe("todo list", () => {
       expect(screen.queryByTestId(doneSection)).not.toBeInTheDocument();
       expect(shownCounts().heroDone).toBe("0");
       expect(shownCounts().percentage).toBe("0%");
+    });
+  });
+
+  describe("when there is nothing in the inbox", () => {
+    it("Then the empty state stands in for the list", async () => {
+      renderInbox([]);
+
+      expect(await screen.findByTestId(emptyState)).toBeInTheDocument();
+      expect(screen.queryByTestId(openSection)).not.toBeInTheDocument();
+      expect(screen.queryByTestId(doneSection)).not.toBeInTheDocument();
+    });
+
+    it("Then a single todo is enough to replace it with the list", async () => {
+      const todo = makeTodo({ done: false });
+      renderInbox([todo]);
+
+      await screen.findByTestId(rowTitle(todo));
+
+      expect(screen.queryByTestId(emptyState)).not.toBeInTheDocument();
     });
   });
 

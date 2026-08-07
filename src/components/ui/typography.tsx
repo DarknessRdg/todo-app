@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { testProp, type TestIdProps } from "@/lib/test-id";
 import { type VariantProps, cva } from "class-variance-authority";
 import React, { type ReactNode } from "react";
 
@@ -25,13 +26,14 @@ const typographyVariants = cva("block antialiased", {
 
 export interface TypographyProps
   extends Omit<VariantProps<typeof typographyVariants>, "variant">,
-    Required<Pick<VariantProps<typeof typographyVariants>, "variant">> {
+    Required<Pick<VariantProps<typeof typographyVariants>, "variant">>,
+    TestIdProps {
   className?: string;
   children?: ReactNode;
 }
 
 export const Typography = React.forwardRef<HTMLElement, TypographyProps>(
-  ({ variant = null, className, ...props }, ref) => {
+  ({ variant = null, className, testId, ...props }, ref) => {
     if (variant === null) {
       throw new Error("<Typography /> Variant cannot be null");
     }
@@ -55,6 +57,7 @@ export const Typography = React.forwardRef<HTMLElement, TypographyProps>(
       className: cn(typographyVariants({ variant }), className),
       ref,
       ...props,
+      ...testProp(testId),
     });
   }
 );
