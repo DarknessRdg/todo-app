@@ -56,6 +56,151 @@ Zod is **not** used directly in the domain. Instead:
 - Import alias `@/` maps to `src/` (configured in both `vite.config.ts` and `tsconfig`).
 - Prettier is the formatter (`.prettierrc.json`, with `prettier-plugin-tailwindcss` for class sorting).
 
+## Testing policy
+
+**Behavior changes start from a test.** Before writing the implementation for any
+change that alters what the app *does*, write the failing Vitest test first, then
+make it pass. This is not optional and not something to retrofit after the fact.
+Vitest is the only test runner.
+
+**Specs live next to the file they cover — always.** `todo-service.ts` is tested by
+`todo-service.test.ts` in the same directory, `todo.tsx` by `todo.test.tsx` beside
+it. Do **not** collect specs into a separate test directory; the only things that
+belong in `src/test/` are shared harness files that are not themselves tests
+(`setup.ts`, `container.tsx`). A root-level `test/` folder is reserved for
+future A/B tests — do not put unit or interaction specs there.
+
+### What MUST be covered
+
+- **Business logic — always, no exceptions.** Anything in `src/backend/`
+  (`todo-service.ts`, the repository adapters), `src/lib/`, and `src/validators/`.
+  Every branch of a service method, every validation rule.
+- **User interaction** in `src/pages/` and `src/components/` — a button click, an
+  input blur, a keyboard shortcut, form submit, toggling a checkbox, opening a
+  modal, navigation triggered by a click. If a user can do it and the app reacts,
+  there is a test asserting the reaction.
+
+### What must NOT be tested
+
+Do not write tests for presentation. No assertions on colors, Tailwind class
+names, DOM structure/nesting, spacing, or which element wraps which. These change
+constantly and the churn is not wanted. A test that breaks when a `className`
+changes is a bug in the test. Assert on **behavior and output** — what the user
+sees happen and what the service was asked to do — never on markup shape.
+
+### Selecting elements — `data-test-id`, nothing else
+
+UI tests **must** locate every element they touch by its test id. Walking the DOM
+is banned: no `container.querySelector`, no `.firstChild`/`parentElement`
+chains, no "the second button inside the third div", and no matching on visible
+copy or class names. Those break the moment the markup or wording is reordered,
+which is exactly the churn this policy exists to avoid.
+
+```tsx
+// ✅ the only accepted form
+await user.click(screen.getByTestId("home.todo.1234.check.button"));
+
+// ❌ brittle — structure, copy, and classes all change freely
+container.querySelector(".todo-row button");
+screen.getByText("Complete");
+screen.getByRole("checkbox");
+```
+
+**Rules for the id value:**
+
+- **Unique per rendered document**, exactly like a DOM `id`. Two elements on
+  screen never carry the same test id — for list rows, include the entity id to
+  disambiguate.
+- **Semantic dotted path**, read outermost → innermost: page, then feature, then
+  entity, then element, then element kind. Lowercase, dot-separated.
+
+  | Example | Meaning |
+  |---|---|
+  | `home.todo.create.input` | the new-todo text input on the home page |
+  | `home.todo.123456678` | the todo row for entity `123456678` |
+  | `home.todo.1234.check.button` | the complete/reopen toggle inside that row |
+
+- Build the path from the entity id at runtime
+  (`` testId={`home.todo.${todo.id}`} ``) rather than hard-coding row ids.
+
+**Every reusable component must accept a `testId` prop** and spread it onto its
+root element as `data-test-id`. A component that cannot be targeted by test id is
+not finished. Compose the type — never redeclare the prop:
+
+**Never write the `data-test-id` attribute by hand.** `src/lib/test-id.ts` owns
+both the type and the attribute spelling; components spread the result of
+`testProp()` so the attribute name can never be typo'd:
+
+```ts
+// src/lib/test-id.ts
+export type TestIdProps = { testId?: string };
+
+/** Spread onto an element to tag it. Emits nothing when testId is undefined. */
+export function testProp(testId?: string): { "data-test-id"?: string } {
+  return testId === undefined ? {} : { "data-test-id": testId };
+}
+```
+
+```tsx
+// any reusable component
+type TodoCheckerInputProps = CheckboxProps & TestIdProps;
+
+function TodoCheckerInput({ testId, ...props }: TodoCheckerInputProps) {
+  return <Checkbox {...props} {...testProp(testId)} />;
+}
+```
+
+Returning `{}` for an absent id matters: writing `data-test-id={testId}` inline
+would stamp `data-test-id="undefined"` onto untagged elements, which then collide
+with each other and break the uniqueness rule.
+
+Note the attribute is `data-test-id` (with the second dash). Testing Library
+queries `data-testid` by default, so `src/test/setup.ts` must call
+`configure({ testIdAttribute: "data-test-id" })` for `getByTestId` to work.
+
+### Mocking — use the ports, that is what they are for
+
+The hexagonal structure exists so tests can swap implementations. Do not reach for
+module-level monkey-patching:
+
+- To test `TodoService`, hand it a **fake/mock `TodoRepository`** (the port
+  interface in `src/backend/todo-service.ts`). Never touch IndexedDB in a test.
+- To test a page or hook, build a test container binding
+  `Dependencies.TodoService` to a mock, and provide it through `ContainerContext`
+  — the same seam `useContainer()` reads from in production.
+- Use `vi.fn()` for the mock methods and assert on the calls (was `create` called
+  with the right payload?) rather than on rendered markup.
+
+### The harness
+
+Configured in `vite.config.ts` under `test`: `jsdom` environment,
+`./src/test/setup.ts` as the setup file, `globals: false` (import `describe`/`it`/
+`expect` from `vitest` explicitly, matching the existing specs), and
+`restoreMocks` so spies reset between tests. `src/test/setup.ts` registers the
+`@testing-library/jest-dom` matchers, runs RTL `cleanup()` after each test, and
+stubs `matchMedia`/`ResizeObserver` — jsdom implements neither, and Radix
+primitives reach for both.
+
+Helpers live in `src/test/container.tsx`:
+
+- `mockTodoRepository(overrides?)` — a `vi.fn()`-backed fake of the
+  `TodoRepository` port, every method resolving an empty default.
+- `createTestContainer(repository?)` — the production container shape bound to a
+  mock repository. Synchronous, unlike `createDIContainer()`, because no
+  IndexedDB is opened.
+- `renderWithContainer(ui, { container? })` — renders through the real seams:
+  `ContainerContext` (what `useContainer()` reads) plus a `QueryClientProvider`
+  with retries disabled.
+
+Both helpers are fully typed against the port: `MockTodoRepository` maps each
+method to `Mock<TodoRepository[K]>`, so `repository.create.mock.calls[0][0]` is a
+`TodoEntity` (not `any`) and `mockResolvedValue` is checked against the real
+return type. There is no `as` cast — adding a method to `TodoRepository` breaks
+`mockTodoRepository()` until it is handled.
+
+Reference examples: `src/components/todo.test.tsx` (DOM interaction) and
+`src/backend/todo-service.test.ts` (service through the container).
+
 ## Design system
 
 The visual direction is the **"Studio" system** — a clean, monochrome product

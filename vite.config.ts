@@ -12,5 +12,12 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  test: {},
+  test: {
+    globals: false,
+    environment: "jsdom",
+    setupFiles: ["./src/test/setup.ts"],
+    css: false,
+    include: ["src/**/*.test.{ts,tsx}"],
+    restoreMocks: true,
+  },
 });

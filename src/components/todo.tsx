@@ -1,6 +1,7 @@
 import { Checkbox, type CheckboxProps } from "./ui/checkbox";
 
 import { cn } from "@/lib/utils";
+import { testProp, type TestIdProps } from "@/lib/test-id";
 import { TooltipText } from "@/components/ui/tooltip";
 import * as React from "react";
 import { CheckIcon } from "lucide-react";
@@ -56,12 +57,14 @@ export function TodoCheckerInput({
   disabled,
   dialogMessage = undefined,
   className,
+  testId,
   ...props
-}: Omit<CheckboxProps, "checked" | "onCheckedChange" | "onToggle"> & {
-  done: boolean;
-  dialogMessage?: string;
-  onToggle?: (checked: boolean) => void;
-}) {
+}: Omit<CheckboxProps, "checked" | "onCheckedChange" | "onToggle"> &
+  TestIdProps & {
+    done: boolean;
+    dialogMessage?: string;
+    onToggle?: (checked: boolean) => void;
+  }) {
   const Message = ({ children }: React.PropsWithChildren) => {
     if (!dialogMessage) return children;
 
@@ -80,6 +83,7 @@ export function TodoCheckerInput({
         className={cn(className, "size-5 rounded-full")}
         checked={done}
         onCheckedChange={onToggle}
+        {...testProp(testId)}
       />
     </Message>
   );
