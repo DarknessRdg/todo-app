@@ -75,6 +75,16 @@ brand colors are registered in `@theme` under **neutral** names only: `--color-i
 (`#1f1f1f`), `--color-sage` (`#f6f7ed`), `--color-mist` (`#f4f4f4`). Never introduce
 product/company-named variables.
 
+**Tune the token, not the component.** When a color, contrast, or hover reads
+wrong, fix it by editing the variable in `src/index.css` — in **both** the `:root`
+and `.dark` blocks — not by bolting a utility class onto the component that
+happens to show the problem. Reach for the token that drives the surface:
+`--input` for control hairlines (checkbox/textarea/calendar borders), `--card-hover`
+for row hover, `--ring` for focus rings, `--border` for dividers. One token edit
+fixes every consumer at once and survives regeneration of the vendored
+`src/components/ui/` files. Only touch a component when no token controls the
+property — and call that out when it happens.
+
 ### The four-color system
 
 | Color | Hex | Token role |

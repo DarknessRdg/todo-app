@@ -16,7 +16,7 @@ const buttonVariants = cva(
   [&_svg]:shrink-0
   
   focus-visible:border-ring 
-  focus-visible:ring-ring/50
+  focus-visible:ring-ring
   focus-visible:ring-[3px] 
   
   aria-invalid:ring-destructive/20

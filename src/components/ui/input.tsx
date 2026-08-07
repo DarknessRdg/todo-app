@@ -33,7 +33,7 @@ function Input({ className, type, ...props }: InputProps) {
         disabled:opacity-50 
         
         focus-visible:border-ring 
-        focus-visible:ring-ring/50 
+        focus-visible:ring-ring 
         focus-visible:ring-[3px]
 
         aria-invalid:ring-destructive/20 

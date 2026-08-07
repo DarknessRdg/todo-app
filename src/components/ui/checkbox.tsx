@@ -17,7 +17,7 @@ function Checkbox({
         `peer border-input size-4 shrink-0 rounded-[4px] border shadow-xs transition-shadow outline-none 
 
         focus-visible:border-ring 
-        focus-visible:ring-ring/50 
+        focus-visible:ring-ring 
         focus-visible:ring-[3px]
         
         aria-invalid:ring-destructive/20 

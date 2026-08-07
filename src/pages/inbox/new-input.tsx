@@ -68,7 +68,7 @@ export function NewInput() {
   return (
     <form.AppForm>
       <form.FormSubmit>
-        <div className="bg-card focus-within:ring-ring/60 flex items-center gap-2.5 rounded-2xl px-3.5 transition-shadow focus-within:ring-2">
+        <div className="bg-card focus-within:ring-ring flex items-center gap-2.5 rounded-2xl px-3.5 transition-shadow focus-within:ring-2">
           <TodoCheckerInput
             done={false}
             disabled
