@@ -88,6 +88,55 @@ constantly and the churn is not wanted. A test that breaks when a `className`
 changes is a bug in the test. Assert on **behavior and output** — what the user
 sees happen and what the service was asked to do — never on markup shape.
 
+### Spec naming — `component` > `action` > `…N side effects`
+
+Every spec is a nesting path, read outermost → innermost, exactly like the test-id
+path below:
+
+```
+"component"  >  "when <action>"  >  "Then <side effect 1>"
+                                 >  "Then <side effect 2>"
+                                 >  "Then <side effect N>"
+```
+
+- **Level 1 — the component.** The outer `describe` names the unit under test as
+  the app calls it: `"todo list"`, `"todo detail modal"`, `"TodoCheckerInput"`,
+  `"TodoService"`. No `"… component"` / `"… tests"` suffixes.
+- **Level 2 — the action.** One `describe` per thing the user (or caller) does,
+  phrased `"when I …"` / `"when the …"`: `"when I complete a todo"`,
+  `"when I delete a todo"`, `"when the page loads"`.
+- **Level N — one `it` per side effect** that action produces, each opening with
+  `Then` and naming *only* the outcome: `"Then it moves from the open section to
+  the done section"`, `"Then it updates the counts"`.
+
+```tsx
+describe("todo list", () => {
+  describe("when I complete a todo", () => {
+    it("Then it moves from the open section to the done section", async () => { … });
+    it("Then it updates the counts", async () => { … });
+  });
+
+  describe("when I delete a todo", () => {
+    it("Then it is removed from the screen", async () => { … });
+    it("Then it updates the counts", async () => { … });
+    it("Then cancelling keeps it and leaves the counts alone", async () => { … });
+  });
+});
+```
+
+Rules that keep the path honest:
+
+- **One side effect per `it`.** An action that changes the list *and* the counts is
+  two `it`s under the same action, never one test asserting both — splitting is
+  what makes a failure name the broken thing.
+- **Collapse the action level when there is exactly one side effect.** Fold it into
+  the `it` as a full sentence — `it("when clicked while done, Then reports the
+  reopen", …)` — rather than writing a `describe` that holds a single `it`.
+- **Never restate the action inside the `it`.** The action level already carries it;
+  the `it` starts at `Then`.
+- **No `should`, no bare verbs.** `it("Then the url carries its id")`, not
+  `it("should update the url")`.
+
 ### Selecting elements — `data-test-id`, nothing else
 
 UI tests **must** locate every element they touch by its test id. Walking the DOM
