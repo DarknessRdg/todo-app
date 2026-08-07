@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A new push to a PR makes the in-flight run obsolete; don't burn minutes on it.
+# main is exempt so every commit on the default branch keeps a real result.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  test:
+    name: Type-check and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # `build` runs `tsc -b` first, so this covers type-checking as well as
+      # proving the bundle still builds.
+      - name: Type-check and build
+        run: npm run build
+
+      - name: Test
+        run: npx vitest run
