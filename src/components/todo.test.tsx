@@ -1,5 +1,5 @@
 import { screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { setupUser } from "@/test/user";
 import { describe, expect, it, vi } from "vitest";
 
 import { TodoCheckerInput } from "@/components/todo";
@@ -11,7 +11,7 @@ const checkButton = `home.todo.${makeTodo().id}.check.button`;
 
 describe("TodoCheckerInput", () => {
   it("when clicked while open, Then reports the completion", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const onToggle = vi.fn();
 
     renderWithContainer(
@@ -24,7 +24,7 @@ describe("TodoCheckerInput", () => {
   });
 
   it("when clicked while done, Then reports the reopen", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const onToggle = vi.fn();
 
     renderWithContainer(
@@ -37,7 +37,7 @@ describe("TodoCheckerInput", () => {
   });
 
   it("when disabled, Then a click reports nothing", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const onToggle = vi.fn();
 
     renderWithContainer(

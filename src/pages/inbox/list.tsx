@@ -1,5 +1,6 @@
 import { TodoCheckerInput, TodoTitle } from "@/components/todo";
 import { testProp, type TestIdProps } from "@/lib/test-id";
+import { Timing } from "@/lib/timing";
 import { useTodoList } from "./use-todo-list";
 import { EmptyList } from "@/pages/inbox/empty-list";
 import { useTodoUpdate } from "@/pages/inbox/use-todo-update";
@@ -14,7 +15,6 @@ import {
   ProjectBadge,
   SubtaskIndicator,
   metaFor,
-  subtasksFor,
 } from "@/pages/inbox/todo-meta.tsx";
 import { useNavigate } from "react-router";
 import { useEffect, useRef, useState } from "react";
@@ -117,7 +117,7 @@ function TodoItem({ todo }: { todo: TodoEntity }) {
   const navigate = useNavigate();
 
   const meta = metaFor(todo.id);
-  const subtasks = subtasksFor(todo.id);
+  const subtasks = todo.subtasks;
   const subDone = subtasks.filter((s) => s.done).length;
 
   // Optimistic done state: flip the checkbox instantly (so the completion
@@ -145,11 +145,11 @@ function TodoItem({ todo }: { todo: TodoEntity }) {
     if (next) {
       setBurstKey((k) => k + 1);
       setShowBurst(true);
-      window.setTimeout(() => setShowBurst(false), 1400);
+      window.setTimeout(() => setShowBurst(false), Timing.confettiVisibleMs);
     }
     // Marking done: hold the row in place briefly so the pop + confetti are seen
     // before it relocates. Reopening: apply immediately.
-    const delay = next ? 450 : 0;
+    const delay = next ? Timing.completionResortMs : 0;
     timer.current = setTimeout(() => {
       check.mutate({ id: todo.id, done: next });
     }, delay);
@@ -196,6 +196,7 @@ function TodoItem({ todo }: { todo: TodoEntity }) {
           {todo.dueDate ? <DueBadge date={todo.dueDate} /> : null}
           {subtasks.length > 0 ? (
             <SubtaskIndicator
+              testId={`home.todo.${todo.id}.subtask.count`}
               done={subDone}
               total={subtasks.length}
               className="ml-0.5"

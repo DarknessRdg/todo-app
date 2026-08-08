@@ -8,6 +8,9 @@ import {
 } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
+import { Paragraph } from "@tiptap/extension-paragraph";
+import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
+import type { MarkdownSerializerState } from "prosemirror-markdown";
 import { createLowlight, common } from "lowlight";
 import { Markdown } from "tiptap-markdown";
 import {
@@ -49,6 +52,33 @@ import { testProp, type TestIdProps } from "@/lib/test-id";
  */
 const lowlight = createLowlight(common);
 
+/**
+ * Markdown has no way to write an empty paragraph — consecutive newlines are
+ * just a paragraph break — so a blank line the user typed is dropped on save
+ * and never comes back. Serialising it as a lone non-breaking space keeps the
+ * paragraph alive: it is not markdown whitespace, so it survives the round
+ * trip, and it renders as the blank line that was meant.
+ */
+const BlankLine = "\u00a0";
+
+const ParagraphKeepingBlanks = Paragraph.extend({
+  addStorage() {
+    return {
+      markdown: {
+        serialize(state: MarkdownSerializerState, node: ProseMirrorNode) {
+          if (node.childCount === 0) {
+            state.write(BlankLine);
+          } else {
+            state.renderInline(node);
+          }
+          state.closeBlock(node);
+        },
+        parse: {},
+      },
+    };
+  },
+});
+
 type RichTextEditorProps = {
   /**
    * The document content, stored/exchanged as Markdown. Markdown is a
@@ -81,7 +111,8 @@ export function RichTextEditor({
     extensions: [
       // StarterKit ships a plain code block; swap it for the lowlight one so
       // fenced blocks are tokenised. Registering both would duplicate the node.
-      StarterKit.configure({ codeBlock: false }),
+      StarterKit.configure({ codeBlock: false, paragraph: false }),
+      ParagraphKeepingBlanks,
       CodeBlockLowlight.configure({ lowlight }),
       Markdown,
       Placeholder.configure({ placeholder }),
@@ -294,7 +325,13 @@ function LinkButton({ editor, active }: { editor: Editor; active: boolean }) {
     getBoundingClientRect: () => selectionRect.current ?? new DOMRect(),
   });
 
-  const openFromSelection = () => {
+  /**
+   * Loads the fields and the anchor from whatever is selected. Deliberately
+   * does *not* touch `open` — the trigger toggles that itself, and a second
+   * writer on the same click makes the two fight (the popover opens and shuts
+   * within one event).
+   */
+  const prepareFromSelection = () => {
     // A bare cursor inside a link means the whole link, so grow the selection
     // first — that is what lets ctrl+K edit a link without selecting it.
     if (editor.isActive("link") && editor.state.selection.empty) {
@@ -308,6 +345,11 @@ function LinkButton({ editor, active }: { editor: Editor; active: boolean }) {
 
     selectionRect.current = selectionViewportRect(editor);
     setAnchored(selectionRect.current !== null);
+  };
+
+  /** The keyboard route, which has no trigger to toggle `open` for it. */
+  const openFromSelection = () => {
+    prepareFromSelection();
     setOpen(true);
   };
 
@@ -356,13 +398,19 @@ function LinkButton({ editor, active }: { editor: Editor; active: boolean }) {
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        if (next) prepareFromSelection();
+        setOpen(next);
+      }}>
       <PopoverTrigger asChild>
         <ToolbarButton
           testId="editor.toolbar.link.button"
           label="Link (Ctrl+K)"
-          active={active}
-          onClick={openFromSelection}>
+          // No onClick: the trigger toggles `open` itself, and a second writer
+          // on the same click makes the two fight.
+          active={active}>
           <LinkIcon className="h-4 w-4" />
         </ToolbarButton>
       </PopoverTrigger>
@@ -378,6 +426,19 @@ function LinkButton({ editor, active }: { editor: Editor; active: boolean }) {
         // Marks this as part of the editor's own chrome, so focus landing here
         // is not treated as the user leaving the editor.
         data-editor-chrome=""
+        // The toolbar blocks its own mousedown so the ProseMirror selection
+        // survives the click — which leaves focus in the editor, i.e. outside
+        // this popover, and Radix reads that as "focus left, dismiss me".
+        // Focus anywhere in the editor's chrome is not the user leaving.
+        onFocusOutside={(event) => {
+          const target = event.target;
+          if (
+            target instanceof Element &&
+            target.closest("[data-editor-chrome]") !== null
+          ) {
+            event.preventDefault();
+          }
+        }}
         align="start"
         side="bottom"
         sideOffset={8}
@@ -499,7 +560,8 @@ type ToolbarButtonProps = Omit<ComponentProps<"button">, "onClick"> &
     label: string;
     active?: boolean;
     disabled?: boolean;
-    onClick: () => void;
+    /** Optional: a button inside a Radix trigger lets the trigger do the work. */
+    onClick?: () => void;
     children: ReactNode;
   };
 

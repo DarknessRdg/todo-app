@@ -1,6 +1,10 @@
 import { faker } from "@faker-js/faker";
 
-import type { CreateTodoEntity, TodoEntity } from "@/backend/todo-service";
+import type {
+  CreateTodoEntity,
+  SubtaskEntity,
+  TodoEntity,
+} from "@/backend/todo-service";
 
 /**
  * Test data is random by default so specs cannot quietly depend on a literal
@@ -21,6 +25,20 @@ export function makeTodo(overrides: Partial<TodoEntity> = {}): TodoEntity {
     title: faker.lorem.sentence({ min: 2, max: 6 }),
     done: faker.datatype.boolean(),
     createdAt: faker.date.recent({ days: 30 }),
+    // Empty rather than random: a spec that cares about subtasks passes them,
+    // and one that does not should not have to reason about surprise rows.
+    subtasks: [],
+    ...overrides,
+  };
+}
+
+export function makeSubtask(
+  overrides: Partial<SubtaskEntity> = {}
+): SubtaskEntity {
+  return {
+    id: faker.string.uuid(),
+    title: faker.lorem.sentence({ min: 2, max: 5 }),
+    done: false,
     ...overrides,
   };
 }

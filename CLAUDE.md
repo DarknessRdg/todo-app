@@ -244,6 +244,32 @@ pass-through assertions, where a random value proves *more* than a literal
 Runs stay reproducible: `src/test/setup.ts` seeds faker once per file and prints
 the seed, so `FAKER_SEED=<n> npx vitest run` replays a failure exactly.
 
+### Speed is a policy, not a nice-to-have
+
+Tests must be cheap enough that adding coverage is never a trade-off. Three
+rules enforce that, and all three are already wired up:
+
+- **Every test finishes inside 1s.** `testTimeout`/`hookTimeout` are 1000ms in
+  `vite.config.ts`. A spec that needs longer is not a unit test — decompose it.
+  The single granted exception is `todo-modal.test.tsx`, which carries its own
+  `describe(…, { timeout: 3000 })` and a comment saying why.
+- **Never sleep in a test, and never make a test sleep.** Deliberate pauses in
+  the app — the beat before a completed row re-sorts, how long confetti lives —
+  live in `src/lib/timing.ts` and are read from the environment. `vite.config.ts`
+  sets them to `0` under `test`, so the same code path runs with no wall clock.
+  **Any new animation delay goes there too**; a literal `setTimeout(…, 400)` in
+  a component is a bug the moment a spec touches it.
+- **Drive the UI with `@/test/user`, never `userEvent` directly.** `setupUser()`
+  is `userEvent.setup({ delay: null })` — the default sleeps between the events
+  of a single gesture, which is pure wall clock. Import `waitFor` from there as
+  well; it polls at 10ms instead of Testing Library's 50ms, which matters for
+  the assertions that touch no DOM (`expect(repository.x).toHaveBeenCalled()`)
+  since those can only settle on a poll tick.
+
+Two things that make a spec expensive, to weigh before writing one: mounting a
+whole page when a component or a pure function would do, and pulling in the rich
+text editor (tiptap + lowlight's ~35 grammars) from a file that does not test it.
+
 ### The harness
 
 Configured in `vite.config.ts` under `test`: `jsdom` environment,

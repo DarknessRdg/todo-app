@@ -1,1 +1,16 @@
 /// <reference types="vite/client" />
+
+/**
+ * Tunable delays — see `src/lib/timing.ts`. Declared as strings because that is
+ * what the environment hands over; `readDelay` does the parsing.
+ */
+interface ImportMetaEnv {
+  /** Hold before a completed todo re-sorts into Done. Default 450. */
+  readonly VITE_COMPLETION_RESORT_MS?: string;
+  /** How long the completion confetti stays mounted. Default 1400. */
+  readonly VITE_CONFETTI_VISIBLE_MS?: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}

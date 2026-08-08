@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge.tsx";
 import { cn } from "@/lib/utils.ts";
+import { testProp, type TestIdProps } from "@/lib/test-id";
 import {
   AlertTriangle,
   CalendarIcon,
@@ -10,14 +11,15 @@ import {
   SignalHigh,
   SignalLow,
   SignalMedium,
+  Tag,
   type LucideIcon,
 } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
 /* Illustrative metadata                                                       */
-/* The data model only stores title/done/dueDate/description/createdAt.        */
-/* Project, labels, priority, assignee and subtasks are derived                */
-/* deterministically from the id so every surface (list, modal, page) agrees.  */
+/* Subtasks are real and stored on the todo; project, labels, priority and     */
+/* assignee are not — they are derived deterministically from the id so every  */
+/* surface (list, modal, page) agrees on the same made-up values.              */
 /* -------------------------------------------------------------------------- */
 
 const PROJECTS = ["Personal", "Work", "Learning"] as const;
@@ -29,17 +31,6 @@ const LABEL_POOL = [
   ["Research", "Spike"],
   ["Chore"],
 ];
-
-const SUBTASK_TITLES = [
-  "Break it into concrete steps",
-  "Draft the first pass",
-  "Review and refine",
-  "Gather references",
-  "Write tests",
-  "Ship it",
-];
-
-export type Subtask = { id: string; title: string; done: boolean };
 
 export function hash(id: string) {
   let h = 0;
@@ -54,21 +45,6 @@ export function metaFor(id: string) {
     priority: PRIORITIES[(h >>> 3) % PRIORITIES.length],
     labels: LABEL_POOL[(h >>> 6) % LABEL_POOL.length],
   };
-}
-
-export function subtasksFor(id: string): Subtask[] {
-  const h = hash(id);
-  // Roughly a third of tasks have no subtasks.
-  if (h % 3 === 0) return [];
-
-  const total = 2 + (h % 5); // 2..6
-  const done = (h >>> 4) % (total + 1); // 0..total
-
-  return Array.from({ length: total }, (_, i) => ({
-    id: `${id}-sub-${i}`,
-    title: SUBTASK_TITLES[i % SUBTASK_TITLES.length],
-    done: i < done,
-  }));
 }
 
 export function formatDate(date: Date) {
@@ -192,7 +168,11 @@ export function LabelChips({
   return (
     <div className={cn("flex flex-wrap items-center gap-1", className)}>
       {shown.map((label) => (
-        <Badge key={label} variant="secondary" className="font-normal">
+        <Badge
+          key={label}
+          variant="secondary"
+          className="gap-1.5 font-normal">
+          <Tag className="size-3.5" />
           {label}
         </Badge>
       ))}
@@ -209,7 +189,8 @@ export function SubtaskIndicator({
   done,
   total,
   className,
-}: {
+  testId,
+}: TestIdProps & {
   done: number;
   total: number;
   className?: string;
@@ -218,6 +199,7 @@ export function SubtaskIndicator({
 
   return (
     <span
+      {...testProp(testId)}
       className={cn(
         "text-muted-foreground inline-flex items-center gap-1 text-xs tabular-nums",
         complete && "text-foreground",

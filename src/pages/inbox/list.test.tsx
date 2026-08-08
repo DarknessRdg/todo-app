@@ -1,5 +1,5 @@
-import { screen, waitFor, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { screen, within } from "@testing-library/react";
+import { setupUser, waitFor } from "@/test/user";
 import { describe, expect, it } from "vitest";
 
 import type { TodoEntity } from "@/backend/todo-service";
@@ -9,7 +9,7 @@ import {
   inMemoryTodoRepository,
   renderWithContainer,
 } from "@/test/container";
-import { makeTodo } from "@/test/todo-factory";
+import { makeSubtask, makeTodo } from "@/test/todo-factory";
 
 const openSection = "home.todo.section.open";
 const doneSection = "home.todo.section.done";
@@ -23,6 +23,8 @@ const deleteDialog = (todo: TodoEntity) => `home.todo.${todo.id}.delete.dialog`;
 const deleteConfirm = (todo: TodoEntity) =>
   `home.todo.${todo.id}.delete.confirm`;
 const deleteCancel = (todo: TodoEntity) => `home.todo.${todo.id}.delete.cancel`;
+const subtaskCount = (todo: TodoEntity) =>
+  `home.todo.${todo.id}.subtask.count`;
 
 function renderInbox(todos: TodoEntity[]) {
   const repository = inMemoryTodoRepository(todos);
@@ -108,7 +110,7 @@ describe("todo list", () => {
 
   describe("when I complete a todo", () => {
     it("Then it moves from the open section to the done section", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       const todo = makeTodo({ done: false });
       const { repository } = renderInbox([todo]);
 
@@ -117,14 +119,12 @@ describe("todo list", () => {
 
       await user.click(screen.getByTestId(checkButton(todo)));
 
-      // The row is deliberately held in place for ~450ms so the completion
-      // animation is visible before it re-sorts, so allow for that here.
-      await waitFor(
-        () =>
-          expect(
-            within(screen.getByTestId(doneSection)).getByTestId(rowTitle(todo))
-          ).toBeInTheDocument(),
-        { timeout: 3000 }
+      // The row is held in place before it re-sorts so the completion animation
+      // is visible. `Timing.completionResortMs` is 0 under test, so no sleep.
+      await waitFor(() =>
+        expect(
+          within(screen.getByTestId(doneSection)).getByTestId(rowTitle(todo))
+        ).toBeInTheDocument()
       );
 
       expect(
@@ -137,7 +137,7 @@ describe("todo list", () => {
     });
 
     it("Then it updates the counts", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       const todo = makeTodo({ done: false });
       const other = makeTodo({ done: false });
       renderInbox([todo, other]);
@@ -147,23 +147,21 @@ describe("todo list", () => {
 
       await user.click(screen.getByTestId(checkButton(todo)));
 
-      await waitFor(
-        () =>
-          expect(shownCounts()).toEqual({
-            heroOpen: "1",
-            heroDone: "1",
-            percentage: "50%",
-            openSection: "1",
-            doneSection: "1",
-          }),
-        { timeout: 3000 }
+      await waitFor(() =>
+        expect(shownCounts()).toEqual({
+          heroOpen: "1",
+          heroDone: "1",
+          percentage: "50%",
+          openSection: "1",
+          doneSection: "1",
+        })
       );
     });
   });
 
   describe("when I reopen a done todo", () => {
     it("Then it moves back to the open section", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       const todo = makeTodo({ done: true });
       const { repository } = renderInbox([todo]);
 
@@ -185,7 +183,7 @@ describe("todo list", () => {
     });
 
     it("Then it updates the counts", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       const todo = makeTodo({ done: true });
       renderInbox([todo]);
 
@@ -207,7 +205,7 @@ describe("todo list", () => {
 
   describe("when I delete a todo", () => {
     it("Then it is removed from the screen", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       const doomed = makeTodo({ done: false });
       const survivor = makeTodo({ done: false });
       const { repository } = renderInbox([doomed, survivor]);
@@ -228,7 +226,7 @@ describe("todo list", () => {
     });
 
     it("Then it updates the counts", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       const doomed = makeTodo({ done: false });
       const survivor = makeTodo({ done: false });
       const completed = makeTodo({ done: true });
@@ -252,7 +250,7 @@ describe("todo list", () => {
     });
 
     it("Then cancelling keeps it and leaves the counts alone", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       const todo = makeTodo({ done: false });
       const { repository } = renderInbox([todo]);
 
@@ -272,9 +270,36 @@ describe("todo list", () => {
     });
   });
 
+  describe("when a todo has subtasks", () => {
+    it("Then its row shows how many are done", async () => {
+      const todo = makeTodo({
+        done: false,
+        subtasks: [
+          makeSubtask({ done: true }),
+          makeSubtask({ done: true }),
+          makeSubtask({ done: false }),
+        ],
+      });
+      renderInbox([todo]);
+
+      expect(await screen.findByTestId(subtaskCount(todo))).toHaveTextContent(
+        "2/3"
+      );
+    });
+
+    it("Then a todo without any shows no indicator", async () => {
+      const todo = makeTodo({ done: false, subtasks: [] });
+      renderInbox([todo]);
+
+      await screen.findByTestId(rowTitle(todo));
+
+      expect(screen.queryByTestId(subtaskCount(todo))).not.toBeInTheDocument();
+    });
+  });
+
   describe("when I open a todo", () => {
     it("Then the url carries its id", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       const first = makeTodo({ done: false });
       const second = makeTodo({ done: false });
       const { currentLocation } = renderInbox([first, second]);
@@ -289,7 +314,7 @@ describe("todo list", () => {
     });
 
     it("Then the modal for the clicked todo opens", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       const first = makeTodo({ done: false });
       const second = makeTodo({ done: false });
       renderInbox([first, second]);

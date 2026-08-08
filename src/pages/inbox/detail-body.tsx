@@ -4,6 +4,9 @@ import { TodoChecker } from "@/components/todo.tsx";
 import type { TodoEntity } from "@/backend/todo-service.ts";
 import { RichTextEditor } from "@/components/rich-text-editor.tsx";
 import { useTodoUpdate } from "@/pages/inbox/use-todo-update.ts";
+import { useTodoSubtasks } from "@/pages/inbox/use-todo-subtasks.ts";
+import { Button } from "@/components/ui/button.tsx";
+import { Input } from "@/components/ui/input.tsx";
 import {
   DueBadge,
   LabelChips,
@@ -13,9 +16,16 @@ import {
   formatDate,
   metaFor,
   shortId,
-  subtasksFor,
 } from "@/pages/inbox/todo-meta.tsx";
-import { CalendarIcon, CircleDot, FolderIcon, Plus, SignalHigh, Tag } from "lucide-react";
+import {
+  CalendarIcon,
+  CircleDot,
+  FolderIcon,
+  Plus,
+  SignalHigh,
+  Tag,
+  Trash2Icon,
+} from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { testProp } from "@/lib/test-id";
 
@@ -236,71 +246,93 @@ function DescriptionEditor({ todo }: { todo: TodoEntity }) {
   );
 }
 
-// Subtasks are illustrative for now — derived from the id so the count matches
-// the list; no persistence wired yet.
 function Subtasks({ todo }: { todo: TodoEntity }) {
-  const [subtasks, setSubtasks] = useState(() => subtasksFor(todo.id));
+  const { add, check, remove } = useTodoSubtasks({ id: todo.id });
+  const [title, setTitle] = useState("");
 
-  if (subtasks.length === 0) {
-    return (
-      <section>
-        <p className="eyebrow mb-3">Subtasks</p>
-        <button
-          type="button"
-          className="text-muted-foreground hover:text-foreground -ml-0.5 inline-flex items-center gap-1.5 rounded-lg px-1.5 py-1.5 text-sm transition-colors">
-          <Plus className="size-4" />
-          Add subtask
-        </button>
-      </section>
-    );
-  }
+  const subtasks = todo.subtasks;
+  const doneCount = subtasks.filter((subtask) => subtask.done).length;
+  const percentage =
+    subtasks.length === 0 ? 0 : (doneCount / subtasks.length) * 100;
 
-  const doneCount = subtasks.filter((s) => s.done).length;
-  const percentage = (doneCount / subtasks.length) * 100;
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
 
-  const toggle = (id: string) =>
-    setSubtasks((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, done: !s.done } : s))
-    );
+    // The service rejects a blank title anyway; stopping here keeps the field
+    // from clearing as though something had been added.
+    if (title.trim() === "") return;
+
+    add.mutate(title);
+    setTitle("");
+  };
 
   return (
     <section>
       <div className="mb-3 flex items-center gap-2.5">
         <span className="eyebrow">Subtasks</span>
-        <span
-          {...testProp("todo.detail.subtask.count")}
-          className="text-muted-foreground text-xs tabular-nums">
-          {doneCount}/{subtasks.length}
-        </span>
-        <Progress value={percentage} className="ml-auto h-1.5 w-24" />
+        {subtasks.length > 0 && (
+          <>
+            <span
+              {...testProp("todo.detail.subtask.count")}
+              className="text-muted-foreground text-xs tabular-nums">
+              {doneCount}/{subtasks.length}
+            </span>
+            <Progress value={percentage} className="ml-auto h-1.5 w-24" />
+          </>
+        )}
       </div>
 
       <div className="flex flex-col">
         {subtasks.map((subtask) => (
-          <label
+          <div
             key={subtask.id}
-            className="hover:bg-muted/60 -mx-2 flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 transition-colors">
+            {...testProp(`todo.detail.subtask.${subtask.id}`)}
+            className="group hover:bg-muted/60 -mx-2 flex items-center gap-3 rounded-lg px-2 py-2 transition-colors">
             <Checkbox
               testId={`todo.detail.subtask.${subtask.id}.check`}
               checked={subtask.done}
-              onCheckedChange={() => toggle(subtask.id)}
+              onCheckedChange={(done) =>
+                check.mutate({ subtaskId: subtask.id, done: done === true })
+              }
               className="size-5 rounded-full"
             />
             <span
+              {...testProp(`todo.detail.subtask.${subtask.id}.title`)}
               data-done={subtask.done}
-              className="text-foreground data-[done=true]:text-muted-foreground text-sm data-[done=true]:line-through">
+              className="text-foreground data-[done=true]:text-muted-foreground grow text-sm data-[done=true]:line-through">
               {subtask.title}
             </span>
-          </label>
+            <Button
+              testId={`todo.detail.subtask.${subtask.id}.delete.button`}
+              variant="ghost"
+              size="icon"
+              aria-label="Delete subtask"
+              onClick={() => remove.mutate(subtask.id)}
+              className="text-muted-foreground hover:text-destructive size-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100">
+              <Trash2Icon className="size-3.5" />
+            </Button>
+          </div>
         ))}
       </div>
 
-      <button
-        type="button"
-        className="text-muted-foreground hover:text-foreground mt-1 -ml-0.5 inline-flex items-center gap-1.5 rounded-lg px-1.5 py-1.5 text-sm transition-colors">
-        <Plus className="size-4" />
-        Add subtask
-      </button>
+      <form onSubmit={submit} className="mt-1 flex items-center gap-2">
+        <Plus className="text-muted-foreground size-4 shrink-0" />
+        <Input
+          testId="todo.detail.subtask.add.input"
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+          placeholder="Add subtask"
+          className="h-8 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 dark:bg-transparent"
+        />
+        <Button
+          testId="todo.detail.subtask.add.button"
+          type="submit"
+          size="sm"
+          variant="ghost"
+          disabled={title.trim() === ""}>
+          Add
+        </Button>
+      </form>
     </section>
   );
 }

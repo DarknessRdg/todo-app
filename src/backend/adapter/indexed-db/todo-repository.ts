@@ -1,5 +1,9 @@
 import { Tables, type AppIDB } from "@/backend/adapter/indexed-db/indexed-db";
-import type { TodoEntity, TodoRepository } from "@/backend/todo-service";
+import type {
+  SubtaskEntity,
+  TodoEntity,
+  TodoRepository,
+} from "@/backend/todo-service";
 
 export class TodoRepositoryIndexedDB implements TodoRepository {
   private db: AppIDB;
@@ -29,16 +33,11 @@ export class TodoRepositoryIndexedDB implements TodoRepository {
   };
 
   updateDone = async ({ id, done }: { id: string; done: boolean }) => {
-    await this.onTransaction("readwrite", async (txRepo) => {
-      const todo = await txRepo.getById(id);
-
-      if (!todo) throw `Todo with given key does not exist: ${id}`;
-
-      todo.done = done;
-      todo.dueDate = new Date();
-
-      txRepo.update(todo);
-    });
+    await this.mutateTodo(id, (todo) => ({
+      ...todo,
+      done,
+      dueDate: new Date(),
+    }));
   };
 
   updateDescription = async ({
@@ -48,29 +47,79 @@ export class TodoRepositoryIndexedDB implements TodoRepository {
     id: string;
     description: string;
   }) => {
-    await this.onTransaction("readwrite", async (txRepo) => {
-      const todo = await txRepo.getById(id);
+    await this.mutateTodo(id, (todo) => ({ ...todo, description }));
+  };
 
-      if (!todo) throw `Todo with given key does not exist: ${id}`;
+  addSubtask = async ({
+    id,
+    subtask,
+  }: {
+    id: string;
+    subtask: SubtaskEntity;
+  }) => {
+    await this.mutateSubtasks(id, (subtasks) => [...subtasks, subtask]);
+  };
 
-      todo.description = description;
+  updateSubtaskDone = async ({
+    id,
+    subtaskId,
+    done,
+  }: {
+    id: string;
+    subtaskId: string;
+    done: boolean;
+  }) => {
+    await this.mutateSubtasks(id, (subtasks) =>
+      subtasks.map((subtask) =>
+        subtask.id === subtaskId ? { ...subtask, done } : subtask
+      )
+    );
+  };
 
-      txRepo.update(todo);
-    });
+  deleteSubtask = async ({
+    id,
+    subtaskId,
+  }: {
+    id: string;
+    subtaskId: string;
+  }) => {
+    await this.mutateSubtasks(id, (subtasks) =>
+      subtasks.filter((subtask) => subtask.id !== subtaskId)
+    );
+  };
+
+  private mutateSubtasks = async (
+    id: string,
+    change: (subtasks: SubtaskEntity[]) => SubtaskEntity[]
+  ) => {
+    await this.mutateTodo(id, (todo) => ({
+      ...todo,
+      subtasks: change(todo.subtasks ?? []),
+    }));
+  };
+
+  /**
+   * Read-modify-write on one todo, within a single transaction.
+   *
+   * The read and the write go through `tx.store`, not through this class's own
+   * methods: those open transactions of their own, and a nested transaction on
+   * a store the outer readwrite already locked waits for a lock that cannot be
+   * released until it returns — a deadlock, and no atomicity either way.
+   */
+  private mutateTodo = async (
+    id: string,
+    change: (todo: TodoEntity) => TodoEntity
+  ) => {
+    const transaction = this.db.transaction(Tables.Todo, "readwrite");
+    const todo = await transaction.store.get(id);
+
+    if (!todo) throw `Todo with given key does not exist: ${id}`;
+
+    await transaction.store.put(change(todo));
+    await transaction.done;
   };
 
   update = async (todo: TodoEntity) => {
     await this.db.put(Tables.Todo, todo);
-  };
-
-  private onTransaction = async (
-    mode: "readonly" | "readwrite",
-    action: (repo: TodoRepositoryIndexedDB) => Promise<void>
-  ) => {
-    const transaction = this.db.transaction(Tables.Todo, mode);
-    const repo = new TodoRepositoryIndexedDB(transaction.db);
-
-    await action(repo);
-    await transaction.done;
   };
 }
