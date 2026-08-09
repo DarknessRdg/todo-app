@@ -48,25 +48,24 @@ export function TodoModalContent({
           </Button>
         </TooltipText>
       }>
-      {(view) => {
-        // Nothing at all while the read is in flight: a dialog that pops open
-        // empty and resizes a beat later is worse than one that arrives whole.
-        if (view.status === "loading") return <></>;
-
-        return (
-          <ModalShell
-            id={id}
-            title={titleFor(view)}
-            onClose={onClose}
-            // Only the real detail needs the tall pane; a message in an 85vh
-            // dialog is mostly empty space.
-            className={
-              view.status === "ready" ? "h-[85vh] max-h-[85vh]" : undefined
-            }>
-            {view.content}
-          </ModalShell>
-        );
-      }}
+      {(view) => (
+        <ModalShell
+          id={id}
+          title={titleFor(view)}
+          onClose={onClose}
+          // The tall pane is for the real detail — a message in an 85vh dialog
+          // is mostly empty space. Loading takes it too, though: the read is
+          // what it is about to become, and opening at the final size means
+          // the content fills a frame that is already there rather than the
+          // frame resizing under it.
+          className={
+            view.status === "ready" || view.status === "loading"
+              ? "h-[85vh] max-h-[85vh]"
+              : undefined
+          }>
+          {view.content}
+        </ModalShell>
+      )}
     </TodoDetail>
   );
 }
@@ -78,6 +77,8 @@ function titleFor(view: TodoDetailView) {
       return "This todo could not be read";
     case "missing":
       return "This todo is no longer here";
+    case "loading":
+      return "Loading this todo";
     default:
       return view.status === "ready" ? view.todo.title : "";
   }

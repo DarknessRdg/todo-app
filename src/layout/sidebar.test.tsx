@@ -4,17 +4,26 @@ import { describe, expect, it } from "vitest";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/layout/sidebar";
 import { views } from "@/layout/views";
-import { renderWithContainer } from "@/test/container";
+import {
+  createTestContainer,
+  inMemoryTodoRepository,
+  renderWithContainer,
+} from "@/test/container";
+import { makeTodo } from "@/test/todo-factory";
 import { setupUser, waitFor } from "@/test/user";
 
 const viewLink = (id: string) => `sidebar.view.${id}.link`;
+const inboxCount = "sidebar.view.inbox.count";
 
-function renderSidebar(route: string) {
+function renderSidebar(
+  route: string,
+  todos: ReturnType<typeof makeTodo>[] = []
+) {
   return renderWithContainer(
     <SidebarProvider>
       <AppSidebar />
     </SidebarProvider>,
-    { route }
+    { route, diContainer: createTestContainer(inMemoryTodoRepository(todos)) }
   );
 }
 
@@ -95,5 +104,38 @@ describe("sidebar", () => {
         "aria-current"
       );
     });
+  });
+
+  describe("when the inbox has open todos", () => {
+    it("Then it carries their count", async () => {
+      renderSidebar("/", [
+        makeTodo({ done: false }),
+        makeTodo({ done: false }),
+      ]);
+
+      expect(await screen.findByTestId(inboxCount)).toHaveTextContent("2");
+    });
+
+    it("Then finished ones are left out of it", async () => {
+      renderSidebar("/", [makeTodo({ done: false }), makeTodo({ done: true })]);
+
+      expect(await screen.findByTestId(inboxCount)).toHaveTextContent("1");
+    });
+
+    it("Then nothing open shows no count at all, rather than a zero", async () => {
+      renderSidebar("/", [makeTodo({ done: true })]);
+
+      await screen.findByTestId(viewLink("inbox"));
+
+      expect(screen.queryByTestId(inboxCount)).not.toBeInTheDocument();
+    });
+  });
+
+  it("when a view is not built yet, Then it carries no invented count", async () => {
+    renderSidebar("/", [makeTodo({ done: false })]);
+
+    await screen.findByTestId(viewLink("today"));
+
+    expect(screen.queryByTestId("sidebar.view.today.count")).not.toBeInTheDocument();
   });
 });

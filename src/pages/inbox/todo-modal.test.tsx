@@ -151,10 +151,13 @@ describe("todo detail modal", { timeout: 3000 }, () => {
 
   it("when I open the description's link popover inside it, Then the popover is usable", async () => {
     const user = setupUser();
-    const { modal } = renderInboxWithModalOpen({ description: "read the docs" });
+    renderInboxWithModalOpen({ description: "read the docs" });
 
-    await screen.findByTestId(modal);
-    await user.click(screen.getByTestId("todo.detail.description.read"));
+    // The frame now opens before the read finishes, so waiting on the modal
+    // itself no longer means the detail is in it — wait for the content.
+    await user.click(
+      await screen.findByTestId("todo.detail.description.read")
+    );
     await user.click(await screen.findByTestId("editor.toolbar.link.button"));
 
     // A dialog makes everything outside it inert, so a popover portalled to the
@@ -167,12 +170,10 @@ describe("todo detail modal", { timeout: 3000 }, () => {
 
   it("when I open it full screen, Then the url becomes the todo's own page", async () => {
     const user = setupUser();
-    const { modal, fullScreenButton, todo, currentLocation } =
+    const { fullScreenButton, todo, currentLocation } =
       renderInboxWithModalOpen();
 
-    await screen.findByTestId(modal);
-
-    await user.click(screen.getByTestId(fullScreenButton));
+    await user.click(await screen.findByTestId(fullScreenButton));
 
     await waitFor(() => expect(currentLocation()).toBe(`/todo/${todo.id}`));
   });

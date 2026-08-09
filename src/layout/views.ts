@@ -18,7 +18,6 @@ export type View = {
   /** The url this view owns. Rendered as a real href, not an onClick. */
   path: string;
   icon: LucideIcon;
-  count?: number;
   /**
    * Further subtrees that belong to this view. A todo's own page is a row of
    * the inbox opened full screen, so `/todo/<id>` keeps Inbox highlighted.
@@ -26,12 +25,14 @@ export type View = {
   owns?: string[];
 };
 
-// Views are filters over the same task set (business logic comes later).
+// Views are filters over the same task set (business logic comes later). No
+// counts here: a number in this file is a number nobody counted. The sidebar
+// derives the ones it can from the stored todos.
 export const views: View[] = [
-  { id: "inbox", title: "Inbox", path: "/", icon: Inbox, count: 12, owns: ["/todo"] },
-  { id: "today", title: "Today", path: "/today", icon: Sun, count: 3 },
-  { id: "upcoming", title: "Upcoming", path: "/upcoming", icon: CalendarDays, count: 8 },
-  { id: "overdue", title: "Overdue", path: "/overdue", icon: CalendarClock, count: 2 },
+  { id: "inbox", title: "Inbox", path: "/", icon: Inbox, owns: ["/todo"] },
+  { id: "today", title: "Today", path: "/today", icon: Sun },
+  { id: "upcoming", title: "Upcoming", path: "/upcoming", icon: CalendarDays },
+  { id: "overdue", title: "Overdue", path: "/overdue", icon: CalendarClock },
   { id: "completed", title: "Completed", path: "/completed", icon: CheckCircle2 },
   { id: "labels", title: "Labels", path: "/labels", icon: Tag },
 ];

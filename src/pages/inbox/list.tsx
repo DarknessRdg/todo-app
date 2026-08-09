@@ -8,7 +8,7 @@ import { useTodoUpdate } from "@/pages/inbox/use-todo-update";
 import { DeleteButton } from "@/pages/inbox/delete-button";
 import type { TodoEntity } from "@/backend/todo-service";
 import { Progress } from "@/components/ui/progress.tsx";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   DueBadge,
   LabelChips,
@@ -21,16 +21,10 @@ import { useEffect, useRef, useState } from "react";
 import { ConfettiBurst } from "@/components/confetti-burst";
 import { TodoProjectBadge } from "@/pages/inbox/todo-project-badge";
 
-export function TodoList() {
-  const { todoList, doneList, count, isLoading } = useTodoList();
+export function TodoList({ projectId }: { projectId?: string } = {}) {
+  const { todoList, doneList, count, isLoading } = useTodoList({ projectId });
 
-  if (isLoading) {
-    return (
-      <div className="text-muted-foreground flex items-center gap-2 py-10 text-sm">
-        <Spinner /> Loading…
-      </div>
-    );
-  }
+  if (isLoading) return <TodoListSkeleton />;
 
   if (count === 0) return <EmptyList />;
 
@@ -63,6 +57,38 @@ export function TodoList() {
           <TodoListContainer todoList={doneList} />
         </Section>
       )}
+    </div>
+  );
+}
+
+/** Row-shaped stand-ins, so the list does not jump when the todos land. */
+function TodoListSkeleton() {
+  return (
+    <div
+      {...testProp("home.todo.list.loading")}
+      aria-busy
+      aria-label="Loading todos"
+      className="flex flex-col gap-8">
+      <section>
+        <div className="mb-3 flex items-center gap-2.5">
+          <Skeleton className="h-4 w-16" />
+          <Skeleton className="h-6 w-6 rounded-md" />
+        </div>
+
+        <div className="flex flex-col gap-2">
+          {[0, 1, 2].map((row) => (
+            <div
+              key={row}
+              className="bg-card flex items-start gap-3 rounded-2xl px-4 py-3.5">
+              <Skeleton className="mt-0.5 size-5 shrink-0 rounded-full" />
+              <div className="flex min-w-0 grow flex-col gap-2">
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-3 w-1/4" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

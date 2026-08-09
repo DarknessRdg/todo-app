@@ -38,7 +38,7 @@ import { useNavigate } from "react-router";
 import { testProp } from "@/lib/test-id";
 import { useTodoDetails } from "@/pages/inbox/use-todo-details.ts";
 import { TodoLookupFailed } from "@/components/todo-lookup-failed";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 /* -------------------------------------------------------------------------- */
 /* Header                                                                      */
@@ -238,12 +238,63 @@ function ResolvedTodoDetail({
   });
 }
 
+/**
+ * Stands in for the detail while it is read, shaped like what is about to
+ * arrive: the header, the description block and the properties column all
+ * occupy the space they will take, so nothing jumps when the data lands.
+ */
 function DetailLoading() {
   return (
     <div
       {...testProp("todo.detail.loading")}
-      className="text-muted-foreground flex items-center gap-2 py-10 text-sm">
-      <Spinner /> Loading…
+      aria-busy
+      aria-label="Loading this todo"
+      className="flex min-h-full flex-col gap-8">
+      <header className="flex flex-col gap-4">
+        <Skeleton className="h-3 w-40" />
+
+        <div className="flex items-start gap-3">
+          <Skeleton className="mt-1 size-5 shrink-0 rounded-full" />
+          <Skeleton className="h-7 w-2/3" />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Skeleton className="h-6 w-20 rounded-full" />
+          <Skeleton className="h-6 w-16 rounded-full" />
+          <Skeleton className="h-6 w-24 rounded-full" />
+        </div>
+      </header>
+
+      <div className="grid flex-1 items-stretch gap-8 lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="flex min-w-0 flex-col gap-8">
+          <section className="flex flex-col gap-2.5">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-5/6" />
+            <Skeleton className="h-4 w-3/4" />
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <Skeleton className="h-3 w-20" />
+            {[0, 1, 2].map((row) => (
+              <div key={row} className="flex items-center gap-3">
+                <Skeleton className="size-5 shrink-0 rounded-full" />
+                <Skeleton className="h-4 w-1/2" />
+              </div>
+            ))}
+          </section>
+        </div>
+
+        <aside className="lg:border-border flex flex-col gap-3 lg:border-l lg:pl-8">
+          <Skeleton className="h-3 w-20" />
+          {[0, 1, 2, 3, 4].map((row) => (
+            <div key={row} className="flex items-center justify-between gap-3">
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-4 w-16" />
+            </div>
+          ))}
+        </aside>
+      </div>
     </div>
   );
 }

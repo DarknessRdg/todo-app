@@ -1,6 +1,7 @@
 import { Route, Routes } from "react-router";
 import { Inbox } from "./pages/inbox/inbox";
 import { TodoPage } from "./pages/todo/todo-page";
+import { ProjectPage } from "./pages/project/project-page";
 import { ComingSoon } from "./pages/coming-soon/coming-soon";
 import { NotFound } from "./pages/not-found/not-found";
 import { AppLayout } from "./layout/layout";
@@ -54,6 +55,7 @@ export function AppRouteTable() {
           <Route key={view.id} path={view.path} element={<ComingSoon />} />
         ))}
         <Route path="todo/:id" element={<TodoPage />} />
+        <Route path="project/:id" element={<ProjectPage />} />
         {/*
           Last, and inside the layout: an address that matches nothing still
           gets the sidebar, so the reader can navigate out rather than hitting

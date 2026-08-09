@@ -33,6 +33,11 @@
     --input: #a8a8a8; /* control hairline — checkbox needs real contrast on mist */
     --ring: #1f1f1f; /* ink focus */
     --card-hover: #edeee1; /* sage-tinted hover — warm, never cool */
+    /* Modal backdrop. The scrim dims what is behind; the blur pushes it out of
+       focus so the dialog reads as the only live surface. Tune here, not on
+       the overlay — every dialog draws from this. */
+    --overlay: oklch(0% 0 0 / 45%);
+    --overlay-blur: 6px;
     --chart-1: #1f1f1f;
     --chart-2: #737373;
     --chart-3: #a3a3a3;
@@ -83,6 +88,10 @@
     --input: #5c5c5c; /* control hairline — checkbox needs real contrast on card */
     --ring: #f4f4f4;
     --card-hover: #17170f; /* sage-tinted hover — warm, never cool */
+    /* Heavier on the near-black canvas: the same 45% over a dark page barely
+       separates the dialog from what is behind it. */
+    --overlay: oklch(0% 0 0 / 65%);
+    --overlay-blur: 6px;
     --chart-1: #f4f4f4;
     --chart-2: #a3a3a3;
     --chart-3: #737373;
@@ -149,6 +158,7 @@
     --color-sage: #f6f7ed;
     --color-mist: #f4f4f4;
     --color-card-hover: var(--card-hover);
+    --color-overlay: var(--overlay);
 
     --radius-sm: calc(var(--radius) - 4px);
     --radius-md: calc(var(--radius) - 2px);
@@ -177,11 +187,6 @@
   /* Count / meta chip — soft gray rounded rect (kanban-column style) */
   .count-chip {
     @apply text-muted-foreground bg-muted inline-flex h-6 min-w-6 items-center justify-center gap-1 rounded-md px-1.5 text-xs font-medium tabular-nums;
-  }
-
-  /* Keyboard hint chip */
-  .kbd {
-    @apply text-muted-foreground bg-muted inline-flex h-5 min-w-5 items-center justify-center rounded-[0.35rem] px-1.5 text-[0.6875rem] font-medium leading-none;
   }
 
   /* Tree indent guide rail (hairline) */

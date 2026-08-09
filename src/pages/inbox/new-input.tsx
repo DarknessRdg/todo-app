@@ -19,14 +19,19 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-export function NewInput() {
+/**
+ * `projectId` files whatever is captured into that project by default — the
+ * project page passes its own, so adding from there does not mean picking it
+ * again for every todo.
+ */
+export function NewInput({ projectId }: { projectId?: string } = {}) {
   const { create, validateField } = useTodoCreate();
 
   const form = useAppForm({
     defaultValues: {
       title: "",
       dueDate: new Date(),
-      projectId: undefined,
+      projectId,
     } as CreateTodoEntity,
     onSubmit: ({ value, formApi }) => {
       create.mutate(value);
@@ -103,8 +108,6 @@ export function NewInput() {
                 />
               )}
             />
-
-            <span className="kbd mr-0.5 hidden sm:inline-flex">↵</span>
 
             <form.SubmitButton
               testId="home.todo.create.submit"

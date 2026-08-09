@@ -388,6 +388,59 @@ this table gets a hue.
   (`--font-mono`) reserved for code only. **Motion:** ~200ms ease; the check-mark
   completion pop (`.animate-check-pop`) is the one flourish.
 
+### Overlays
+
+Modal backdrops are driven by two tokens in `src/index.css` — `--overlay`
+(the scrim) and `--overlay-blur` (how far what is behind it is pushed out of
+focus). Retune those, in **both** `:root` and `.dark`, rather than touching an
+overlay component.
+
+The catch: shadcn vendors **one overlay per primitive**, so the same class
+string is duplicated across `dialog.tsx`, `alert-dialog.tsx` and `sheet.tsx`.
+All three read the tokens; changing one of them only and calling it done is how
+the delete confirmation ends up looking different from the todo modal. When a
+vendored file is regenerated, re-apply `bg-overlay
+backdrop-blur-[var(--overlay-blur)]` there — the same way `testId` has to be
+re-applied.
+
+### Loading states — skeletons, not spinners
+
+**Content that is loading is drawn as a skeleton, never a spinner.** Use
+`Skeleton` from `src/components/ui/skeleton.tsx`. A spinner says only "wait";
+a skeleton says what is coming and holds its place, so the page does not
+reflow the moment the data lands.
+
+The skeleton **mirrors the layout it stands in for** — same wrapper classes,
+same grid, same rough block sizes. A generic grey box in the middle of the
+screen is not a skeleton, it is a spinner that lost its animation. If the real
+view is a two-column grid with a header, so is its skeleton.
+
+```tsx
+// ✅ shaped like the thing it replaces
+<div className="flex flex-col gap-4" aria-busy aria-label="Loading this todo">
+  <Skeleton className="h-3 w-40" />
+  <Skeleton className="h-7 w-2/3" />
+</div>
+
+// ❌ tells the reader nothing and reflows on arrival
+<div className="flex items-center gap-2"><Spinner /> Loading…</div>
+```
+
+Rules that keep it honest:
+
+- **Tag it** — `aria-busy` plus an `aria-label` naming what is loading, and a
+  `data-test-id` (`todo.detail.loading`, `home.todo.list.loading`) so a spec can
+  assert the state without matching on copy.
+- **No text.** "Loading…" beside a skeleton is a spinner with extra steps.
+- **Size it like the real thing.** The skeleton's container gets the same height
+  the loaded view will take (`h-[85vh]` on the modal, for instance), so the frame
+  is final before the content arrives.
+
+**Spinners survive in exactly one place: in-place feedback on an action the user
+just took** — a submit button mid-request (`delete-button.tsx`), where there is
+no content to stand in for and the button must keep its own size. Never for a
+page, a panel, a list, or anything fetched on mount.
+
 ### Dark theme
 
 Neutral monochrome inversion in the `.dark` block: near-black canvas `#161616`,

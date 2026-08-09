@@ -1,26 +1,17 @@
 import { TodoList } from "./list";
-import { TodoModalContent } from "@/pages/inbox/todo-modal.tsx";
+import { TodoModalRoute } from "@/pages/inbox/todo-modal-route.tsx";
 import { RightRail } from "@/pages/inbox/right-rail.tsx";
-import { useNavigation } from "@/hooks/navigation.ts";
 import { NewInput } from "@/pages/inbox/new-input";
 import { useTodoList } from "@/pages/inbox/use-todo-list";
 import { Text } from "@/components/ui/text";
 import { type TestIdProps } from "@/lib/test-id";
 
-const QueryParamsKeys = {
-  TodoId: "todo",
-};
-
 export function Inbox() {
   const { count, doneList } = useTodoList();
-  const { searchParams, removeQueryParms } = useNavigation();
-  const todoId = searchParams.get(QueryParamsKeys.TodoId);
 
   const doneCount = doneList?.length ?? 0;
   const openCount = count - doneCount;
   const percentage = count > 0 ? Math.round((doneCount / count) * 100) : 0;
-
-  const closeTodo = () => removeQueryParms(QueryParamsKeys.TodoId);
 
   return (
     <div className="flex items-start gap-8">
@@ -49,7 +40,7 @@ export function Inbox() {
 
       <RightRail />
 
-      {todoId && <TodoModalContent id={todoId} onClose={closeTodo} />}
+      <TodoModalRoute />
     </div>
   );
 }
