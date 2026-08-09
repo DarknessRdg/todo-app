@@ -16,10 +16,12 @@ import { makeTodo } from "@/test/todo-factory";
 
 const title = "todo.detail.title";
 const backButton = "todo.page.back.button";
-const notFound = "not-found";
-const notFoundInboxLink = "not-found.inbox.link";
-const loadFailed = "todo.page.error";
-const loadFailedRetry = "todo.page.error.retry.button";
+// The three non-content states are the shared detail's, not the page's — the
+// modal renders the same ones, which is the point of the shared component.
+const missing = "todo.detail.missing";
+const missingInboxLink = "todo.detail.missing.close.button";
+const loadFailed = "todo.detail.error";
+const loadFailedRetry = "todo.detail.error.retry.button";
 
 /**
  * The page reads its id from the path, so it has to be mounted behind a real
@@ -112,30 +114,30 @@ describe("todo page", () => {
   });
 
   describe("when the url points at a todo that is not there", () => {
-    it("Then the not-found page stands in for it", async () => {
+    it("Then it says the todo is no longer here", async () => {
       renderTodoPage({ stored: [makeTodo()], visiting: makeTodo().id });
 
-      expect(await screen.findByTestId(notFound)).toBeInTheDocument();
+      expect(await screen.findByTestId(missing)).toBeInTheDocument();
     });
 
     it("Then no detail is shown", async () => {
       renderTodoPage({ stored: [makeTodo()], visiting: makeTodo().id });
 
-      await screen.findByTestId(notFound);
+      await screen.findByTestId(missing);
 
       expect(screen.queryByTestId(title)).not.toBeInTheDocument();
     });
 
     it("Then the url is left alone, so the id can still be read off it", async () => {
-      const missing = makeTodo();
+      const absent = makeTodo();
       const { currentLocation } = renderTodoPage({
         stored: [makeTodo()],
-        visiting: missing.id,
+        visiting: absent.id,
       });
 
-      await screen.findByTestId(notFound);
+      await screen.findByTestId(missing);
 
-      expect(currentLocation()).toBe(`/todo/${missing.id}`);
+      expect(currentLocation()).toBe(`/todo/${absent.id}`);
     });
 
     it("Then the inbox is one click away", async () => {
@@ -145,7 +147,7 @@ describe("todo page", () => {
         visiting: makeTodo().id,
       });
 
-      await user.click(await screen.findByTestId(notFoundInboxLink));
+      await user.click(await screen.findByTestId(missingInboxLink));
 
       await waitFor(() => expect(currentLocation()).toBe("/"));
     });
@@ -156,7 +158,7 @@ describe("todo page", () => {
       renderFailingTodoPage();
 
       expect(await screen.findByTestId(loadFailed)).toBeInTheDocument();
-      expect(screen.queryByTestId(notFound)).not.toBeInTheDocument();
+      expect(screen.queryByTestId(missing)).not.toBeInTheDocument();
     });
 
     it("Then retrying re-reads the todo", async () => {

@@ -116,6 +116,59 @@ describe("TodoService", () => {
     });
   });
 
+  describe("when I retitle a todo", () => {
+    it("Then the new title is persisted against it", async () => {
+      const repository = mockTodoRepository();
+      const todo = makeTodo();
+
+      await serviceWith(repository).updateTitle({
+        id: todo.id,
+        title: "Repot the fig tree",
+      });
+
+      expect(repository.updateTitle).toHaveBeenCalledTimes(1);
+      expect(repository.updateTitle.mock.calls[0][0]).toEqual({
+        id: todo.id,
+        title: "Repot the fig tree",
+      });
+    });
+
+    it("Then the title is stored trimmed", async () => {
+      const repository = mockTodoRepository();
+
+      await serviceWith(repository).updateTitle({
+        id: makeTodo().id,
+        title: "   Repot the fig tree   ",
+      });
+
+      expect(repository.updateTitle.mock.calls[0][0].title).toBe(
+        "Repot the fig tree"
+      );
+    });
+
+    it("Then an empty title is rejected, so a todo cannot be left nameless", async () => {
+      const repository = mockTodoRepository();
+
+      await serviceWith(repository).updateTitle({
+        id: makeTodo().id,
+        title: "",
+      });
+
+      expect(repository.updateTitle).not.toHaveBeenCalled();
+    });
+
+    it("Then a title of only whitespace is rejected too", async () => {
+      const repository = mockTodoRepository();
+
+      await serviceWith(repository).updateTitle({
+        id: makeTodo().id,
+        title: "   ",
+      });
+
+      expect(repository.updateTitle).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when I complete a subtask", () => {
     it("Then the change is passed to the repository", async () => {
       const repository = mockTodoRepository();

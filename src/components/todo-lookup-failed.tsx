@@ -1,6 +1,7 @@
 import { RotateCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Text } from "@/components/ui/text";
 import { testProp, type TestIdProps } from "@/lib/test-id";
 
 type TodoLookupFailedProps = TestIdProps & {
@@ -18,14 +19,12 @@ type TodoLookupFailedProps = TestIdProps & {
 export function TodoLookupFailed({ onRetry, testId }: TodoLookupFailedProps) {
   return (
     <div className="flex flex-col items-start gap-3" {...testProp(testId)}>
-      <p className="eyebrow">Error</p>
-      <h2 className="text-2xl font-medium tracking-tight">
-        This todo could not be read
-      </h2>
-      <p className="text-muted-foreground text-sm">
+      <Text variant="eyebrow">Error</Text>
+      <Text variant="h2">This todo could not be read</Text>
+      <Text variant="muted">
         The stored data could not be opened. The todo may still be there — this
         is not the same as it being gone.
-      </p>
+      </Text>
 
       <Button
         // The dotted path continues from the root id, so a caller only names

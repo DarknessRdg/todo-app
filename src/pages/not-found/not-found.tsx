@@ -1,5 +1,6 @@
 import { testProp } from "@/lib/test-id";
 import { Button } from "@/components/ui/button";
+import { Text } from "@/components/ui/text";
 import { Link, useLocation } from "react-router";
 
 /**
@@ -12,14 +13,15 @@ export function NotFound() {
 
   return (
     <div className="flex flex-col items-start gap-3 py-16" {...testProp("not-found")}>
-      <p className="eyebrow">404</p>
-      <h1 className="text-2xl font-medium tracking-tight">
+      <Text variant="eyebrow">404</Text>
+      {/* Sized as a section heading, but the page's only h1. */}
+      <Text variant="h2" as="h1">
         There is nothing at this address
-      </h1>
-      <p className="text-muted-foreground text-sm">
+      </Text>
+      <Text variant="muted">
         <span className="font-mono">{pathname}</span> does not match anything in
         the app.
-      </p>
+      </Text>
 
       <Button asChild className="mt-3 rounded-full">
         <Link to="/" {...testProp("not-found.inbox.link")}>

@@ -1,4 +1,5 @@
 import { TodoCheckerInput, TodoTitle } from "@/components/todo";
+import { Text } from "@/components/ui/text";
 import { testProp, type TestIdProps } from "@/lib/test-id";
 import { Timing } from "@/lib/timing";
 import { useTodoList } from "./use-todo-list";
@@ -83,7 +84,7 @@ function Section({
   return (
     <section {...testProp(testId)}>
       <div className="mb-3 flex items-center gap-2.5">
-        <h2 className="text-base font-semibold tracking-tight">{label}</h2>
+        <Text variant="h5">{label}</Text>
         <span {...testProp(countTestId)} className="count-chip">
           {count}
         </span>
@@ -97,9 +98,9 @@ function Section({
 function TodoListContainer({ todoList }: { todoList?: TodoEntity[] }) {
   if (!todoList?.length) {
     return (
-      <p className="text-muted-foreground/70 px-1 py-3 text-sm">
+      <Text variant="muted" className="text-muted-foreground/70 px-1 py-3">
         Nothing here yet.
-      </p>
+      </Text>
     );
   }
 

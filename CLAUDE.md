@@ -88,6 +88,24 @@ constantly and the churn is not wanted. A test that breaks when a `className`
 changes is a bug in the test. Assert on **behavior and output** — what the user
 sees happen and what the service was asked to do — never on markup shape.
 
+### Never delete a test on your own
+
+A test is only removed or rewritten when the feature it covers **genuinely changed
+behavior** — the assertion now describes something the app is no longer supposed to
+do. A failing test is not a reason to delete it; it is the finding. Never delete,
+skip, `it.only`-around, or weaken a spec to make a suite green.
+
+When a behavior change really does invalidate a test, **stop and ask permission
+first**. State plainly, before touching it:
+
+- which spec (file + the full `component > action > Then …` path),
+- what behavior changed and why the old assertion no longer holds,
+- what replaces it — the new spec covering the new behavior, or an explicit note
+  that the behavior is gone entirely.
+
+Proceed only after the user says yes. Removing coverage silently is worse than
+leaving a red test on screen.
+
 ### Spec naming — `component` > `action` > `…N side effects`
 
 Every spec is a nesting path, read outermost → innermost, exactly like the test-id

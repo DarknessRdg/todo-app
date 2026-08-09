@@ -3,7 +3,7 @@ import { useStore } from "@tanstack/react-form";
 import { Label } from "@radix-ui/react-label";
 import { Input, type InputProps as UiInputProps } from "@/components/ui/input";
 import type { ReactNode } from "react";
-import { Typography } from "@/components/ui/typography";
+import { Text } from "@/components/ui/text";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { uuidV7 } from "@/lib/uuid";
 import { testProp, type TestIdProps } from "@/lib/test-id";
@@ -66,9 +66,7 @@ function ErrorMessage({ error }: { error: string | undefined }) {
   }
 
   return (
-    <Typography variant="p" className="text-destructive">
-      {error}
-    </Typography>
+    <Text className="text-destructive">{error}</Text>
   );
 }
 

@@ -1,4 +1,5 @@
 import { testProp } from "@/lib/test-id";
+import { Text } from "@/components/ui/text";
 import { views } from "@/layout/views";
 import { useLocation } from "react-router";
 
@@ -18,10 +19,12 @@ export function ComingSoon() {
     <div
       className="flex flex-col gap-2 py-16"
       {...testProp("coming-soon")}>
-      <h1 className="text-2xl font-medium tracking-tight">{title}</h1>
-      <p className="text-muted-foreground text-sm">
+      <Text variant="h2" as="h1">
+        {title}
+      </Text>
+      <Text variant="muted">
         Not built yet — everything still lives in the inbox.
-      </p>
+      </Text>
     </div>
   );
 }

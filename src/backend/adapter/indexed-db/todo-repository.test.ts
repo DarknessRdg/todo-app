@@ -78,6 +78,41 @@ describe("TodoRepositoryIndexedDB", () => {
     });
   });
 
+  describe("when I retitle a todo", () => {
+    it("Then the stored title is the new one", async () => {
+      const todo = makeTodo({ title: "Water the plants" });
+      const repository = await repositoryWith([todo]);
+
+      await repository.updateTitle({
+        id: todo.id,
+        title: "Repot the fig tree",
+      });
+
+      const stored = await repository.getById(todo.id);
+      expect(stored?.title).toBe("Repot the fig tree");
+    });
+
+    it("Then the rest of the todo is left untouched", async () => {
+      const todo = makeTodo({ title: "Water the plants", done: true });
+      const repository = await repositoryWith([todo]);
+
+      await repository.updateTitle({ id: todo.id, title: "Repot it" });
+
+      const stored = await repository.getById(todo.id);
+      expect(stored).toEqual({ ...todo, title: "Repot it" });
+    });
+
+    it("Then a todo that is not there is refused rather than created", async () => {
+      const repository = await repositoryWith([]);
+
+      await expect(
+        repository.updateTitle({ id: makeTodo().id, title: "Anything" })
+      ).rejects.toBeDefined();
+
+      expect(await repository.count()).toBe(0);
+    });
+  });
+
   describe("when I complete a subtask", () => {
     it("Then only that subtask changes", async () => {
       const target = makeSubtask({ done: false });

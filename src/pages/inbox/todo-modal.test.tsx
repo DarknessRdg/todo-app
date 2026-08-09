@@ -101,10 +101,10 @@ function renderInboxWithUnreadableTodo({
     id,
     repository,
     modal: `home.todo.${id}.modal`,
-    missing: `home.todo.${id}.modal.missing`,
-    missingClose: `home.todo.${id}.modal.missing.close.button`,
-    failed: `home.todo.${id}.modal.error`,
-    failedRetry: `home.todo.${id}.modal.error.retry.button`,
+    missing: "todo.detail.missing",
+    missingClose: "todo.detail.missing.close.button",
+    failed: "todo.detail.error",
+    failedRetry: "todo.detail.error.retry.button",
   };
 }
 

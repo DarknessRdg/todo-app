@@ -27,6 +27,23 @@ export function useTodoUpdate() {
     },
   });
 
+  const titleMutation = useMutation({
+    mutationFn: todoService.updateTitle,
+    // The title is shown in two places, so both have to be refreshed: the
+    // detail being edited, and the list row it was opened from.
+    onSuccess: (_data, { id }) => {
+      queryClient.invalidateQueries({ queryKey: [QueryTodoDetailsKey, id] });
+      queryClient.invalidateQueries({ queryKey: [QueryTodoKey] });
+    },
+    onError: (error) => {
+      console.error(error);
+
+      toast.error("Error", {
+        description: "An internal error happened while saving your title",
+      });
+    },
+  });
+
   const checkMutation = useMutation({
     mutationFn: todoService.updateDone,
     onSuccess: () => {
@@ -49,6 +66,7 @@ export function useTodoUpdate() {
 
   return {
     check: checkMutation,
+    updateTitle: titleMutation,
     updateDescription: descriptionMutation,
   };
 }

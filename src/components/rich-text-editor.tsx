@@ -2,9 +2,13 @@ import { cn } from "@/lib/utils";
 import Placeholder from "@tiptap/extension-placeholder";
 import {
   EditorContent,
+  NodeViewContent,
+  NodeViewWrapper,
+  ReactNodeViewRenderer,
   useEditor,
   useEditorState,
   type Editor,
+  type NodeViewProps,
 } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
@@ -44,6 +48,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { testProp, type TestIdProps } from "@/lib/test-id";
 
 /**
@@ -60,6 +71,149 @@ const lowlight = createLowlight(common);
  * trip, and it renders as the blank line that was meant.
  */
 const BlankLine = "\u00a0";
+
+/* -------------------------------------------------------------------------- */
+/* Code blocks: the per-block language picker                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The picker's value when the block names no language of its own. Not a real
+ * language — it stands for leaving `language` unset, which is what sends
+ * lowlight down its `highlightAuto` path.
+ */
+const AutoDetect = "auto";
+
+/** The grammars lowlight can actually apply, so the list cannot promise more. */
+const languages = lowlight.listLanguages().sort();
+
+/**
+ * The lowlight code block with a language picker in its top-right corner.
+ *
+ * The `language` attribute already arrives set from a fence that named one
+ * (```` ```ts ````), a paste carrying `class="language-…"`, or VS Code's
+ * clipboard payload — the picker just surfaces it and makes it editable, and is
+ * the only route for a block created from the toolbar, which sets no language
+ * and would otherwise be auto-detected forever.
+ */
+const CodeBlockWithLanguage = CodeBlockLowlight.extend({
+  addNodeView() {
+    return ReactNodeViewRenderer(CodeBlockView);
+  },
+});
+
+function CodeBlockView({
+  node,
+  updateAttributes,
+  editor,
+  getPos,
+}: NodeViewProps) {
+  const language: string | null = node.attrs.language;
+
+  return (
+    <NodeViewWrapper className="relative">
+      {editor.isEditable && (
+        // Outside the document as far as ProseMirror is concerned: without
+        // this the picker's own markup is treated as editable content.
+        <div contentEditable={false} className="absolute top-2 right-2 z-10">
+          <LanguagePicker
+            editor={editor}
+            index={codeBlockIndex(editor, getPos)}
+            language={language}
+            onChange={(next) =>
+              updateAttributes({
+                language: next === AutoDetect ? null : next,
+              })
+            }
+          />
+        </div>
+      )}
+      <pre>
+        {/* `as` is `NoInfer`d, so the tag has to be named on the type too. */}
+        <NodeViewContent<"code"> as="code" />
+      </pre>
+    </NodeViewWrapper>
+  );
+}
+
+function LanguagePicker({
+  editor,
+  index,
+  language,
+  onChange,
+}: {
+  editor: Editor;
+  index: number;
+  language: string | null;
+  onChange: (language: string) => void;
+}) {
+  const testId = `editor.codeblock.${index}.language`;
+
+  // A fence may name an alias ("ts") or a grammar lowlight does not carry.
+  // Offering it back keeps the picker honest about what the block actually
+  // says, rather than showing an empty box or silently rewriting it.
+  const options =
+    language !== null && !languages.includes(language)
+      ? [language, ...languages]
+      : languages;
+
+  return (
+    <Select value={language ?? AutoDetect} onValueChange={onChange}>
+      <SelectTrigger
+        testId={`${testId}.select`}
+        size="sm"
+        aria-label="Code language"
+        // Keep the editor selection: prevent the click from blurring it.
+        onMouseDown={(event) => event.preventDefault()}
+        // Filled rather than transparent: it sits over the block, and a long
+        // first line would otherwise run underneath the label.
+        className="text-muted-foreground hover:text-foreground bg-muted dark:bg-muted h-6 border-0 px-1.5 font-mono text-xs shadow-none focus-visible:ring-0">
+        <SelectValue />
+      </SelectTrigger>
+
+      <SelectContent
+        // Same reason the link popover portals here: a modal dialog makes
+        // everything outside itself inert, and a blur landing outside the
+        // editor's chrome tears down click-to-edit views mid-interaction.
+        container={chrome(editor)}
+        data-editor-chrome=""
+        className="max-h-64">
+        <SelectItem testId={`${testId}.${AutoDetect}`} value={AutoDetect}>
+          Auto detect
+        </SelectItem>
+        {options.map((option) => (
+          <SelectItem
+            key={option}
+            testId={`${testId}.${option}`}
+            value={option}
+            className="font-mono text-xs">
+            {option}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+/**
+ * Which code block this is, counting from the top of the document — the test id
+ * needs something stable to name a block by, and a code block has no id of its
+ * own. Positions shift as the document is edited; the ordinal does not.
+ */
+function codeBlockIndex(
+  editor: Editor,
+  getPos: NodeViewProps["getPos"]
+): number {
+  const pos = getPos();
+  if (pos === undefined) return 0;
+
+  let index = 0;
+  editor.state.doc.descendants((child, childPos) => {
+    if (child.type.name === "codeBlock" && childPos < pos) index += 1;
+    return true;
+  });
+
+  return index;
+}
 
 const ParagraphKeepingBlanks = Paragraph.extend({
   addStorage() {
@@ -113,7 +267,7 @@ export function RichTextEditor({
       // fenced blocks are tokenised. Registering both would duplicate the node.
       StarterKit.configure({ codeBlock: false, paragraph: false }),
       ParagraphKeepingBlanks,
-      CodeBlockLowlight.configure({ lowlight }),
+      CodeBlockWithLanguage.configure({ lowlight }),
       Markdown,
       Placeholder.configure({ placeholder }),
     ],

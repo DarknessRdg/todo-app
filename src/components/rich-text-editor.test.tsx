@@ -126,6 +126,80 @@ describe("rich text editor", () => {
     }
   });
 
+  /**
+   * The picker is per block, so its id carries the block's index — the same
+   * disambiguation a list row gets from its entity id.
+   */
+  const languagePicker = "editor.codeblock.0.language.select";
+  const languageOption = (language: string) =>
+    `editor.codeblock.0.language.${language}`;
+
+  const fenced = (language: string) =>
+    `\`\`\`${language}\nconst answer = 42\n\`\`\``;
+
+  it("when a fence names its language, Then the picker is already set to it", async () => {
+    renderEditor({ content: fenced("ts") });
+
+    expect(await screen.findByTestId(languagePicker)).toHaveTextContent("ts");
+  });
+
+  it("when a fence names no language, Then the picker offers to detect it", async () => {
+    renderEditor({ content: fenced("") });
+
+    expect(await screen.findByTestId(languagePicker)).toHaveTextContent(
+      "Auto detect"
+    );
+  });
+
+  it("when the editor is read only, Then no picker is offered", async () => {
+    renderEditor({ content: fenced("ts"), editable: false });
+
+    await screen.findByTestId(editor);
+
+    expect(screen.queryByTestId(languagePicker)).not.toBeInTheDocument();
+  });
+
+  describe("when I pick a language for a code block", () => {
+    it("Then the fence carries it in the markdown", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor({ content: fenced("") });
+
+      await user.click(await screen.findByTestId(languagePicker));
+      await user.click(await screen.findByTestId(languageOption("python")));
+      blurEditor();
+
+      await waitFor(() =>
+        expect(onBlur).toHaveBeenCalledWith(
+          expect.stringContaining("```python")
+        )
+      );
+    });
+
+    it("Then the code it fences is left alone", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor({ content: fenced("") });
+
+      await user.click(await screen.findByTestId(languagePicker));
+      await user.click(await screen.findByTestId(languageOption("python")));
+      blurEditor();
+
+      await waitFor(() => expect(onBlur).toHaveBeenCalled());
+      expect(onBlur.mock.lastCall?.[0]).toContain("const answer = 42");
+    });
+  });
+
+  it("when I hand a block back to auto detect, Then the fence stops naming a language", async () => {
+    const user = setupUser();
+    const { onBlur } = renderEditor({ content: fenced("python") });
+
+    await user.click(await screen.findByTestId(languagePicker));
+    await user.click(await screen.findByTestId(languageOption("auto")));
+    blurEditor();
+
+    await waitFor(() => expect(onBlur).toHaveBeenCalled());
+    expect(onBlur.mock.lastCall?.[0]).not.toContain("```python");
+  });
+
   describe("when I undo", () => {
     it("Then the last thing I typed is taken back", async () => {
       const user = setupUser();

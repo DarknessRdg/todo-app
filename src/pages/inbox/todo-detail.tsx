@@ -27,7 +27,14 @@ import {
   Trash2Icon,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { InlineEdit } from "@/components/inline-edit";
+import { Text, textVariants } from "@/components/ui/text";
+import { cn } from "@/lib/utils";
+import { useNavigate } from "react-router";
 import { testProp } from "@/lib/test-id";
+import { useTodoDetails } from "@/pages/inbox/use-todo-details.ts";
+import { TodoLookupFailed } from "@/components/todo-lookup-failed";
+import { Spinner } from "@/components/ui/spinner";
 
 /* -------------------------------------------------------------------------- */
 /* Header                                                                      */
@@ -57,14 +64,12 @@ export function TodoDetailHeader({
         ) : null}
       </div>
 
-      <h1
-        {...testProp("todo.detail.title")}
-        className="font-display flex items-start gap-3 text-2xl leading-snug font-semibold tracking-tight">
-        <span className="mt-1 shrink-0">
+      <div className="flex items-start gap-3">
+        <span className="mt-1.5 shrink-0">
           <TodoChecker done={todo.done} />
         </span>
-        {todo.title}
-      </h1>
+        <TitleEditor todo={todo} />
+      </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <StatusBadge done={todo.done} />
@@ -85,7 +90,7 @@ export function TodoDetailBody({ todo }: { todo: TodoEntity }) {
     <div className="grid flex-1 items-stretch gap-8 lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_18rem]">
       <main className="flex min-w-0 flex-col gap-8">
         <section className="flex flex-col gap-2.5">
-          <p className="eyebrow">Description</p>
+          <Text variant="eyebrow">Description</Text>
           <DescriptionEditor todo={todo} />
         </section>
 
@@ -97,8 +102,68 @@ export function TodoDetailBody({ todo }: { todo: TodoEntity }) {
   );
 }
 
-/* Convenience wrapper used by both the modal and the dedicated page. */
-export function TodoDetail({
+/* -------------------------------------------------------------------------- */
+/* The detail itself — one component, two containers                           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * What the detail is currently showing. Handed to the container so it can frame
+ * each state its own way — the modal needs the title for its dialog, the page
+ * sizes itself differently once there is content to size around.
+ */
+export type TodoDetailView =
+  | { status: "loading"; content: ReactNode }
+  | { status: "error"; content: ReactNode }
+  | { status: "missing"; content: ReactNode }
+  | { status: "ready"; content: ReactNode; todo: TodoEntity };
+
+type TodoDetailProps = {
+  headerActions?: ReactNode;
+} & (
+  | { todo: TodoEntity; id?: never; children?: never }
+  | {
+      id: string;
+      todo?: never;
+      /**
+       * How this container leaves for the inbox when the todo is not there.
+       * The modal drops the query param; the page has a url to navigate off.
+       */
+      onLeave?: () => void;
+      /**
+       * The container seam. Every state's content is rendered here already —
+       * the container only decides what to wrap it in (a dialog, a page). Omit
+       * it and the content stands on its own.
+       */
+      children?: (view: TodoDetailView) => ReactNode;
+    }
+);
+
+/**
+ * The todo detail, given either the model or the id to resolve it from.
+ *
+ * Both the dedicated page and the inbox modal render *this* — content and the
+ * states around it are defined once here, and the containers supply nothing but
+ * their wrapper. A fix to the detail (the description editor's link popover,
+ * say) therefore cannot land in one and miss the other.
+ */
+export function TodoDetail({ headerActions, ...props }: TodoDetailProps) {
+  // Two components rather than a conditional hook: the id form has to read the
+  // query, the model form must not.
+  if (props.todo !== undefined) {
+    return <TodoDetailContent todo={props.todo} headerActions={headerActions} />;
+  }
+
+  return (
+    <ResolvedTodoDetail
+      id={props.id}
+      headerActions={headerActions}
+      onLeave={props.onLeave}>
+      {props.children}
+    </ResolvedTodoDetail>
+  );
+}
+
+function TodoDetailContent({
   todo,
   headerActions,
 }: {
@@ -113,6 +178,93 @@ export function TodoDetail({
   );
 }
 
+/** Renders whatever the container asked for; bare content when it asked for nothing. */
+const bareContainer = (view: TodoDetailView) => view.content;
+
+function ResolvedTodoDetail({
+  id,
+  headerActions,
+  onLeave,
+  children = bareContainer,
+}: {
+  id: string;
+  headerActions?: ReactNode;
+  onLeave?: () => void;
+  children?: (view: TodoDetailView) => ReactNode;
+}) {
+  const navigate = useNavigate();
+  const { todo, isLoading, error, retry } = useTodoDetails({ id });
+  const leave = onLeave ?? (() => void navigate("/"));
+
+  if (isLoading) {
+    return children({ status: "loading", content: <DetailLoading /> });
+  }
+
+  // Order matters: a read that *failed* is not the same as a todo that is not
+  // there, and answering "no such todo" to a broken database sends the reader
+  // hunting for a mistake they did not make.
+  if (error) {
+    return children({
+      status: "error",
+      content: (
+        <TodoLookupFailed
+          testId="todo.detail.error"
+          onRetry={() => void retry()}
+        />
+      ),
+    });
+  }
+
+  // Said out loud rather than redirected away from. The detail is reached by
+  // url in both containers, so a shared or bookmarked link that no longer
+  // resolves would otherwise dump the reader somewhere with no explanation —
+  // and the url is the only record of which todo was asked for.
+  if (!todo) {
+    return children({
+      status: "missing",
+      content: <DetailMissing onLeave={leave} />,
+    });
+  }
+
+  return children({
+    status: "ready",
+    todo,
+    content: <TodoDetailContent todo={todo} headerActions={headerActions} />,
+  });
+}
+
+function DetailLoading() {
+  return (
+    <div
+      {...testProp("todo.detail.loading")}
+      className="text-muted-foreground flex items-center gap-2 py-10 text-sm">
+      <Spinner /> Loading…
+    </div>
+  );
+}
+
+function DetailMissing({ onLeave }: { onLeave: () => void }) {
+  return (
+    <div
+      className="flex flex-col items-start gap-3"
+      {...testProp("todo.detail.missing")}>
+      <Text variant="eyebrow">Not found</Text>
+      <Text variant="h2">This todo is no longer here</Text>
+      <Text variant="muted">
+        It may have been deleted, or it was never on this device — todos are
+        stored locally, so a link from elsewhere will not find one.
+      </Text>
+
+      <Button
+        testId="todo.detail.missing.close.button"
+        onClick={onLeave}
+        className="mt-3 rounded-full">
+        Back to the inbox
+      </Button>
+    </div>
+  );
+}
+
 /* -------------------------------------------------------------------------- */
 /* Properties panel                                                            */
 /* -------------------------------------------------------------------------- */
@@ -122,7 +274,9 @@ function PropertiesPanel({ todo }: { todo: TodoEntity }) {
 
   return (
     <aside className="lg:border-border flex flex-col gap-1 lg:border-l lg:pl-8">
-      <p className="eyebrow mb-3">Properties</p>
+      <Text variant="eyebrow" className="mb-3">
+        Properties
+      </Text>
 
       <PropertyRow icon={<CircleDot className="size-3.5" />} label="Status">
         <StatusBadge done={todo.done} />
@@ -196,53 +350,94 @@ function Assignee({ name }: { name: string }) {
 /* Description + Subtasks                                                       */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Heading-sized in both states, so the text does not shift on the way into the
+ * field. The two slots are styled separately, so the shared part is repeated
+ * deliberately rather than inherited.
+ */
+// Derived from the `h1` variant rather than restated, so the title cannot
+// drift away from every other page heading.
+const titleType = cn(
+  textVariants({ variant: "h1" }),
+  "font-display grow leading-snug"
+);
+
+function TitleEditor({ todo }: { todo: TodoEntity }) {
+  const { updateTitle } = useTodoUpdate();
+
+  return (
+    <InlineEdit
+      required
+      value={todo.title}
+      onCommit={(title) => updateTitle.mutate({ id: todo.id, title })}>
+      {/* The `h1` carries no classes of its own: `Slot` joins the two
+          `className`s verbatim, so keeping them in one place avoids a fight. */}
+      <InlineEdit.Read
+        asChild
+        testId="todo.detail.title"
+        aria-label="Edit title"
+        className={titleType}>
+        <h1>{todo.title}</h1>
+      </InlineEdit.Read>
+
+      <InlineEdit.Input
+        testId="todo.detail.title.input"
+        // The primitive's 3px ring plus `border-ring` reads as a halo at this
+        // size; 2px and no focus border matches the inbox capture bar.
+        // `px-0 py-0` overrides the primitive's own padding so the text sits
+        // exactly where the heading had it, rather than jumping right.
+        className={cn(
+          titleType,
+          "h-auto rounded-lg border-transparent px-0 py-0 shadow-none focus-visible:border-transparent focus-visible:ring-2 md:text-2xl"
+        )}
+      />
+    </InlineEdit>
+  );
+}
+
 function DescriptionEditor({ todo }: { todo: TodoEntity }) {
   const { updateDescription } = useTodoUpdate();
-  const [editing, setEditing] = useState(false);
 
-  const handleBlur = (markdown: string) => {
-    const next = markdown.trim();
-    setEditing(false);
-
-    if (next === (todo.description ?? "")) return;
-
-    updateDescription.mutate({ id: todo.id, description: next });
-  };
-
-  if (editing) {
-    return (
-      <RichTextEditor
-        testId="todo.detail.description.editor"
-        content={todo.description}
-        placeholder="Add a description…"
-        editable
-        autoFocus
-        onBlur={handleBlur}
-      />
-    );
-  }
-
-  // Read view: renders as plain content, shows a light border on hover, and
-  // turns into the editor on click.
   return (
-    <div
-      {...testProp("todo.detail.description.read")}
-      role="button"
-      tabIndex={0}
-      onClick={() => setEditing(true)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          setEditing(true);
-        }
-      }}
-      className="hover:border-border cursor-text rounded-lg border border-transparent p-2 transition-colors">
-      {todo.description?.trim() ? (
-        <RichTextEditor content={todo.description} editable={false} chrome={false} />
-      ) : (
-        <p className="text-muted-foreground text-sm">Add a description…</p>
-      )}
-    </div>
+    <InlineEdit
+      value={todo.description ?? ""}
+      onCommit={(description) =>
+        updateDescription.mutate({ id: todo.id, description })
+      }>
+      <InlineEdit.Read
+        testId="todo.detail.description.read"
+        aria-label="Edit description"
+        // Read view only — the editor brings its own chrome and padding.
+        className="p-2">
+        {todo.description?.trim() ? (
+          <RichTextEditor
+            content={todo.description}
+            editable={false}
+            chrome={false}
+          />
+        ) : (
+          <Text variant="muted">Add a description…</Text>
+        )}
+      </InlineEdit.Read>
+
+      {/*
+        Not `InlineEdit.Input`: the editor holds its own content and hands the
+        markdown back on blur, and Enter has to stay a newline rather than
+        saving.
+      */}
+      <InlineEdit.Edit>
+        {({ commit }) => (
+          <RichTextEditor
+            testId="todo.detail.description.editor"
+            content={todo.description}
+            placeholder="Add a description…"
+            editable
+            autoFocus
+            onBlur={commit}
+          />
+        )}
+      </InlineEdit.Edit>
+    </InlineEdit>
   );
 }
 
@@ -269,7 +464,9 @@ function Subtasks({ todo }: { todo: TodoEntity }) {
   return (
     <section>
       <div className="mb-3 flex items-center gap-2.5">
-        <span className="eyebrow">Subtasks</span>
+        <Text variant="eyebrow" as="span">
+          Subtasks
+        </Text>
         {subtasks.length > 0 && (
           <>
             <span

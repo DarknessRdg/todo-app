@@ -1,3 +1,4 @@
+import { Text } from "@/components/ui/text";
 import { testProp } from "@/lib/test-id";
 import { ArrowUp, Feather } from "lucide-react";
 
@@ -9,14 +10,18 @@ export function EmptyList() {
       <div className="bg-background text-muted-foreground mb-4 flex size-11 items-center justify-center rounded-full">
         <Feather className="size-5" />
       </div>
-      <p className="text-foreground text-lg font-semibold">Inbox zero</p>
-      <p className="text-muted-foreground mt-1.5 max-w-xs text-sm">
+      <Text variant="large" className="text-foreground">
+        Inbox zero
+      </Text>
+      <Text variant="muted" className="mt-1.5 max-w-xs">
         Nothing to organize yet. Capture your first thought in the bar above — it
         takes about two seconds.
-      </p>
-      <p className="text-muted-foreground/80 mt-4 inline-flex items-center gap-1.5 text-xs font-medium">
+      </Text>
+      <Text
+        variant="eyebrow"
+        className="text-muted-foreground/80 mt-4 inline-flex items-center gap-1.5">
         <ArrowUp className="size-3.5" /> start typing
-      </p>
+      </Text>
     </div>
   );
 }

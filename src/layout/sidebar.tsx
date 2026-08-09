@@ -1,4 +1,5 @@
 import { Logo } from "@/components/logo";
+import { Text } from "@/components/ui/text";
 import {
   Sidebar,
   SidebarContent,
@@ -155,7 +156,9 @@ export function AppSidebar({ className }: { className?: string } = {}) {
               </button>
             </PopoverTrigger>
             <PopoverContent side="right" align="end" className="w-56 p-2">
-              <p className="eyebrow px-2 pt-1 pb-2">Appearance</p>
+              <Text variant="eyebrow" className="px-2 pt-1 pb-2">
+                Appearance
+              </Text>
               <ThemeToggle />
             </PopoverContent>
           </Popover>

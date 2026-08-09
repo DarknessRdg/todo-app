@@ -33,6 +33,7 @@ export interface TodoRepository {
   create(todo: TodoEntity): Promise<void>;
   delete(id: string): Promise<void>;
   updateDone(params: { id: string; done: boolean }): Promise<void>;
+  updateTitle(params: { id: string; title: string }): Promise<void>;
   updateDescription(params: { id: string; description: string }): Promise<void>;
   count(): Promise<number>;
   getById(id: string): Promise<TodoEntity | undefined>;
@@ -80,6 +81,24 @@ export class TodoService {
 
   updateDone = async (params: { id: string; done: boolean }) => {
     return this.repository.updateDone(params);
+  };
+
+  /**
+   * A todo must always have a name, so a retitle is validated the same way the
+   * original title was — a blank one is refused rather than persisted, which
+   * would leave the row unidentifiable in the list.
+   */
+  updateTitle = async ({ id, title }: { id: string; title: string }) => {
+    // Trimmed here, not by the schema: `IValidator` reports errors on the
+    // object it was handed and never returns zod's transformed output, so a
+    // `.trim()` in the scheme would guard the rule without cleaning the value.
+    const validation = this.createTodoEntityValidator.validateAll({
+      title: title.trim(),
+    });
+
+    return validation.onValidAsync(async (valid) => {
+      await this.repository.updateTitle({ id, title: valid.title });
+    });
   };
 
   updateDescription = async (params: { id: string; description: string }) => {

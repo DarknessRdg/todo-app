@@ -3,7 +3,7 @@ import { setupUser, waitFor } from "@/test/user";
 import { describe, expect, it } from "vitest";
 
 import type { TodoEntity } from "@/backend/todo-service";
-import { TodoDetail } from "@/pages/inbox/detail-body";
+import { TodoDetail } from "@/pages/inbox/todo-detail";
 import { useTodoDetails } from "@/pages/inbox/use-todo-details";
 import {
   createTestContainer,
@@ -13,6 +13,7 @@ import {
 import { makeSubtask, makeTodo } from "@/test/todo-factory";
 
 const title = "todo.detail.title";
+const titleInput = "todo.detail.title.input";
 const readView = "todo.detail.description.read";
 const editor = "todo.detail.description.editor";
 const subtaskCount = "todo.detail.subtask.count";
@@ -67,6 +68,119 @@ describe("todo detail", () => {
         "Add a description…"
       );
     });
+  });
+
+  describe("when I click the title", () => {
+    it("Then it turns into an input holding the current title", async () => {
+      const user = setupUser();
+      renderDetail(makeTodo({ title: "Rewire the doorbell" }));
+
+      await user.click(await screen.findByTestId(title));
+
+      expect(await screen.findByTestId(titleInput)).toHaveValue(
+        "Rewire the doorbell"
+      );
+    });
+  });
+
+  describe("when I retitle a todo and leave the field", () => {
+    it("Then the new title is persisted", async () => {
+      const user = setupUser();
+      const todo = makeTodo({ title: "Rewire the doorbell" });
+      const { repository } = renderDetail(todo);
+
+      await user.click(await screen.findByTestId(title));
+      const field = await screen.findByTestId(titleInput);
+
+      await user.clear(field);
+      await user.type(field, "Repot the fig tree");
+      fireEvent.blur(field);
+
+      await waitFor(() =>
+        expect(repository.updateTitle).toHaveBeenCalledWith({
+          id: todo.id,
+          title: "Repot the fig tree",
+        })
+      );
+    });
+
+    it("Then it goes back to reading as a heading", async () => {
+      const user = setupUser();
+      renderDetail(makeTodo({ title: "Rewire the doorbell" }));
+
+      await user.click(await screen.findByTestId(title));
+      fireEvent.blur(await screen.findByTestId(titleInput));
+
+      await waitFor(() =>
+        expect(screen.getByTestId(title)).toBeInTheDocument()
+      );
+    });
+
+    it("Then an unchanged title is not written back", async () => {
+      const user = setupUser();
+      const { repository } = renderDetail(
+        makeTodo({ title: "Rewire the doorbell" })
+      );
+
+      await user.click(await screen.findByTestId(title));
+      fireEvent.blur(await screen.findByTestId(titleInput));
+
+      await waitFor(() => expect(screen.getByTestId(title)).toBeInTheDocument());
+      expect(repository.updateTitle).not.toHaveBeenCalled();
+    });
+
+    it("Then a blank title is not written back, so the todo keeps its name", async () => {
+      const user = setupUser();
+      const { repository } = renderDetail(
+        makeTodo({ title: "Rewire the doorbell" })
+      );
+
+      await user.click(await screen.findByTestId(title));
+      const field = await screen.findByTestId(titleInput);
+
+      await user.clear(field);
+      fireEvent.blur(field);
+
+      await waitFor(() => expect(screen.getByTestId(title)).toBeInTheDocument());
+      expect(repository.updateTitle).not.toHaveBeenCalled();
+      expect(screen.getByTestId(title)).toHaveTextContent("Rewire the doorbell");
+    });
+  });
+
+  it("when I press enter while retitling, Then it is saved without leaving the field", async () => {
+    const user = setupUser();
+    const todo = makeTodo({ title: "Rewire the doorbell" });
+    const { repository } = renderDetail(todo);
+
+    await user.click(await screen.findByTestId(title));
+    const field = await screen.findByTestId(titleInput);
+
+    await user.clear(field);
+    await user.type(field, "Repot the fig tree{Enter}");
+
+    await waitFor(() =>
+      expect(repository.updateTitle).toHaveBeenCalledWith({
+        id: todo.id,
+        title: "Repot the fig tree",
+      })
+    );
+  });
+
+  it("when I press escape while retitling, Then the edit is abandoned", async () => {
+    const user = setupUser();
+    const { repository } = renderDetail(
+      makeTodo({ title: "Rewire the doorbell" })
+    );
+
+    await user.click(await screen.findByTestId(title));
+    const field = await screen.findByTestId(titleInput);
+
+    await user.clear(field);
+    await user.type(field, "Something else{Escape}");
+
+    await waitFor(() => expect(screen.getByTestId(title)).toBeInTheDocument());
+    expect(repository.updateTitle).not.toHaveBeenCalled();
+    expect(screen.getByTestId(title)).toHaveTextContent("Rewire the doorbell");
   });
 
   describe("when I click the description", () => {

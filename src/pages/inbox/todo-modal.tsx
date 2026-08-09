@@ -5,13 +5,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog.tsx";
-import { useTodoDetails } from "@/pages/inbox/use-todo-details.ts";
 import { useNavigate } from "react-router";
-import { TodoDetail } from "@/pages/inbox/detail-body.tsx";
-import { TodoLookupFailed } from "@/components/todo-lookup-failed";
+import { TodoDetail, type TodoDetailView } from "@/pages/inbox/todo-detail.tsx";
 import { Button } from "@/components/ui/button";
 import { TooltipText } from "@/components/ui/tooltip";
-import { testProp } from "@/lib/test-id";
 import { cn } from "@/lib/utils";
 import { Maximize2 } from "lucide-react";
 import type { PropsWithChildren } from "react";
@@ -23,88 +20,67 @@ type TodoModalContentProps = {
 
 const voidClose = () => {};
 
+/**
+ * The modal container. Like `TodoPage`, it renders `TodoDetail` and supplies
+ * only the frame — so the detail itself, and every state around it, is the same
+ * in both places by construction rather than by remembering to copy a fix over.
+ */
 export function TodoModalContent({
   id,
   onClose = voidClose,
 }: TodoModalContentProps) {
-  const { todo, isLoading, error, retry } = useTodoDetails({ id });
   const navigate = useNavigate();
 
-  if (isLoading) {
-    return <></>;
-  }
-
-  // Order matters: a read that *failed* is not the same as a todo that is not
-  // there. Collapsing the two tells the reader their todo is gone when the
-  // database is merely unreadable.
-  if (error) {
-    return (
-      <ModalShell id={id} title="This todo could not be read" onClose={onClose}>
-        <TodoLookupFailed
-          testId={`home.todo.${id}.modal.error`}
-          onRetry={() => void retry()}
-        />
-      </ModalShell>
-    );
-  }
-
-  // Said out loud rather than silently closing. The modal is reached by url, so
-  // a shared or bookmarked `?todo=` that no longer resolves would otherwise
-  // dump the reader on someone else's inbox with no explanation.
-  if (!todo) {
-    return (
-      <ModalShell id={id} title="This todo is no longer here" onClose={onClose}>
-        <div
-          className="flex flex-col items-start gap-3"
-          {...testProp(`home.todo.${id}.modal.missing`)}>
-          <p className="eyebrow">Not found</p>
-          <h2 className="text-2xl font-medium tracking-tight">
-            This todo is no longer here
-          </h2>
-          <p className="text-muted-foreground text-sm">
-            It may have been deleted, or it was never on this device — todos are
-            stored locally, so a link from elsewhere will not find one.
-          </p>
-
-          <Button
-            testId={`home.todo.${id}.modal.missing.close.button`}
-            onClick={onClose}
-            className="mt-3 rounded-full">
-            Back to the inbox
-          </Button>
-        </div>
-      </ModalShell>
-    );
-  }
-
-  const openFullScreen = () => navigate(`/todo/${todo.id}`);
-
   return (
-    <ModalShell
+    <TodoDetail
       id={id}
-      title={todo.title}
-      onClose={onClose}
-      // Only the real detail needs the tall pane; a message in an 85vh dialog
-      // is mostly empty space.
-      className="h-[85vh] max-h-[85vh]">
-      <TodoDetail
-        todo={todo}
-        headerActions={
-          <TooltipText text="Open full screen" asChild>
-            <Button
-              testId={`home.todo.${todo.id}.modal.fullscreen.button`}
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground hover:text-foreground mr-8 size-8"
-              onClick={openFullScreen}
-              aria-label="Open full screen">
-              <Maximize2 className="size-4" />
-            </Button>
-          </TooltipText>
-        }
-      />
-    </ModalShell>
+      onLeave={onClose}
+      headerActions={
+        <TooltipText text="Open full screen" asChild>
+          <Button
+            testId={`home.todo.${id}.modal.fullscreen.button`}
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground hover:text-foreground mr-8 size-8"
+            onClick={() => void navigate(`/todo/${id}`)}
+            aria-label="Open full screen">
+            <Maximize2 className="size-4" />
+          </Button>
+        </TooltipText>
+      }>
+      {(view) => {
+        // Nothing at all while the read is in flight: a dialog that pops open
+        // empty and resizes a beat later is worse than one that arrives whole.
+        if (view.status === "loading") return <></>;
+
+        return (
+          <ModalShell
+            id={id}
+            title={titleFor(view)}
+            onClose={onClose}
+            // Only the real detail needs the tall pane; a message in an 85vh
+            // dialog is mostly empty space.
+            className={
+              view.status === "ready" ? "h-[85vh] max-h-[85vh]" : undefined
+            }>
+            {view.content}
+          </ModalShell>
+        );
+      }}
+    </TodoDetail>
   );
+}
+
+/** The dialog's accessible name, which differs per state. */
+function titleFor(view: TodoDetailView) {
+  switch (view.status) {
+    case "error":
+      return "This todo could not be read";
+    case "missing":
+      return "This todo is no longer here";
+    default:
+      return view.status === "ready" ? view.todo.title : "";
+  }
 }
 
 type ModalShellProps = PropsWithChildren<{

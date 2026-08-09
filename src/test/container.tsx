@@ -33,6 +33,9 @@ export function mockTodoRepository(
     create: vi.fn<TodoRepository["create"]>().mockResolvedValue(undefined),
     delete: vi.fn<TodoRepository["delete"]>().mockResolvedValue(undefined),
     updateDone: vi.fn<TodoRepository["updateDone"]>().mockResolvedValue(undefined),
+    updateTitle: vi
+      .fn<TodoRepository["updateTitle"]>()
+      .mockResolvedValue(undefined),
     updateDescription: vi
       .fn<TodoRepository["updateDescription"]>()
       .mockResolvedValue(undefined),
@@ -86,6 +89,10 @@ export function inMemoryTodoRepository(
     updateDone: vi.fn<TodoRepository["updateDone"]>(async ({ id, done }) => {
       const row = find(id);
       if (row) row.done = done;
+    }),
+    updateTitle: vi.fn<TodoRepository["updateTitle"]>(async ({ id, title }) => {
+      const row = find(id);
+      if (row) row.title = title;
     }),
     updateDescription: vi.fn<TodoRepository["updateDescription"]>(
       async ({ id, description }) => {

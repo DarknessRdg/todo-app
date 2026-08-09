@@ -4,7 +4,8 @@ import { RightRail } from "@/pages/inbox/right-rail.tsx";
 import { useNavigation } from "@/hooks/navigation.ts";
 import { NewInput } from "@/pages/inbox/new-input";
 import { useTodoList } from "@/pages/inbox/use-todo-list";
-import { testProp, type TestIdProps } from "@/lib/test-id";
+import { Text } from "@/components/ui/text";
+import { type TestIdProps } from "@/lib/test-id";
 
 const QueryParamsKeys = {
   TodoId: "todo",
@@ -26,8 +27,10 @@ export function Inbox() {
       <div className="min-w-0 grow">
         <div className="mb-6 flex items-end justify-between gap-4">
           <div>
-            <p className="eyebrow mb-1">Workspace</p>
-            <h1 className="text-2xl font-semibold tracking-tight">Inbox</h1>
+            <Text variant="eyebrow" className="mb-1">
+              Workspace
+            </Text>
+            <Text variant="h1">Inbox</Text>
           </div>
         </div>
 
@@ -78,12 +81,15 @@ function HeroPanel({
         <div className="ml-auto flex items-center gap-3.5">
           <ProgressRing value={percentage} />
           <div>
-            <p
-              {...testProp("home.stats.percentage")}
-              className="text-2xl leading-none font-semibold tabular-nums">
+            <Text
+              testId="home.stats.percentage"
+              variant="h1"
+              className="leading-none tabular-nums">
               {percentage}%
-            </p>
-            <p className="text-muted-foreground mt-1 text-sm">tasks done</p>
+            </Text>
+            <Text variant="muted" className="mt-1">
+              tasks done
+            </Text>
           </div>
         </div>
       </div>
@@ -98,12 +104,15 @@ function HeroStat({
 }: TestIdProps & { label: string; value: number }) {
   return (
     <div>
-      <p
-        {...testProp(testId)}
-        className="text-3xl leading-none font-semibold tabular-nums">
+      <Text
+        testId={testId}
+        variant="h1"
+        className="text-3xl leading-none tabular-nums">
         {value}
-      </p>
-      <p className="text-muted-foreground mt-1.5 text-sm">{label}</p>
+      </Text>
+      <Text variant="muted" className="mt-1.5">
+        {label}
+      </Text>
     </div>
   );
 }

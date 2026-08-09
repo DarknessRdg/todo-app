@@ -40,6 +40,10 @@ export class TodoRepositoryIndexedDB implements TodoRepository {
     }));
   };
 
+  updateTitle = async ({ id, title }: { id: string; title: string }) => {
+    await this.mutateTodo(id, (todo) => ({ ...todo, title }));
+  };
+
   updateDescription = async ({
     id,
     description,
