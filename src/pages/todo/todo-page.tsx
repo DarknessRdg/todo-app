@@ -1,44 +1,37 @@
-import { Navigate, useNavigate, useParams } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import { ArrowLeft } from "lucide-react";
-import { useTodoDetails } from "@/pages/inbox/use-todo-details.ts";
-import { TodoDetail } from "@/pages/inbox/detail-body.tsx";
+import { TodoDetail } from "@/pages/inbox/todo-detail.tsx";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
 
+/**
+ * The dedicated page container. Everything below the back button — the content
+ * and the loading / failed / not-here states alike — comes from `TodoDetail`,
+ * the same component the inbox modal renders. This file owns the frame and
+ * nothing else.
+ */
 export function TodoPage() {
-  const { id } = useParams();
+  // `:id` never matches an empty segment, so by the time this renders the id
+  // is always there — `/todo` and `/todo/` fall through to the catch-all route.
+  const { id = "" } = useParams();
   const navigate = useNavigate();
-  const { todo, isLoading } = useTodoDetails({ id: id ?? "" });
-
-  if (!id) {
-    return <Navigate to="/" />;
-  }
-
-  if (isLoading) {
-    return (
-      <div className="text-muted-foreground flex items-center gap-2 py-10 text-sm">
-        <Spinner /> Loading…
-      </div>
-    );
-  }
-
-  if (!todo) {
-    return <Navigate to="/" />;
-  }
 
   return (
-    <div className="mx-auto w-full max-w-5xl">
-      <Button
-        testId="todo.page.back.button"
-        variant="ghost"
-        size="sm"
-        onClick={() => navigate("/")}
-        className="text-muted-foreground hover:text-foreground mb-6 -ml-2 gap-1.5">
-        <ArrowLeft className="size-4" />
-        <span className="text-xs font-medium">Back to inbox</span>
-      </Button>
+    <TodoDetail id={id}>
+      {(view) => (
+        <div className="mx-auto w-full max-w-5xl">
+          <Button
+            testId="todo.page.back.button"
+            variant="ghost"
+            size="sm"
+            onClick={() => void navigate("/")}
+            className="text-muted-foreground hover:text-foreground mb-6 -ml-2 gap-1.5">
+            <ArrowLeft className="size-4" />
+            <span className="text-xs font-medium">Back to inbox</span>
+          </Button>
 
-      <TodoDetail todo={todo} />
-    </div>
+          {view.content}
+        </div>
+      )}
+    </TodoDetail>
   );
 }

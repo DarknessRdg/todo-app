@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { setupUser, waitFor, type User } from "@/test/user";
 import { describe, expect, it, vi } from "vitest";
 
 import { RichTextEditor } from "@/components/rich-text-editor";
@@ -29,7 +29,7 @@ function renderEditor(
 const blurEditor = () => fireEvent.blur(screen.getByTestId(editor));
 
 /** Selects the whole document, so a spec can act on "the selected text". */
-const selectAll = (user: ReturnType<typeof userEvent.setup>) =>
+const selectAll = (user: User) =>
   user.keyboard("{Control>}a{/Control}");
 
 describe("rich text editor", () => {
@@ -56,7 +56,7 @@ describe("rich text editor", () => {
 
     for (const mark of marks) {
       it(`Then ${mark.name} wraps it`, async () => {
-        const user = userEvent.setup();
+        const user = setupUser();
         const { onBlur } = renderEditor({ content: "words" });
 
         await user.click(screen.getByTestId(editor));
@@ -73,7 +73,7 @@ describe("rich text editor", () => {
     }
 
     it("Then pressing the same button again unwraps it", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       const { onBlur } = renderEditor({ content: "words" });
 
       await user.click(screen.getByTestId(editor));
@@ -110,7 +110,7 @@ describe("rich text editor", () => {
 
     for (const block of blocks) {
       it(`Then ${block.name} is what gets saved`, async () => {
-        const user = userEvent.setup();
+        const user = setupUser();
         const { onBlur } = renderEditor({ content: "words" });
 
         await user.click(screen.getByTestId(editor));
@@ -126,9 +126,83 @@ describe("rich text editor", () => {
     }
   });
 
+  /**
+   * The picker is per block, so its id carries the block's index — the same
+   * disambiguation a list row gets from its entity id.
+   */
+  const languagePicker = "editor.codeblock.0.language.select";
+  const languageOption = (language: string) =>
+    `editor.codeblock.0.language.${language}`;
+
+  const fenced = (language: string) =>
+    `\`\`\`${language}\nconst answer = 42\n\`\`\``;
+
+  it("when a fence names its language, Then the picker is already set to it", async () => {
+    renderEditor({ content: fenced("ts") });
+
+    expect(await screen.findByTestId(languagePicker)).toHaveTextContent("ts");
+  });
+
+  it("when a fence names no language, Then the picker offers to detect it", async () => {
+    renderEditor({ content: fenced("") });
+
+    expect(await screen.findByTestId(languagePicker)).toHaveTextContent(
+      "Auto detect"
+    );
+  });
+
+  it("when the editor is read only, Then no picker is offered", async () => {
+    renderEditor({ content: fenced("ts"), editable: false });
+
+    await screen.findByTestId(editor);
+
+    expect(screen.queryByTestId(languagePicker)).not.toBeInTheDocument();
+  });
+
+  describe("when I pick a language for a code block", () => {
+    it("Then the fence carries it in the markdown", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor({ content: fenced("") });
+
+      await user.click(await screen.findByTestId(languagePicker));
+      await user.click(await screen.findByTestId(languageOption("python")));
+      blurEditor();
+
+      await waitFor(() =>
+        expect(onBlur).toHaveBeenCalledWith(
+          expect.stringContaining("```python")
+        )
+      );
+    });
+
+    it("Then the code it fences is left alone", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor({ content: fenced("") });
+
+      await user.click(await screen.findByTestId(languagePicker));
+      await user.click(await screen.findByTestId(languageOption("python")));
+      blurEditor();
+
+      await waitFor(() => expect(onBlur).toHaveBeenCalled());
+      expect(onBlur.mock.lastCall?.[0]).toContain("const answer = 42");
+    });
+  });
+
+  it("when I hand a block back to auto detect, Then the fence stops naming a language", async () => {
+    const user = setupUser();
+    const { onBlur } = renderEditor({ content: fenced("python") });
+
+    await user.click(await screen.findByTestId(languagePicker));
+    await user.click(await screen.findByTestId(languageOption("auto")));
+    blurEditor();
+
+    await waitFor(() => expect(onBlur).toHaveBeenCalled());
+    expect(onBlur.mock.lastCall?.[0]).not.toContain("```python");
+  });
+
   describe("when I undo", () => {
     it("Then the last thing I typed is taken back", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       const { onBlur } = renderEditor();
 
       await user.click(screen.getByTestId(editor));
@@ -141,7 +215,7 @@ describe("rich text editor", () => {
     });
 
     it("Then redo puts it back", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       const { onBlur } = renderEditor();
 
       await user.click(screen.getByTestId(editor));
@@ -169,7 +243,7 @@ describe("rich text editor", () => {
     });
 
     it("Then typing changes nothing", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       const { onBlur } = renderEditor({ editable: false, content: "words" });
 
       await user.click(screen.getByTestId(editor));
@@ -197,9 +271,57 @@ describe("rich text editor", () => {
     });
   });
 
+  describe("when I leave a blank line between paragraphs", () => {
+    it("Then the saved notes differ from the same text without one", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor();
+
+      await user.click(screen.getByTestId(editor));
+      await user.keyboard("first{Enter}{Enter}second");
+      blurEditor();
+
+      await waitFor(() => expect(onBlur).toHaveBeenCalled());
+      const withBlank = onBlur.mock.lastCall?.[0];
+
+      cleanup();
+      const plain = renderEditor();
+      await user.click(screen.getByTestId(editor));
+      await user.keyboard("first{Enter}second");
+      blurEditor();
+
+      await waitFor(() => expect(plain.onBlur).toHaveBeenCalled());
+
+      // Asserting on the difference, not the encoding: whatever marker is used
+      // for the blank line, losing it makes the two indistinguishable.
+      expect(withBlank).not.toBe(plain.onBlur.mock.lastCall?.[0]);
+    });
+
+    it("Then it survives being reloaded and saved again", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor();
+
+      await user.click(screen.getByTestId(editor));
+      await user.keyboard("first{Enter}{Enter}second");
+      blurEditor();
+
+      await waitFor(() => expect(onBlur).toHaveBeenCalled());
+      const saved = onBlur.mock.lastCall?.[0] as string;
+
+      cleanup();
+      const reopened = renderEditor({ content: saved });
+
+      await waitFor(() =>
+        expect(screen.getByTestId(editor)).toHaveTextContent("second")
+      );
+      blurEditor();
+
+      await waitFor(() => expect(reopened.onBlur).toHaveBeenCalledWith(saved));
+    });
+  });
+
   describe("when I type a bare url", () => {
     it("Then it is saved as a link", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       const { onBlur } = renderEditor();
 
       // Autolinking only resolves once the url is terminated, so type past it.
@@ -218,7 +340,7 @@ describe("rich text editor", () => {
 
   describe("when I open a fenced code block", () => {
     it("Then the language I named is kept", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       const { onBlur } = renderEditor();
 
       await user.click(screen.getByTestId(editor));
@@ -233,7 +355,7 @@ describe("rich text editor", () => {
     });
 
     it("Then a newline inside it stays in the block instead of ending it", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       const { onBlur } = renderEditor();
 
       await user.click(screen.getByTestId(editor));
@@ -250,7 +372,7 @@ describe("rich text editor", () => {
 
   describe("when I link the selected text from the toolbar", () => {
     it("Then the selection becomes a link to the url I gave", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       const { onBlur } = renderEditor();
 
       await user.click(screen.getByTestId(editor));
@@ -271,7 +393,7 @@ describe("rich text editor", () => {
     });
 
     it("Then the surrounding prose is left alone", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       const { onBlur } = renderEditor({ content: "read the docs today" });
 
       await user.click(screen.getByTestId(editor));
@@ -293,7 +415,7 @@ describe("rich text editor", () => {
 
   describe("when I open the link popover", () => {
     it("Then the text field holds what I had selected", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       renderEditor({ content: "read the docs" });
 
       await user.click(screen.getByTestId(editor));
@@ -304,7 +426,7 @@ describe("rich text editor", () => {
     });
 
     it("Then changing the text renames the link as well as targeting it", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       const { onBlur } = renderEditor({ content: "the old name" });
 
       await user.click(screen.getByTestId(editor));
@@ -330,7 +452,7 @@ describe("rich text editor", () => {
 
   describe("when I press ctrl+k with text selected", () => {
     it("Then the same url field opens", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       renderEditor();
 
       await user.click(screen.getByTestId(editor));
@@ -345,7 +467,7 @@ describe("rich text editor", () => {
     });
 
     it("Then the url I give links the selection", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       const { onBlur } = renderEditor();
 
       await user.click(screen.getByTestId(editor));
@@ -368,7 +490,7 @@ describe("rich text editor", () => {
 
   describe("when the cursor sits inside a link", () => {
     it("Then the field opens holding the url it already has", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       renderEditor({ content: "read [the docs](https://example.com/docs)" });
 
       await user.click(screen.getByTestId(editor));
@@ -381,7 +503,7 @@ describe("rich text editor", () => {
     });
 
     it("Then removing it leaves the text as plain prose", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       const { onBlur } = renderEditor({
         content: "[the docs](https://example.com/docs)",
       });
@@ -401,7 +523,7 @@ describe("rich text editor", () => {
 
   describe("when I press the toolbar's code block button", () => {
     it("Then what I type afterwards is fenced", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       const { onBlur } = renderEditor();
 
       await user.click(screen.getByTestId(editor));
@@ -417,7 +539,7 @@ describe("rich text editor", () => {
     });
 
     it("Then pressing it again returns the text to prose", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       const { onBlur } = renderEditor();
 
       await user.click(screen.getByTestId(editor));

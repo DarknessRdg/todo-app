@@ -97,10 +97,18 @@ function SelectContent({
   className,
   children,
   position = "popper",
+  container,
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.Content>) {
+}: React.ComponentProps<typeof SelectPrimitive.Content> & {
+  /**
+   * Where the dropdown is portalled to. Defaults to the body, which is dead to
+   * clicks inside a modal dialog — that makes everything outside itself inert —
+   * so a caller inside one passes an element within its own subtree.
+   */
+  container?: React.ComponentProps<typeof SelectPrimitive.Portal>["container"];
+}) {
   return (
-    <SelectPrimitive.Portal>
+    <SelectPrimitive.Portal container={container}>
       <SelectPrimitive.Content
         data-slot="select-content"
         className={cn(

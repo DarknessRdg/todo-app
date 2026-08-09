@@ -33,11 +33,21 @@ export function mockTodoRepository(
     create: vi.fn<TodoRepository["create"]>().mockResolvedValue(undefined),
     delete: vi.fn<TodoRepository["delete"]>().mockResolvedValue(undefined),
     updateDone: vi.fn<TodoRepository["updateDone"]>().mockResolvedValue(undefined),
+    updateTitle: vi
+      .fn<TodoRepository["updateTitle"]>()
+      .mockResolvedValue(undefined),
     updateDescription: vi
       .fn<TodoRepository["updateDescription"]>()
       .mockResolvedValue(undefined),
     count: vi.fn<TodoRepository["count"]>().mockResolvedValue(0),
     getById: vi.fn<TodoRepository["getById"]>().mockResolvedValue(undefined),
+    addSubtask: vi.fn<TodoRepository["addSubtask"]>().mockResolvedValue(undefined),
+    updateSubtaskDone: vi
+      .fn<TodoRepository["updateSubtaskDone"]>()
+      .mockResolvedValue(undefined),
+    deleteSubtask: vi
+      .fn<TodoRepository["deleteSubtask"]>()
+      .mockResolvedValue(undefined),
     ...overrides,
   };
 }
@@ -52,16 +62,21 @@ export function mockTodoRepository(
 export function inMemoryTodoRepository(
   initial: TodoEntity[] = []
 ): MockTodoRepository {
-  const rows: TodoEntity[] = initial.map((row) => ({ ...row }));
+  const rows: TodoEntity[] = initial.map((row) => ({
+    ...row,
+    subtasks: row.subtasks.map((subtask) => ({ ...subtask })),
+  }));
   const find = (id: string) => rows.find((row) => row.id === id);
 
   return mockTodoRepository({
     listAll: vi.fn<TodoRepository["listAll"]>(async () =>
-      rows.map((row) => ({ ...row }))
+      rows.map((row) => ({ ...row, subtasks: [...row.subtasks] }))
     ),
     getById: vi.fn<TodoRepository["getById"]>(async (id) => {
       const row = find(id);
-      return row === undefined ? undefined : { ...row };
+      return row === undefined
+        ? undefined
+        : { ...row, subtasks: [...row.subtasks] };
     }),
     count: vi.fn<TodoRepository["count"]>(async () => rows.length),
     create: vi.fn<TodoRepository["create"]>(async (todo) => {
@@ -75,10 +90,36 @@ export function inMemoryTodoRepository(
       const row = find(id);
       if (row) row.done = done;
     }),
+    updateTitle: vi.fn<TodoRepository["updateTitle"]>(async ({ id, title }) => {
+      const row = find(id);
+      if (row) row.title = title;
+    }),
     updateDescription: vi.fn<TodoRepository["updateDescription"]>(
       async ({ id, description }) => {
         const row = find(id);
         if (row) row.description = description;
+      }
+    ),
+    addSubtask: vi.fn<TodoRepository["addSubtask"]>(async ({ id, subtask }) => {
+      const row = find(id);
+      if (row) row.subtasks = [...row.subtasks, { ...subtask }];
+    }),
+    updateSubtaskDone: vi.fn<TodoRepository["updateSubtaskDone"]>(
+      async ({ id, subtaskId, done }) => {
+        const row = find(id);
+        if (!row) return;
+        row.subtasks = row.subtasks.map((subtask) =>
+          subtask.id === subtaskId ? { ...subtask, done } : subtask
+        );
+      }
+    ),
+    deleteSubtask: vi.fn<TodoRepository["deleteSubtask"]>(
+      async ({ id, subtaskId }) => {
+        const row = find(id);
+        if (!row) return;
+        row.subtasks = row.subtasks.filter(
+          (subtask) => subtask.id !== subtaskId
+        );
       }
     ),
   });
@@ -109,17 +150,26 @@ export function renderWithContainer(
   ui: ReactElement,
   // `diContainer`, not `container` — RTL's RenderOptions already owns that name
   // for the host element, and the two silently collide.
-  options: RenderOptions & { diContainer?: Container; route?: string } = {}
+  options: RenderOptions & {
+    diContainer?: Container;
+    route?: string;
+    /**
+     * Override the query client. The default disables retries so a spec never
+     * waits out a backoff — which also makes the suite blind to whether the
+     * *app* retries. A spec about retry behaviour must pass its own client
+     * carrying the production defaults.
+     */
+    queryClient?: QueryClient;
+  } = {}
 ) {
   const {
     diContainer = createTestContainer(),
     route,
+    queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    }),
     ...renderOptions
   } = options;
-
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-  });
 
   let location: Location | undefined;
 

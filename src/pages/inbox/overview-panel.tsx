@@ -1,5 +1,6 @@
 import { Calendar } from "@/components/ui/calendar";
-import { testProp, type TestIdProps } from "@/lib/test-id";
+import { Text } from "@/components/ui/text";
+import { type TestIdProps } from "@/lib/test-id";
 import { Progress } from "@/components/ui/progress";
 import { useTodoList } from "@/pages/inbox/use-todo-list";
 import { CheckCircle2, Circle, CalendarClock } from "lucide-react";
@@ -27,7 +28,9 @@ export function OverviewPanel() {
   return (
     <div className="flex flex-col gap-6">
       <section>
-        <p className="eyebrow mb-3">Overview</p>
+        <Text variant="eyebrow" className="mb-3">
+          Overview
+        </Text>
         <div className="grid grid-cols-2 gap-2.5">
           <Stat
             testId="home.overview.open.count"
@@ -64,7 +67,9 @@ export function OverviewPanel() {
       </section>
 
       <section>
-        <p className="eyebrow mb-3">Calendar</p>
+        <Text variant="eyebrow" className="mb-3">
+          Calendar
+        </Text>
         <div className="bg-card rounded-2xl p-3">
           <Calendar
             mode="single"
@@ -93,13 +98,17 @@ function Stat({
     <div className="bg-card flex flex-col gap-1 rounded-2xl px-3.5 py-3">
       <span className="text-muted-foreground flex items-center gap-1.5">
         {icon}
-        <span className="eyebrow">{label}</span>
+        <Text variant="eyebrow" as="span">
+          {label}
+        </Text>
       </span>
-      <span
-        {...testProp(testId)}
-        className="font-display text-2xl leading-none font-semibold tabular-nums">
+      <Text
+        testId={testId}
+        variant="h1"
+        as="span"
+        className="font-display leading-none tabular-nums">
         {value}
-      </span>
+      </Text>
     </div>
   );
 }

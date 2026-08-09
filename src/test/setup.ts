@@ -49,6 +49,18 @@ if (!document.elementFromPoint) {
   document.elementFromPoint = () => null;
 }
 
+// Radix's Select drives itself off pointer capture and scrolls the active item
+// into view. jsdom implements neither, so opening one throws without these.
+if (!Element.prototype.hasPointerCapture) {
+  Element.prototype.hasPointerCapture = () => false;
+  Element.prototype.setPointerCapture = () => {};
+  Element.prototype.releasePointerCapture = () => {};
+}
+
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {};
+}
+
 if (!window.ResizeObserver) {
   window.ResizeObserver = class {
     observe() {}

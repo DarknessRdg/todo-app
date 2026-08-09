@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/shadcn-io/spinner";
 import { toast } from "@/components/ui/sonner";
 import { TooltipText } from "@/components/ui/tooltip";
-import { Typography } from "@/components/ui/typography";
+import { Text } from "@/components/ui/text";
 import { useTodoDelete } from "@/pages/inbox/use-todo-delete";
 import { Trash2Icon } from "lucide-react";
 
@@ -49,16 +49,15 @@ export function DeleteButton({ title, id }: { title: string; id: string }) {
             Are sure you want to delete the ToDo?
           </AlertDialogTitle>
           <AlertDialogDescription>
-            <Typography variant="p">
+            {/* AlertDialogDescription is already muted; keep inheriting it. */}
+            <Text className="text-inherit">
               This action cannot be undone. This will permanently delete your
               ToDo and you won't be able to restore it.
-            </Typography>
-            <Typography variant="code" className="mt-4 mr-1 inline-block">
+            </Text>
+            <Text variant="code" className="mt-4 mr-1 inline-block">
               {title}
-            </Typography>
-            <Typography variant="p" className="inline-block">
-              will be deleted.
-            </Typography>
+            </Text>
+            <Text className="text-inherit inline-block">will be deleted.</Text>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

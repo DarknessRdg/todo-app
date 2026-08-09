@@ -1,4 +1,5 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen } from "@testing-library/react";
+import { waitFor } from "@/test/user";
 import { describe, expect, it } from "vitest";
 
 import type { TodoEntity } from "@/backend/todo-service";

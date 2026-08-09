@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
-import { Typography } from "@/components/ui/typography";
+import { Text } from "@/components/ui/text";
 import { useTodoCreate } from "@/pages/inbox/use-todo-create";
 import {
   CalendarIcon,
@@ -116,12 +116,11 @@ export function NewInput() {
       </form.FormSubmit>
 
       {form.state.errors.length > 0 && (
-        <Typography
+        <Text
           testId="home.todo.create.error"
-          variant="p"
           className="text-destructive mt-2 px-1 text-sm">
           {form.state.errors}
-        </Typography>
+        </Text>
       )}
     </form.AppForm>
   );
@@ -161,8 +160,8 @@ function DueDateButton({ initial }: { initial: Date }) {
       <PopoverContent className="w-auto overflow-hidden p-0" align="end">
         <div className="mb-3 flex flex-nowrap items-center justify-between px-4 pt-3">
           <div>
-            <Typography variant="h6">Due date</Typography>
-            <Typography variant="muted">When it's due</Typography>
+            <Text variant="h6">Due date</Text>
+            <Text variant="muted">When it's due</Text>
           </div>
           <Button
             testId="home.todo.create.duedate.today"

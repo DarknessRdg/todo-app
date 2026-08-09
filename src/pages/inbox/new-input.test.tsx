@@ -1,5 +1,5 @@
-import { screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { screen } from "@testing-library/react";
+import { setupUser, waitFor } from "@/test/user";
 import { describe, expect, it } from "vitest";
 
 import { NewInput } from "@/pages/inbox/new-input";
@@ -33,7 +33,7 @@ function created(repository: ReturnType<typeof mockTodoRepository>) {
 describe("new todo input", () => {
   describe("when I submit a title", () => {
     it("Then the todo is persisted with that title", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       // A pass-through assertion: a generated title proves the value the user
       // typed reached the repository untouched, which a literal would not.
       const { title } = makeCreateTodo();
@@ -46,7 +46,7 @@ describe("new todo input", () => {
     });
 
     it("Then it is persisted as not yet done", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       const { title } = makeCreateTodo();
       const { repository } = renderNewInput();
 
@@ -57,7 +57,7 @@ describe("new todo input", () => {
     });
 
     it("Then it defaults to being due today", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       const { title } = makeCreateTodo();
       const { repository } = renderNewInput();
 
@@ -72,7 +72,7 @@ describe("new todo input", () => {
     });
 
     it("Then the field clears, ready for the next capture", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       const { title } = makeCreateTodo();
       renderNewInput();
 
@@ -85,7 +85,7 @@ describe("new todo input", () => {
 
   describe("when I submit without a title", () => {
     it("Then nothing is persisted", async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       const { repository } = renderNewInput();
 
       await user.click(screen.getByTestId(submit));

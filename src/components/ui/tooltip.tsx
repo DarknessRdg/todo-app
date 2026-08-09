@@ -4,7 +4,7 @@ import * as React from "react";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 
 import { cn } from "@/lib/utils";
-import { Typography } from "@/components/ui/typography";
+import { Text } from "@/components/ui/text";
 
 function TooltipProvider({
   delayDuration = 0,
@@ -76,7 +76,9 @@ export function TooltipText({
     <Tooltip>
       <TooltipTrigger {...props}>{children}</TooltipTrigger>
       <TooltipContent>
-        <Typography variant="p">{text}</Typography>
+        {/* The tooltip surface owns the colour (ink with light text), so the
+            variant hands it back rather than repainting it. */}
+        <Text className="text-inherit">{text}</Text>
       </TooltipContent>
     </Tooltip>
   );

@@ -1,4 +1,5 @@
 import { Logo } from "@/components/logo";
+import { Text } from "@/components/ui/text";
 import {
   Sidebar,
   SidebarContent,
@@ -18,38 +19,11 @@ import {
 } from "@/components/ui/popover";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils.ts";
-import {
-  CalendarClock,
-  CalendarDays,
-  CheckCircle2,
-  ChevronRight,
-  Hash,
-  Inbox,
-  Plus,
-  Search,
-  Settings,
-  Sun,
-  Tag,
-  type LucideIcon,
-} from "lucide-react";
+import { testProp } from "@/lib/test-id";
+import { views, viewIsActive } from "@/layout/views";
+import { ChevronRight, Hash, Plus, Search, Settings } from "lucide-react";
 import { useState } from "react";
-
-type View = {
-  title: string;
-  icon: LucideIcon;
-  count?: number;
-  active?: boolean;
-};
-
-// Views are filters over the same task set (business logic comes later).
-const views: View[] = [
-  { title: "Inbox", icon: Inbox, count: 12, active: true },
-  { title: "Today", icon: Sun, count: 3 },
-  { title: "Upcoming", icon: CalendarDays, count: 8 },
-  { title: "Overdue", icon: CalendarClock, count: 2 },
-  { title: "Completed", icon: CheckCircle2 },
-  { title: "Labels", icon: Tag },
-];
+import { Link, useLocation } from "react-router";
 
 type AreaNode = {
   name: string;
@@ -94,6 +68,8 @@ const areas: AreaNode[] = [
 ];
 
 export function AppSidebar({ className }: { className?: string } = {}) {
+  const { pathname } = useLocation();
+
   return (
     <Sidebar className="border-none">
       <SidebarContent
@@ -116,21 +92,36 @@ export function AppSidebar({ className }: { className?: string } = {}) {
           <SidebarGroupLabel className="eyebrow">Views</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {views.map((view) => (
-                <SidebarMenuItem key={view.title}>
-                  <SidebarMenuButton
-                    isActive={view.active}
-                    className="h-9 gap-2.5">
-                    <view.icon className="size-4.5" />
-                    <span>{view.title}</span>
-                    {view.count ? (
-                      <span className="ml-auto text-xs tabular-nums opacity-90">
-                        {view.count}
-                      </span>
-                    ) : null}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {views.map((view) => {
+                const active = viewIsActive(view, pathname);
+
+                return (
+                  <SidebarMenuItem key={view.id}>
+                    {/*
+                      `asChild` so the rendered element is the Link's own
+                      anchor: a real href the browser can open in a new tab or
+                      copy, rather than a button that fakes navigation.
+                    */}
+                    <SidebarMenuButton
+                      asChild
+                      isActive={active}
+                      className="h-9 gap-2.5">
+                      <Link
+                        to={view.path}
+                        aria-current={active ? "page" : undefined}
+                        {...testProp(`sidebar.view.${view.id}.link`)}>
+                        <view.icon className="size-4.5" />
+                        <span>{view.title}</span>
+                        {view.count ? (
+                          <span className="ml-auto text-xs tabular-nums opacity-90">
+                            {view.count}
+                          </span>
+                        ) : null}
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -165,7 +156,9 @@ export function AppSidebar({ className }: { className?: string } = {}) {
               </button>
             </PopoverTrigger>
             <PopoverContent side="right" align="end" className="w-56 p-2">
-              <p className="eyebrow px-2 pt-1 pb-2">Appearance</p>
+              <Text variant="eyebrow" className="px-2 pt-1 pb-2">
+                Appearance
+              </Text>
               <ThemeToggle />
             </PopoverContent>
           </Popover>
