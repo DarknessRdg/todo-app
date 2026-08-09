@@ -18,11 +18,19 @@ import {
 } from "@/pages/inbox/todo-meta.tsx";
 import { useNavigate } from "react-router";
 import { useEffect, useRef, useState } from "react";
+import { ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { flagKey } from "@/lib/persisted-flag";
+import { useStickyToggle } from "@/hooks/use-sticky-toggle";
 import { ConfettiBurst } from "@/components/confetti-burst";
 import { TodoProjectBadge } from "@/pages/inbox/todo-project-badge";
 
 export function TodoList({ projectId }: { projectId?: string } = {}) {
   const { todoList, doneList, count, isLoading } = useTodoList({ projectId });
+
+  // Each page keeps its own: collapsing Done in the inbox says nothing about
+  // whether it should be collapsed in a project.
+  const scope = projectId ?? "inbox";
 
   if (isLoading) return <TodoListSkeleton />;
 
@@ -36,6 +44,7 @@ export function TodoList({ projectId }: { projectId?: string } = {}) {
       <Section
         testId="home.todo.section.open"
         countTestId="home.todo.section.open.count"
+        storageKey={flagKey("section", scope, "open")}
         label="To do"
         count={todoList?.length ?? 0}>
         <TodoListContainer todoList={todoList} />
@@ -45,6 +54,7 @@ export function TodoList({ projectId }: { projectId?: string } = {}) {
         <Section
           testId="home.todo.section.done"
           countTestId="home.todo.section.done.count"
+          storageKey={flagKey("section", scope, "done")}
           label="Done"
           count={doneCount}
           trailing={
@@ -100,23 +110,50 @@ function Section({
   children,
   testId,
   countTestId,
+  storageKey,
 }: TestIdProps & {
   label: string;
   count: number;
   countTestId?: string;
   trailing?: React.ReactNode;
   children: React.ReactNode;
+  /** Where this section's collapsed state is remembered. */
+  storageKey: string;
 }) {
+  const [open, setOpen] = useStickyToggle(storageKey, true);
+
   return (
     <section {...testProp(testId)}>
       <div className="mb-3 flex items-center gap-2.5">
-        <Text variant="h5">{label}</Text>
+        {/*
+          The heading itself is the control, so the whole label is a target
+          rather than a chevron the size of a full stop. The count stays
+          outside it: collapsed, it is the only thing still saying how much is
+          in there.
+        */}
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          aria-label={`${open ? "Collapse" : "Expand"} ${label}`}
+          {...testProp(testId === undefined ? undefined : `${testId}.toggle`)}
+          className="group -ml-1 flex items-center gap-1.5 rounded-md px-1 py-0.5 transition-colors">
+          <ChevronRight
+            className={cn(
+              "text-muted-foreground size-4 shrink-0 transition-transform duration-200",
+              open && "rotate-90"
+            )}
+          />
+          <Text variant="h5">{label}</Text>
+        </button>
+
         <span {...testProp(countTestId)} className="count-chip">
           {count}
         </span>
         {trailing ? <div className="ml-auto">{trailing}</div> : null}
       </div>
-      {children}
+
+      {open ? children : null}
     </section>
   );
 }

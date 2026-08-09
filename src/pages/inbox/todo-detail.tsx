@@ -32,7 +32,14 @@ import { ProjectSelect } from "@/components/project-select";
 import { TodoProjectBadge } from "@/pages/inbox/todo-project-badge";
 import { useTodoProjectName } from "@/pages/inbox/use-todo-project";
 import { Timing } from "@/lib/timing";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Text, textVariants } from "@/components/ui/text";
+import { dialogOf } from "@/lib/dialog-container";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router";
 import { testProp } from "@/lib/test-id";
@@ -351,9 +358,7 @@ function PropertiesPanel({ todo }: { todo: TodoEntity }) {
       </PropertyRow>
 
       <PropertyRow icon={<CalendarIcon className="size-3.5" />} label="Due">
-        <span className="text-xs tabular-nums">
-          {todo.dueDate ? formatDate(todo.dueDate) : "—"}
-        </span>
+        <DueDatePicker todo={todo} />
       </PropertyRow>
 
       <div className="my-3 border-t" />
@@ -429,6 +434,78 @@ function TodoBreadcrumbProject({ projectId }: { projectId: string | undefined })
       <span className="text-foreground/70">{name}</span>
       <span className="opacity-40">/</span>
     </>
+  );
+}
+
+/**
+ * Sets or clears the due date from the properties panel.
+ *
+ * Clearing is offered as plainly as picking: a date set by mistake is as
+ * common as one that was never wanted, and the only other way out would be
+ * choosing an arbitrary day to mean "none".
+ */
+function DueDatePicker({ todo }: { todo: TodoEntity }) {
+  const { updateDueDate } = useTodoUpdate();
+  const [open, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const dialog = dialogOf(trigger.current);
+
+  const choose = (dueDate: Date | undefined) => {
+    updateDueDate.mutate({ id: todo.id, dueDate });
+    setOpen(false);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          ref={trigger}
+          testId="todo.detail.duedate.button"
+          variant="ghost"
+          size="sm"
+          type="button"
+          className="text-muted-foreground hover:text-foreground -mr-2 h-7 gap-1.5 px-2">
+          <span className="text-xs tabular-nums">
+            {todo.dueDate ? formatDate(todo.dueDate) : "Add a date"}
+          </span>
+        </Button>
+      </PopoverTrigger>
+
+      <PopoverContent
+        container={dialog}
+        collisionBoundary={dialog}
+        collisionPadding={12}
+        align="end"
+        className="w-auto overflow-hidden p-0">
+        <Calendar
+          mode="single"
+          selected={todo.dueDate}
+          defaultMonth={todo.dueDate}
+          onSelect={(date) => (date ? choose(date) : undefined)}
+        />
+
+        <div className="flex items-center gap-1 border-t p-2">
+          <Button
+            testId="todo.detail.duedate.today"
+            variant="ghost"
+            size="sm"
+            className="grow"
+            onClick={() => choose(new Date())}>
+            Today
+          </Button>
+          {todo.dueDate ? (
+            <Button
+              testId="todo.detail.duedate.clear"
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-foreground grow"
+              onClick={() => choose(undefined)}>
+              Clear
+            </Button>
+          ) : null}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 

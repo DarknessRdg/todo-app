@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/popover";
 import { Text } from "@/components/ui/text";
 import { testProp, type TestIdProps } from "@/lib/test-id";
+import { dialogOf } from "@/lib/dialog-container";
 import { cn } from "@/lib/utils";
 import { useProjectCreate, useProjects } from "@/pages/inbox/use-projects";
 
@@ -55,11 +56,8 @@ export function ProjectSelect({
 
   // Read on every render rather than once: the trigger is null on the first
   // pass, and opening the popover re-renders, so by the time the panel mounts
-  // this resolves. `undefined` (not `null`) outside a dialog, so Radix falls
-  // back to its own default rather than being handed an empty container.
-  const dialog =
-    trigger.current?.closest<HTMLElement>("[data-slot='dialog-content']") ??
-    undefined;
+  // this resolves.
+  const dialog = dialogOf(trigger.current);
 
   const choose = (projectId: string | undefined) => {
     onChange(projectId);

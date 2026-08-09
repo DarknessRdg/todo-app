@@ -119,6 +119,40 @@ describe("TodoRepositoryIndexedDB", () => {
     });
   });
 
+  describe("when I give a todo a due date", () => {
+    it("Then the stored todo carries it", async () => {
+      const todo = makeTodo({ dueDate: undefined });
+      const repository = await repositoryWith([todo]);
+      const dueDate = new Date("2026-09-01T00:00:00.000Z");
+
+      await repository.updateDueDate({ id: todo.id, dueDate });
+
+      const stored = await repository.getById(todo.id);
+      expect(stored?.dueDate).toEqual(dueDate);
+    });
+
+    it("Then clearing it takes the date away rather than zeroing it", async () => {
+      const todo = makeTodo({ dueDate: new Date("2026-09-01T00:00:00.000Z") });
+      const repository = await repositoryWith([todo]);
+
+      await repository.updateDueDate({ id: todo.id, dueDate: undefined });
+
+      const stored = await repository.getById(todo.id);
+      expect(stored?.dueDate).toBeUndefined();
+    });
+
+    it("Then the rest of the todo is left untouched", async () => {
+      const todo = makeTodo({ dueDate: undefined, done: true });
+      const repository = await repositoryWith([todo]);
+      const dueDate = new Date("2026-09-01T00:00:00.000Z");
+
+      await repository.updateDueDate({ id: todo.id, dueDate });
+
+      const stored = await repository.getById(todo.id);
+      expect(stored).toEqual({ ...todo, dueDate });
+    });
+  });
+
   describe("when I move a todo to a project", () => {
     it("Then the stored todo carries that project", async () => {
       const todo = makeTodo({ projectId: undefined });

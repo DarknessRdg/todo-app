@@ -61,6 +61,22 @@ export function useTodoUpdate() {
     },
   });
 
+  const dueDateMutation = useMutation({
+    mutationFn: todoService.updateDueDate,
+    // The due date is a badge on the list row and a property on the detail.
+    onSuccess: (_data, { id }) => {
+      queryClient.invalidateQueries({ queryKey: [QueryTodoKey] });
+      queryClient.invalidateQueries({ queryKey: [QueryTodoDetailsKey, id] });
+    },
+    onError: (error) => {
+      console.error(error);
+
+      toast.error("Error", {
+        description: "An internal error happened while saving your due date",
+      });
+    },
+  });
+
   const checkMutation = useMutation({
     mutationFn: todoService.updateDone,
     // Done is shown in both places, so both have to be refreshed: the list this
@@ -86,6 +102,7 @@ export function useTodoUpdate() {
     check: checkMutation,
     updateTitle: titleMutation,
     updateProject: projectMutation,
+    updateDueDate: dueDateMutation,
     updateDescription: descriptionMutation,
   };
 }

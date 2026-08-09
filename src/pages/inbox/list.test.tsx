@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import type { TodoEntity } from "@/backend/todo-service";
 import { Inbox } from "@/pages/inbox/inbox";
+import { TodoList } from "@/pages/inbox/list";
 import {
   createTestContainer,
   inMemoryTodoRepository,
@@ -14,6 +15,9 @@ import { makeSubtask, makeTodo } from "@/test/todo-factory";
 const openSection = "home.todo.section.open";
 const doneSection = "home.todo.section.done";
 const emptyState = "home.todo.empty";
+const openToggle = "home.todo.section.open.toggle";
+const doneToggle = "home.todo.section.done.toggle";
+const openCount = "home.todo.section.open.count";
 
 const rowTitle = (todo: TodoEntity) => `home.todo.${todo.id}.title`;
 const checkButton = (todo: TodoEntity) => `home.todo.${todo.id}.check.button`;
@@ -327,6 +331,158 @@ describe("todo list", () => {
       expect(await screen.findByTestId(modal(second))).toBeInTheDocument();
       // Two todos, so this proves the *clicked* one opened.
       expect(screen.queryByTestId(modal(first))).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when I collapse a section", () => {
+    it("Then its todos are taken off the screen", async () => {
+      const user = setupUser();
+      const todo = makeTodo({ done: false });
+      renderInbox([todo]);
+
+      await screen.findByTestId(rowTitle(todo));
+      await user.click(screen.getByTestId(openToggle));
+
+      await waitFor(() =>
+        expect(screen.queryByTestId(rowTitle(todo))).not.toBeInTheDocument()
+      );
+    });
+
+    it("Then its count stays on screen, so it still says how much is hidden", async () => {
+      const user = setupUser();
+      const todo = makeTodo({ done: false });
+      renderInbox([todo]);
+
+      await screen.findByTestId(rowTitle(todo));
+      await user.click(screen.getByTestId(openToggle));
+
+      await waitFor(() =>
+        expect(screen.queryByTestId(rowTitle(todo))).not.toBeInTheDocument()
+      );
+      expect(screen.getByTestId(openCount)).toHaveTextContent("1");
+    });
+
+    it("Then expanding it again brings them back", async () => {
+      const user = setupUser();
+      const todo = makeTodo({ done: false });
+      renderInbox([todo]);
+
+      await screen.findByTestId(rowTitle(todo));
+      await user.click(screen.getByTestId(openToggle));
+      await waitFor(() =>
+        expect(screen.queryByTestId(rowTitle(todo))).not.toBeInTheDocument()
+      );
+
+      await user.click(screen.getByTestId(openToggle));
+
+      expect(await screen.findByTestId(rowTitle(todo))).toBeInTheDocument();
+    });
+
+    it("Then the other section is left open", async () => {
+      const user = setupUser();
+      const open = makeTodo({ done: false });
+      const done = makeTodo({ done: true });
+      renderInbox([open, done]);
+
+      await screen.findByTestId(rowTitle(open));
+      await user.click(screen.getByTestId(doneToggle));
+
+      await waitFor(() =>
+        expect(screen.queryByTestId(rowTitle(done))).not.toBeInTheDocument()
+      );
+      expect(screen.getByTestId(rowTitle(open))).toBeInTheDocument();
+    });
+  });
+
+  describe("when I come back to a page whose section I collapsed", () => {
+    it("Then it is still collapsed", async () => {
+      const user = setupUser();
+      const todo = makeTodo({ done: false });
+
+      const first = renderInbox([todo]);
+      await screen.findByTestId(rowTitle(todo));
+      await user.click(screen.getByTestId(openToggle));
+      await waitFor(() =>
+        expect(screen.queryByTestId(rowTitle(todo))).not.toBeInTheDocument()
+      );
+      first.unmount();
+
+      renderInbox([todo]);
+
+      await screen.findByTestId(openToggle);
+      expect(screen.queryByTestId(rowTitle(todo))).not.toBeInTheDocument();
+    });
+
+    it("Then expanding it again is remembered too", async () => {
+      const user = setupUser();
+      const todo = makeTodo({ done: false });
+
+      const first = renderInbox([todo]);
+      await screen.findByTestId(rowTitle(todo));
+      await user.click(screen.getByTestId(openToggle));
+      await waitFor(() =>
+        expect(screen.queryByTestId(rowTitle(todo))).not.toBeInTheDocument()
+      );
+      await user.click(screen.getByTestId(openToggle));
+      await screen.findByTestId(rowTitle(todo));
+      first.unmount();
+
+      renderInbox([todo]);
+
+      expect(await screen.findByTestId(rowTitle(todo))).toBeInTheDocument();
+    });
+  });
+
+  describe("when I move from one project to another without leaving the page", () => {
+    /**
+     * `/project/a` and `/project/b` render the same element, so `TodoList` is
+     * never unmounted between them — only its `projectId` changes.
+     */
+    function renderProjectList(projectId: string, todos: TodoEntity[]) {
+      return renderWithContainer(<TodoList projectId={projectId} />, {
+        diContainer: createTestContainer(inMemoryTodoRepository(todos)),
+        route: `/project/${projectId}`,
+      });
+    }
+
+    it("Then the section I collapsed in the first is not collapsed in the second", async () => {
+      const user = setupUser();
+      const mine = makeTodo({ done: false, projectId: "a" });
+      const theirs = makeTodo({ done: false, projectId: "b" });
+
+      const { rerender } = renderProjectList("a", [mine, theirs]);
+
+      await screen.findByTestId(rowTitle(mine));
+      await user.click(screen.getByTestId(openToggle));
+      await waitFor(() =>
+        expect(screen.queryByTestId(rowTitle(mine))).not.toBeInTheDocument()
+      );
+
+      rerender(<TodoList projectId="b" />);
+
+      expect(await screen.findByTestId(rowTitle(theirs))).toBeInTheDocument();
+    });
+
+    it("Then coming back to the first finds it still collapsed", async () => {
+      const user = setupUser();
+      const mine = makeTodo({ done: false, projectId: "a" });
+      const theirs = makeTodo({ done: false, projectId: "b" });
+
+      const { rerender } = renderProjectList("a", [mine, theirs]);
+
+      await screen.findByTestId(rowTitle(mine));
+      await user.click(screen.getByTestId(openToggle));
+      await waitFor(() =>
+        expect(screen.queryByTestId(rowTitle(mine))).not.toBeInTheDocument()
+      );
+
+      rerender(<TodoList projectId="b" />);
+      await screen.findByTestId(rowTitle(theirs));
+
+      rerender(<TodoList projectId="a" />);
+
+      await screen.findByTestId(openToggle);
+      expect(screen.queryByTestId(rowTitle(mine))).not.toBeInTheDocument();
     });
   });
 });

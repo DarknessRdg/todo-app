@@ -44,6 +44,9 @@ export function mockTodoRepository(
     updateProject: vi
       .fn<TodoRepository["updateProject"]>()
       .mockResolvedValue(undefined),
+    updateDueDate: vi
+      .fn<TodoRepository["updateDueDate"]>()
+      .mockResolvedValue(undefined),
     updateDescription: vi
       .fn<TodoRepository["updateDescription"]>()
       .mockResolvedValue(undefined),
@@ -107,6 +110,12 @@ export function inMemoryTodoRepository(
       async ({ id, projectId }) => {
         const row = find(id);
         if (row) row.projectId = projectId;
+      }
+    ),
+    updateDueDate: vi.fn<TodoRepository["updateDueDate"]>(
+      async ({ id, dueDate }) => {
+        const row = find(id);
+        if (row) row.dueDate = dueDate;
       }
     ),
     updateTitle: vi.fn<TodoRepository["updateTitle"]>(async ({ id, title }) => {

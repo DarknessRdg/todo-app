@@ -43,6 +43,10 @@ export interface TodoRepository {
     id: string;
     projectId: string | undefined;
   }): Promise<void>;
+  updateDueDate(params: {
+    id: string;
+    dueDate: Date | undefined;
+  }): Promise<void>;
   updateDescription(params: { id: string; description: string }): Promise<void>;
   count(): Promise<number>;
   getById(id: string): Promise<TodoEntity | undefined>;
@@ -108,6 +112,11 @@ export class TodoService {
     return validation.onValidAsync(async (valid) => {
       await this.repository.updateTitle({ id, title: valid.title });
     });
+  };
+
+  /** Setting a due date, or clearing the one it had. */
+  updateDueDate = async (params: { id: string; dueDate: Date | undefined }) => {
+    return this.repository.updateDueDate(params);
   };
 
   /** Moving a todo between projects, or out of one entirely. */

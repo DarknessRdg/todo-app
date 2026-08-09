@@ -18,6 +18,9 @@ const titleInput = "todo.detail.title.input";
 const checkButton = "todo.detail.check.button";
 const completedDate = "todo.detail.completed.date";
 const projectPicker = "todo.detail.project";
+const duePicker = "todo.detail.duedate.button";
+const dueClear = "todo.detail.duedate.clear";
+const dueToday = "todo.detail.duedate.today";
 const projectOption = (id: string) => `todo.detail.project.option.${id}`;
 const readView = "todo.detail.description.read";
 const editor = "todo.detail.description.editor";
@@ -133,6 +136,85 @@ describe("todo detail", () => {
         done: false,
       })
     );
+  });
+
+  describe("when I set a due date from the detail", () => {
+    it("Then the day I choose is persisted", async () => {
+      const user = setupUser();
+      const todo = makeTodo({ dueDate: undefined });
+      const { repository } = renderDetail(todo);
+
+      await user.click(await screen.findByTestId(duePicker));
+      await user.click(await screen.findByTestId(dueToday));
+
+      await waitFor(() => expect(repository.updateDueDate).toHaveBeenCalled());
+      const { dueDate } = repository.updateDueDate.mock.calls[0][0];
+      expect(dueDate?.toDateString()).toBe(new Date().toDateString());
+    });
+
+    it("Then the detail stops inviting a date and shows the one it has", async () => {
+      const user = setupUser();
+      renderDetail(makeTodo({ dueDate: undefined }));
+
+      await user.click(await screen.findByTestId(duePicker));
+      await user.click(await screen.findByTestId(dueToday));
+
+      await waitFor(() =>
+        expect(screen.getByTestId(duePicker)).not.toHaveTextContent(
+          "Add a date"
+        )
+      );
+    });
+  });
+
+  describe("when a todo has no due date", () => {
+    it("Then the picker invites me to add one", async () => {
+      renderDetail(makeTodo({ dueDate: undefined }));
+
+      expect(await screen.findByTestId(duePicker)).toHaveTextContent(
+        "Add a date"
+      );
+    });
+
+    it("Then there is nothing to clear", async () => {
+      const user = setupUser();
+      renderDetail(makeTodo({ dueDate: undefined }));
+
+      await user.click(await screen.findByTestId(duePicker));
+      await screen.findByTestId(dueToday);
+
+      expect(screen.queryByTestId(dueClear)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when I clear a due date", () => {
+    it("Then the todo is left with none", async () => {
+      const user = setupUser();
+      const todo = makeTodo({ dueDate: new Date("2026-09-10T00:00:00.000Z") });
+      const { repository } = renderDetail(todo);
+
+      await user.click(await screen.findByTestId(duePicker));
+      await user.click(await screen.findByTestId(dueClear));
+
+      await waitFor(() =>
+        expect(repository.updateDueDate).toHaveBeenCalledWith({
+          id: todo.id,
+          dueDate: undefined,
+        })
+      );
+    });
+
+    it("Then the picker goes back to inviting a date", async () => {
+      const user = setupUser();
+      renderDetail(makeTodo({ dueDate: new Date("2026-09-10T00:00:00.000Z") }));
+
+      await user.click(await screen.findByTestId(duePicker));
+      await user.click(await screen.findByTestId(dueClear));
+
+      await waitFor(() =>
+        expect(screen.getByTestId(duePicker)).toHaveTextContent("Add a date")
+      );
+    });
   });
 
   describe("when I move a todo to another project", () => {

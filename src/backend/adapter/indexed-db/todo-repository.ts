@@ -46,6 +46,16 @@ export class TodoRepositoryIndexedDB implements TodoRepository {
     await this.mutateTodo(id, (todo) => ({ ...todo, title }));
   };
 
+  updateDueDate = async ({
+    id,
+    dueDate,
+  }: {
+    id: string;
+    dueDate: Date | undefined;
+  }) => {
+    await this.mutateTodo(id, (todo) => ({ ...todo, dueDate }));
+  };
+
   updateProject = async ({
     id,
     projectId,

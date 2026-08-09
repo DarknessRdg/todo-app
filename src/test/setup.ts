@@ -18,6 +18,14 @@ configure({ testIdAttribute: "data-test-id" });
 // RTL does not auto-cleanup when globals are disabled, so unmount between tests.
 afterEach(() => {
   cleanup();
+  // Preferences (collapsed sections) persist by design, which would otherwise
+  // leak from one spec into the next. Guarded because a spec may have stubbed
+  // storage out to prove the app survives without it.
+  try {
+    window.localStorage.clear();
+  } catch {
+    // Nothing to clear.
+  }
 });
 
 // jsdom implements neither of these, and both are reached by components under
