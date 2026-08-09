@@ -119,6 +119,28 @@ describe("TodoRepositoryIndexedDB", () => {
     });
   });
 
+  describe("when I move a todo to a project", () => {
+    it("Then the stored todo carries that project", async () => {
+      const todo = makeTodo({ projectId: undefined });
+      const repository = await repositoryWith([todo]);
+
+      await repository.updateProject({ id: todo.id, projectId: "project-work" });
+
+      const stored = await repository.getById(todo.id);
+      expect(stored?.projectId).toBe("project-work");
+    });
+
+    it("Then taking it out of every project clears the field", async () => {
+      const todo = makeTodo({ projectId: "project-work" });
+      const repository = await repositoryWith([todo]);
+
+      await repository.updateProject({ id: todo.id, projectId: undefined });
+
+      const stored = await repository.getById(todo.id);
+      expect(stored?.projectId).toBeUndefined();
+    });
+  });
+
   describe("when I retitle a todo", () => {
     it("Then the stored title is the new one", async () => {
       const todo = makeTodo({ title: "Water the plants" });

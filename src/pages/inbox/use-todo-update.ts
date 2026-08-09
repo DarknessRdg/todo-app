@@ -44,6 +44,23 @@ export function useTodoUpdate() {
     },
   });
 
+  const projectMutation = useMutation({
+    mutationFn: todoService.updateProject,
+    // The project is shown on the list row and throughout the detail, so both
+    // have to be refreshed.
+    onSuccess: (_data, { id }) => {
+      queryClient.invalidateQueries({ queryKey: [QueryTodoKey] });
+      queryClient.invalidateQueries({ queryKey: [QueryTodoDetailsKey, id] });
+    },
+    onError: (error) => {
+      console.error(error);
+
+      toast.error("Error", {
+        description: "An internal error happened while moving your todo",
+      });
+    },
+  });
+
   const checkMutation = useMutation({
     mutationFn: todoService.updateDone,
     // Done is shown in both places, so both have to be refreshed: the list this
@@ -68,6 +85,7 @@ export function useTodoUpdate() {
   return {
     check: checkMutation,
     updateTitle: titleMutation,
+    updateProject: projectMutation,
     updateDescription: descriptionMutation,
   };
 }

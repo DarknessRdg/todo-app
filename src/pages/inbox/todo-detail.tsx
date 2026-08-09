@@ -11,7 +11,6 @@ import {
   DueBadge,
   LabelChips,
   PriorityBadge,
-  ProjectBadge,
   StatusBadge,
   formatDate,
   metaFor,
@@ -29,6 +28,9 @@ import {
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ConfettiBurst } from "@/components/confetti-burst";
 import { InlineEdit } from "@/components/inline-edit";
+import { ProjectSelect } from "@/components/project-select";
+import { TodoProjectBadge } from "@/pages/inbox/todo-project-badge";
+import { useTodoProjectName } from "@/pages/inbox/use-todo-project";
 import { Timing } from "@/lib/timing";
 import { Text, textVariants } from "@/components/ui/text";
 import { cn } from "@/lib/utils";
@@ -57,8 +59,7 @@ export function TodoDetailHeader({
         <div className="text-muted-foreground flex items-center gap-2 text-xs font-medium">
           <span className="text-foreground/70">Inbox</span>
           <span className="opacity-40">/</span>
-          <span className="text-foreground/70">{meta.project}</span>
-          <span className="opacity-40">/</span>
+          <TodoBreadcrumbProject projectId={todo.projectId} />
           <span>{shortId(todo.id)}</span>
         </div>
         {actions ? (
@@ -77,7 +78,7 @@ export function TodoDetailHeader({
         <StatusBadge done={todo.done} />
         <PriorityBadge priority={meta.priority} />
         {todo.dueDate ? <DueBadge date={todo.dueDate} /> : null}
-        <ProjectBadge project={meta.project} />
+        <TodoProjectBadge projectId={todo.projectId} />
       </div>
     </header>
   );
@@ -291,7 +292,7 @@ function PropertiesPanel({ todo }: { todo: TodoEntity }) {
       </PropertyRow>
 
       <PropertyRow icon={<FolderIcon className="size-3.5" />} label="Project">
-        <span className="text-sm">{meta.project}</span>
+        <TodoProjectPicker todo={todo} />
       </PropertyRow>
 
       <PropertyRow icon={<Tag className="size-3.5" />} label="Labels">
@@ -365,6 +366,38 @@ function Assignee({ name }: { name: string }) {
 /* -------------------------------------------------------------------------- */
 /* Description + Subtasks                                                       */
 /* -------------------------------------------------------------------------- */
+
+/** The project segment of the breadcrumb, dropped when there is no project. */
+function TodoBreadcrumbProject({ projectId }: { projectId: string | undefined }) {
+  const name = useTodoProjectName(projectId);
+
+  if (name === undefined) return null;
+
+  return (
+    <>
+      <span className="text-foreground/70">{name}</span>
+      <span className="opacity-40">/</span>
+    </>
+  );
+}
+
+/** Moves the todo between projects, from the properties panel. */
+function TodoProjectPicker({ todo }: { todo: TodoEntity }) {
+  const { updateProject } = useTodoUpdate();
+
+  return (
+    <ProjectSelect
+      testId="todo.detail.project"
+      value={todo.projectId}
+      placeholder="No project"
+      onChange={(projectId) => updateProject.mutate({ id: todo.id, projectId })}
+      // The properties panel sits against the right edge, so the panel lines
+      // up with the trigger's right and opens inward.
+      align="end"
+      className="-mr-2 h-7"
+    />
+  );
+}
 
 /**
  * The completion toggle beside the title.

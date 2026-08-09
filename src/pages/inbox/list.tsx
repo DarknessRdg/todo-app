@@ -13,13 +13,13 @@ import {
   DueBadge,
   LabelChips,
   PriorityBadge,
-  ProjectBadge,
   SubtaskIndicator,
   metaFor,
 } from "@/pages/inbox/todo-meta.tsx";
 import { useNavigate } from "react-router";
 import { useEffect, useRef, useState } from "react";
 import { ConfettiBurst } from "@/components/confetti-burst";
+import { TodoProjectBadge } from "@/pages/inbox/todo-project-badge";
 
 export function TodoList() {
   const { todoList, doneList, count, isLoading } = useTodoList();
@@ -192,7 +192,7 @@ function TodoItem({ todo }: { todo: TodoEntity }) {
 
         <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5">
           <PriorityBadge priority={meta.priority} />
-          <ProjectBadge project={meta.project} />
+          <TodoProjectBadge projectId={todo.projectId} />
           <LabelChips labels={meta.labels} max={2} />
           {todo.dueDate ? <DueBadge date={todo.dueDate} /> : null}
           {subtasks.length > 0 ? (

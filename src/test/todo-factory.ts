@@ -1,5 +1,6 @@
 import { faker } from "@faker-js/faker";
 
+import type { ProjectEntity } from "@/backend/project-service";
 import type {
   CreateTodoEntity,
   SubtaskEntity,
@@ -51,6 +52,16 @@ export function makeCreateTodo(
 ): CreateTodoEntity {
   return {
     title: faker.lorem.sentence({ min: 2, max: 6 }),
+    ...overrides,
+  };
+}
+
+export function makeProject(
+  overrides: Partial<ProjectEntity> = {}
+): ProjectEntity {
+  return {
+    id: faker.string.uuid(),
+    name: faker.commerce.department(),
     ...overrides,
   };
 }

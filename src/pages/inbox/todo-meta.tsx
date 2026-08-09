@@ -17,12 +17,11 @@ import {
 
 /* -------------------------------------------------------------------------- */
 /* Illustrative metadata                                                       */
-/* Subtasks are real and stored on the todo; project, labels, priority and     */
-/* assignee are not — they are derived deterministically from the id so every  */
-/* surface (list, modal, page) agrees on the same made-up values.              */
+/* Subtasks and the project are real and stored; labels, priority and assignee */
+/* are not — they are derived deterministically from the id so every surface   */
+/* (list, modal, page) agrees on the same made-up values.                      */
 /* -------------------------------------------------------------------------- */
 
-const PROJECTS = ["Personal", "Work", "Learning"] as const;
 const PRIORITIES = ["Low", "Medium", "High", "Urgent"] as const;
 const LABEL_POOL = [
   ["Design"],
@@ -41,7 +40,6 @@ export function hash(id: string) {
 export function metaFor(id: string) {
   const h = hash(id);
   return {
-    project: PROJECTS[h % PROJECTS.length],
     priority: PRIORITIES[(h >>> 3) % PRIORITIES.length],
     labels: LABEL_POOL[(h >>> 6) % LABEL_POOL.length],
   };

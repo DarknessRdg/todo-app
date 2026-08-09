@@ -5,20 +5,26 @@ import { describe, expect, it } from "vitest";
 import { NewInput } from "@/pages/inbox/new-input";
 import {
   createTestContainer,
+  inMemoryProjectRepository,
   mockTodoRepository,
   renderWithContainer,
 } from "@/test/container";
-import { makeCreateTodo } from "@/test/todo-factory";
+import { makeCreateTodo, makeProject } from "@/test/todo-factory";
 
 const input = "home.todo.create.input";
 const submit = "home.todo.create.submit";
 
-function renderNewInput() {
+function renderNewInput({
+  projects = [],
+}: { projects?: ReturnType<typeof makeProject>[] } = {}) {
   const repository = mockTodoRepository();
 
   return {
     ...renderWithContainer(<NewInput />, {
-      diContainer: createTestContainer(repository),
+      diContainer: createTestContainer(
+        repository,
+        inMemoryProjectRepository(projects)
+      ),
     }),
     repository,
   };
@@ -93,6 +99,28 @@ describe("new todo input", () => {
       // Give the mutation a chance to run before concluding it did not persist.
       await waitFor(() => expect(screen.getByTestId(input)).toHaveValue(""));
       expect(repository.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when I choose a project for a new todo", () => {
+    it("Then the todo is created against it", async () => {
+      const user = setupUser();
+      const garden = makeProject({ name: "Garden" });
+      const { repository } = renderNewInput({ projects: [garden] });
+
+      await user.click(screen.getByTestId("home.todo.create.project"));
+      await user.click(
+        await screen.findByTestId(`home.todo.create.project.option.${garden.id}`)
+      );
+
+      await user.type(screen.getByTestId(input), "Repot the fig tree");
+      await user.click(screen.getByTestId(submit));
+
+      await waitFor(() =>
+        expect(repository.create.mock.calls[0][0]).toMatchObject({
+          projectId: garden.id,
+        })
+      );
     });
   });
 });

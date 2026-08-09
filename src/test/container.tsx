@@ -7,6 +7,11 @@ import { vi, type Mock } from "vitest";
 
 import type { TodoEntity, TodoRepository } from "@/backend/todo-service";
 import { TodoService } from "@/backend/todo-service";
+import type {
+  ProjectEntity,
+  ProjectRepository,
+} from "@/backend/project-service";
+import { ProjectService } from "@/backend/project-service";
 import { ContainerContext } from "@/di-container/hook";
 import { Dependencies } from "@/di-container";
 
@@ -35,6 +40,9 @@ export function mockTodoRepository(
     updateDone: vi.fn<TodoRepository["updateDone"]>().mockResolvedValue(undefined),
     updateTitle: vi
       .fn<TodoRepository["updateTitle"]>()
+      .mockResolvedValue(undefined),
+    updateProject: vi
+      .fn<TodoRepository["updateProject"]>()
       .mockResolvedValue(undefined),
     updateDescription: vi
       .fn<TodoRepository["updateDescription"]>()
@@ -95,6 +103,12 @@ export function inMemoryTodoRepository(
       // the completion date back is not being told a story by the fake.
       row.doneAt = done ? new Date() : undefined;
     }),
+    updateProject: vi.fn<TodoRepository["updateProject"]>(
+      async ({ id, projectId }) => {
+        const row = find(id);
+        if (row) row.projectId = projectId;
+      }
+    ),
     updateTitle: vi.fn<TodoRepository["updateTitle"]>(async ({ id, title }) => {
       const row = find(id);
       if (row) row.title = title;
@@ -130,16 +144,64 @@ export function inMemoryTodoRepository(
   });
 }
 
+/** The ProjectRepository port, each method a typed `vi.fn()`. */
+export type MockProjectRepository = {
+  [K in keyof ProjectRepository]: Mock<ProjectRepository[K]>;
+};
+
+export function mockProjectRepository(
+  overrides: Partial<MockProjectRepository> = {}
+): MockProjectRepository {
+  return {
+    listAll: vi.fn<ProjectRepository["listAll"]>().mockResolvedValue([]),
+    create: vi.fn<ProjectRepository["create"]>().mockResolvedValue(undefined),
+    findByName: vi
+      .fn<ProjectRepository["findByName"]>()
+      .mockResolvedValue(undefined),
+    ...overrides,
+  };
+}
+
 /**
- * Builds the same container shape the app uses, but backed by a mock repository
+ * A `mockProjectRepository` whose reads reflect its own writes, so a spec can
+ * create a project inline and then find it in the list.
+ */
+export function inMemoryProjectRepository(
+  initial: ProjectEntity[] = []
+): MockProjectRepository {
+  const rows: ProjectEntity[] = initial.map((row) => ({ ...row }));
+
+  return mockProjectRepository({
+    listAll: vi.fn<ProjectRepository["listAll"]>(async () =>
+      [...rows].sort((a, b) => a.name.localeCompare(b.name))
+    ),
+    create: vi.fn<ProjectRepository["create"]>(async (project) => {
+      rows.push({ ...project });
+    }),
+    findByName: vi.fn<ProjectRepository["findByName"]>(async (name) => {
+      const wanted = name.trim().toLocaleLowerCase();
+      return rows.find((row) => row.name.toLocaleLowerCase() === wanted);
+    }),
+  });
+}
+
+/**
+ * Builds the same container shape the app uses, but backed by mock repositories
  * — no IndexedDB is opened, so this is synchronous unlike `createDIContainer()`.
  */
-export function createTestContainer(repository: TodoRepository = mockTodoRepository()) {
+export function createTestContainer(
+  repository: TodoRepository = mockTodoRepository(),
+  projectRepository: ProjectRepository = mockProjectRepository()
+) {
   const container = new Container({ defaultScope: "Singleton" });
 
   container
     .bind<TodoService>(Dependencies.TodoService)
     .toConstantValue(new TodoService({ repository }));
+
+  container
+    .bind<ProjectService>(Dependencies.ProjectService)
+    .toConstantValue(new ProjectService({ repository: projectRepository }));
 
   return container;
 }

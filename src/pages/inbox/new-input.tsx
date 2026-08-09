@@ -1,5 +1,6 @@
 import type { CreateTodoEntity } from "@/backend/todo-service";
 import { useAppForm, useFieldContext } from "@/components/app-form/app-form";
+import { ProjectSelect } from "@/components/project-select";
 import { TodoCheckerInput } from "@/components/todo";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -8,22 +9,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
 import { Text } from "@/components/ui/text";
 import { useTodoCreate } from "@/pages/inbox/use-todo-create";
 import {
   CalendarIcon,
   ChevronDownIcon,
-  FolderIcon,
   SendIcon,
 } from "lucide-react";
 import { useState } from "react";
@@ -35,6 +26,7 @@ export function NewInput() {
     defaultValues: {
       title: "",
       dueDate: new Date(),
+      projectId: undefined,
     } as CreateTodoEntity,
     onSubmit: ({ value, formApi }) => {
       create.mutate(value);
@@ -100,7 +92,17 @@ export function NewInput() {
               )}
             />
 
-            <SelectProjectsButton />
+            <form.AppField
+              name="projectId"
+              children={(field) => (
+                <ProjectSelect
+                  testId="home.todo.create.project"
+                  value={field.state.value as string | undefined}
+                  onChange={(projectId) => field.handleChange(projectId)}
+                  placeholder="Inbox"
+                />
+              )}
+            />
 
             <span className="kbd mr-0.5 hidden sm:inline-flex">↵</span>
 
@@ -180,27 +182,5 @@ function DueDateButton({ initial }: { initial: Date }) {
         />
       </PopoverContent>
     </Popover>
-  );
-}
-
-function SelectProjectsButton() {
-  return (
-    <Select>
-      <SelectTrigger
-        testId="home.todo.create.project.button"
-        className="text-muted-foreground hover:text-foreground h-8 gap-1.5 border-0 bg-transparent px-2 shadow-none"
-        size="sm">
-        <FolderIcon className="size-4" />
-        <SelectValue placeholder="Inbox" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectGroup>
-          <SelectLabel>Areas</SelectLabel>
-          <SelectItem value="personal">Personal</SelectItem>
-          <SelectItem value="work">Work</SelectItem>
-          <SelectItem value="learning">Learning</SelectItem>
-        </SelectGroup>
-      </SelectContent>
-    </Select>
   );
 }

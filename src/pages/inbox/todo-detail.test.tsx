@@ -7,15 +7,18 @@ import { TodoDetail } from "@/pages/inbox/todo-detail";
 import { useTodoDetails } from "@/pages/inbox/use-todo-details";
 import {
   createTestContainer,
+  inMemoryProjectRepository,
   inMemoryTodoRepository,
   renderWithContainer,
 } from "@/test/container";
-import { makeSubtask, makeTodo } from "@/test/todo-factory";
+import { makeProject, makeSubtask, makeTodo } from "@/test/todo-factory";
 
 const title = "todo.detail.title";
 const titleInput = "todo.detail.title.input";
 const checkButton = "todo.detail.check.button";
 const completedDate = "todo.detail.completed.date";
+const projectPicker = "todo.detail.project";
+const projectOption = (id: string) => `todo.detail.project.option.${id}`;
 const readView = "todo.detail.description.read";
 const editor = "todo.detail.description.editor";
 const subtaskCount = "todo.detail.subtask.count";
@@ -40,14 +43,19 @@ function SubscribedDetail({ id }: { id: string }) {
   return todo ? <TodoDetail todo={todo} /> : null;
 }
 
-function renderDetail(todo: TodoEntity) {
+function renderDetail(
+  todo: TodoEntity,
+  projects: ReturnType<typeof makeProject>[] = []
+) {
   const repository = inMemoryTodoRepository([todo]);
+  const projectRepository = inMemoryProjectRepository(projects);
 
   return {
     ...renderWithContainer(<SubscribedDetail id={todo.id} />, {
-      diContainer: createTestContainer(repository),
+      diContainer: createTestContainer(repository, projectRepository),
     }),
     repository,
+    projectRepository,
   };
 }
 
@@ -125,6 +133,55 @@ describe("todo detail", () => {
         done: false,
       })
     );
+  });
+
+  describe("when I move a todo to another project", () => {
+    it("Then the move is persisted", async () => {
+      const user = setupUser();
+      const garden = makeProject({ name: "Garden" });
+      const todo = makeTodo({ projectId: undefined });
+      const { repository } = renderDetail(todo, [garden]);
+
+      await user.click(await screen.findByTestId(projectPicker));
+      await user.click(await screen.findByTestId(projectOption(garden.id)));
+
+      await waitFor(() =>
+        expect(repository.updateProject).toHaveBeenCalledWith({
+          id: todo.id,
+          projectId: garden.id,
+        })
+      );
+    });
+
+    it("Then the detail names the project it moved to", async () => {
+      const user = setupUser();
+      const garden = makeProject({ name: "Garden" });
+      renderDetail(makeTodo({ projectId: undefined }), [garden]);
+
+      await user.click(await screen.findByTestId(projectPicker));
+      await user.click(await screen.findByTestId(projectOption(garden.id)));
+
+      await waitFor(() =>
+        expect(screen.getByTestId(projectPicker)).toHaveTextContent("Garden")
+      );
+    });
+
+    it("Then taking it out of every project is persisted too", async () => {
+      const user = setupUser();
+      const garden = makeProject({ name: "Garden" });
+      const todo = makeTodo({ projectId: garden.id });
+      const { repository } = renderDetail(todo, [garden]);
+
+      await user.click(await screen.findByTestId(projectPicker));
+      await user.click(await screen.findByTestId("todo.detail.project.none"));
+
+      await waitFor(() =>
+        expect(repository.updateProject).toHaveBeenCalledWith({
+          id: todo.id,
+          projectId: undefined,
+        })
+      );
+    });
   });
 
   describe("when I click the title", () => {

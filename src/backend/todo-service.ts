@@ -13,6 +13,8 @@ const createTodoZodScheme = z.object({
   title: z.string().nonempty({ error: "title-required" }),
   dueDate: z.date().optional(),
   description: z.string().optional(),
+  /** Which project it belongs to. Unset means the inbox — no project yet. */
+  projectId: z.string().optional(),
 });
 
 const todoZodScheme = createTodoZodScheme.extend({
@@ -37,6 +39,10 @@ export interface TodoRepository {
   delete(id: string): Promise<void>;
   updateDone(params: { id: string; done: boolean }): Promise<void>;
   updateTitle(params: { id: string; title: string }): Promise<void>;
+  updateProject(params: {
+    id: string;
+    projectId: string | undefined;
+  }): Promise<void>;
   updateDescription(params: { id: string; description: string }): Promise<void>;
   count(): Promise<number>;
   getById(id: string): Promise<TodoEntity | undefined>;
@@ -102,6 +108,14 @@ export class TodoService {
     return validation.onValidAsync(async (valid) => {
       await this.repository.updateTitle({ id, title: valid.title });
     });
+  };
+
+  /** Moving a todo between projects, or out of one entirely. */
+  updateProject = async (params: {
+    id: string;
+    projectId: string | undefined;
+  }) => {
+    return this.repository.updateProject(params);
   };
 
   updateDescription = async (params: { id: string; description: string }) => {
