@@ -76,7 +76,9 @@ export function TooltipText({
     <Tooltip>
       <TooltipTrigger {...props}>{children}</TooltipTrigger>
       <TooltipContent>
-        <Text>{text}</Text>
+        {/* The tooltip surface owns the colour (ink with light text), so the
+            variant hands it back rather than repainting it. */}
+        <Text className="text-inherit">{text}</Text>
       </TooltipContent>
     </Tooltip>
   );

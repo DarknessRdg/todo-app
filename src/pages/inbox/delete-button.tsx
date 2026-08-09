@@ -49,14 +49,15 @@ export function DeleteButton({ title, id }: { title: string; id: string }) {
             Are sure you want to delete the ToDo?
           </AlertDialogTitle>
           <AlertDialogDescription>
-            <Text>
+            {/* AlertDialogDescription is already muted; keep inheriting it. */}
+            <Text className="text-inherit">
               This action cannot be undone. This will permanently delete your
               ToDo and you won't be able to restore it.
             </Text>
             <Text variant="code" className="mt-4 mr-1 inline-block">
               {title}
             </Text>
-            <Text className="inline-block">will be deleted.</Text>
+            <Text className="text-inherit inline-block">will be deleted.</Text>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

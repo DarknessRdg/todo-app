@@ -23,25 +23,29 @@ import { cn } from "@/lib/utils";
  * lands in, and the containers that own a size (a tooltip, a dialog
  * description) would otherwise be overridden by it. Variants that *are* a size
  * — `muted`, `small`, `lead`, `large` — say so explicitly.
+ *
+ * Every variant *does* set a colour, so nothing relies on what it happens to be
+ * nested in. Where a container owns the colour — a tooltip on ink, a dialog
+ * description already muted — pass `className="text-inherit"` to hand it back.
  */
 export const textVariants = cva("antialiased", {
   variants: {
     variant: {
-      h1: "text-2xl font-semibold tracking-tight",
-      h2: "text-2xl font-medium tracking-tight",
-      h3: "text-xl font-semibold tracking-tight",
-      h4: "text-lg font-semibold tracking-tight",
-      h5: "text-base font-semibold tracking-tight",
-      h6: "text-sm font-semibold tracking-tight",
-      p: "font-normal",
+      h1: "text-foreground text-2xl font-semibold tracking-tight",
+      h2: "text-foreground text-2xl font-medium tracking-tight",
+      h3: "text-foreground text-xl font-semibold tracking-tight",
+      h4: "text-foreground text-lg font-semibold tracking-tight",
+      h5: "text-foreground text-base font-semibold tracking-tight",
+      h6: "text-foreground text-sm font-semibold tracking-tight",
+      p: "text-foreground font-normal",
       lead: "text-muted-foreground text-xl",
-      large: "text-lg font-semibold",
-      small: "text-sm leading-none font-medium",
+      large: "text-foreground text-lg font-semibold",
+      small: "text-foreground text-sm leading-none font-medium",
       muted: "text-muted-foreground text-sm",
       /** The small caps-ish label above a section. Mirrors `.eyebrow`. */
       eyebrow: "text-muted-foreground text-xs font-medium",
-      code: "bg-muted relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold",
-      blockquote: "my-6 rounded-none border-l-2 pl-6 italic",
+      code: "text-foreground bg-muted relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold",
+      blockquote: "text-foreground my-6 rounded-none border-l-2 pl-6 italic",
       link: "text-link underline underline-offset-2 transition-colors hover:decoration-2",
     },
   },

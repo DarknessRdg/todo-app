@@ -10,9 +10,7 @@ export function EmptyList() {
       <div className="bg-background text-muted-foreground mb-4 flex size-11 items-center justify-center rounded-full">
         <Feather className="size-5" />
       </div>
-      <Text variant="large" className="text-foreground">
-        Inbox zero
-      </Text>
+      <Text variant="large">Inbox zero</Text>
       <Text variant="muted" className="mt-1.5 max-w-xs">
         Nothing to organize yet. Capture your first thought in the bar above — it
         takes about two seconds.
