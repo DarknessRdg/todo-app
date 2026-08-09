@@ -46,10 +46,11 @@ export function useTodoUpdate() {
 
   const checkMutation = useMutation({
     mutationFn: todoService.updateDone,
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: [QueryTodoKey],
-      });
+    // Done is shown in both places, so both have to be refreshed: the list this
+    // may have been toggled from, and the detail, which can toggle it too.
+    onSuccess: (_data, { id }) => {
+      queryClient.invalidateQueries({ queryKey: [QueryTodoKey] });
+      queryClient.invalidateQueries({ queryKey: [QueryTodoDetailsKey, id] });
     },
     onError: (error, params) => {
       console.error(error);

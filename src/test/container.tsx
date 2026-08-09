@@ -88,7 +88,12 @@ export function inMemoryTodoRepository(
     }),
     updateDone: vi.fn<TodoRepository["updateDone"]>(async ({ id, done }) => {
       const row = find(id);
-      if (row) row.done = done;
+      if (!row) return;
+
+      row.done = done;
+      // Stamped and cleared exactly as the real adapter does, so a spec reading
+      // the completion date back is not being told a story by the fake.
+      row.doneAt = done ? new Date() : undefined;
     }),
     updateTitle: vi.fn<TodoRepository["updateTitle"]>(async ({ id, title }) => {
       const row = find(id);

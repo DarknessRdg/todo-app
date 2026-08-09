@@ -78,6 +78,47 @@ describe("TodoRepositoryIndexedDB", () => {
     });
   });
 
+  describe("when I complete a todo", () => {
+    it("Then it is stamped with when it was completed", async () => {
+      const todo = makeTodo({ done: false, doneAt: undefined });
+      const repository = await repositoryWith([todo]);
+      const before = Date.now();
+
+      await repository.updateDone({ id: todo.id, done: true });
+
+      const stored = await repository.getById(todo.id);
+      expect(stored?.doneAt).toBeInstanceOf(Date);
+      expect(stored!.doneAt!.getTime()).toBeGreaterThanOrEqual(before);
+    });
+
+    /**
+     * The completion stamp used to be written over `dueDate`, which silently
+     * rewrote a date the user had chosen every time they ticked the box.
+     */
+    it("Then the due date it was given is left alone", async () => {
+      const dueDate = new Date("2026-03-01T00:00:00.000Z");
+      const todo = makeTodo({ done: false, dueDate });
+      const repository = await repositoryWith([todo]);
+
+      await repository.updateDone({ id: todo.id, done: true });
+
+      const stored = await repository.getById(todo.id);
+      expect(stored?.dueDate).toEqual(dueDate);
+    });
+  });
+
+  describe("when I reopen a todo", () => {
+    it("Then the completion stamp is cleared, so it claims no completion date", async () => {
+      const todo = makeTodo({ done: true, doneAt: new Date() });
+      const repository = await repositoryWith([todo]);
+
+      await repository.updateDone({ id: todo.id, done: false });
+
+      const stored = await repository.getById(todo.id);
+      expect(stored?.doneAt).toBeUndefined();
+    });
+  });
+
   describe("when I retitle a todo", () => {
     it("Then the stored title is the new one", async () => {
       const todo = makeTodo({ title: "Water the plants" });

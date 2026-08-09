@@ -19,6 +19,9 @@ const todoZodScheme = createTodoZodScheme.extend({
   id: z.string().nonempty({ error: "id-required" }),
   done: z.boolean(),
   createdAt: z.date(),
+  // When it was completed. Absent while the todo is open, and cleared again if
+  // it is reopened — kept separate from `dueDate`, which the user chooses.
+  doneAt: z.date().optional(),
   // Rows written before subtasks existed have no such field, so the default
   // keeps them valid instead of failing to load.
   subtasks: z.array(subtaskZodScheme).default([]),

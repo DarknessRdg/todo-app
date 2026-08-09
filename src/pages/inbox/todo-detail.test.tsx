@@ -14,6 +14,8 @@ import { makeSubtask, makeTodo } from "@/test/todo-factory";
 
 const title = "todo.detail.title";
 const titleInput = "todo.detail.title.input";
+const checkButton = "todo.detail.check.button";
+const completedDate = "todo.detail.completed.date";
 const readView = "todo.detail.description.read";
 const editor = "todo.detail.description.editor";
 const subtaskCount = "todo.detail.subtask.count";
@@ -68,6 +70,61 @@ describe("todo detail", () => {
         "Add a description…"
       );
     });
+  });
+
+  describe("when I complete a todo from its detail", () => {
+    it("Then it is persisted as done", async () => {
+      const user = setupUser();
+      const todo = makeTodo({ done: false });
+      const { repository } = renderDetail(todo);
+
+      await user.click(await screen.findByTestId(checkButton));
+
+      await waitFor(() =>
+        expect(repository.updateDone).toHaveBeenCalledWith({
+          id: todo.id,
+          done: true,
+        })
+      );
+    });
+
+    it("Then the detail shows it as done", async () => {
+      const user = setupUser();
+      renderDetail(makeTodo({ done: false }));
+
+      await user.click(await screen.findByTestId(checkButton));
+
+      await waitFor(() =>
+        expect(screen.getByTestId(checkButton)).toBeChecked()
+      );
+    });
+
+    it("Then its completion date is shown, having had none before", async () => {
+      const user = setupUser();
+      renderDetail(makeTodo({ done: false, doneAt: undefined }));
+
+      await screen.findByTestId(checkButton);
+      expect(screen.queryByTestId(completedDate)).not.toBeInTheDocument();
+
+      await user.click(screen.getByTestId(checkButton));
+
+      expect(await screen.findByTestId(completedDate)).toBeInTheDocument();
+    });
+  });
+
+  it("when I reopen a done todo from its detail, Then it is persisted as open", async () => {
+    const user = setupUser();
+    const todo = makeTodo({ done: true });
+    const { repository } = renderDetail(todo);
+
+    await user.click(await screen.findByTestId(checkButton));
+
+    await waitFor(() =>
+      expect(repository.updateDone).toHaveBeenCalledWith({
+        id: todo.id,
+        done: false,
+      })
+    );
   });
 
   describe("when I click the title", () => {

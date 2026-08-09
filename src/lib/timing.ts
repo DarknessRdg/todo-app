@@ -15,9 +15,9 @@
 
 const Defaults = {
   /** How long a just-completed row is held in place before it re-sorts. */
-  completionResortMs: 450,
+  completionResortMs: 500,
   /** How long the confetti burst stays mounted after a completion. */
-  confettiVisibleMs: 1400,
+  confettiVisibleMs: 700,
 } as const;
 
 /**

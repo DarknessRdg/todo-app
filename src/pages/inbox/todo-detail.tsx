@@ -1,6 +1,6 @@
 import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { Progress } from "@/components/ui/progress.tsx";
-import { TodoChecker } from "@/components/todo.tsx";
+import { TodoCheckerInput } from "@/components/todo.tsx";
 import type { TodoEntity } from "@/backend/todo-service.ts";
 import { RichTextEditor } from "@/components/rich-text-editor.tsx";
 import { useTodoUpdate } from "@/pages/inbox/use-todo-update.ts";
@@ -26,8 +26,10 @@ import {
   Tag,
   Trash2Icon,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ConfettiBurst } from "@/components/confetti-burst";
 import { InlineEdit } from "@/components/inline-edit";
+import { Timing } from "@/lib/timing";
 import { Text, textVariants } from "@/components/ui/text";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router";
@@ -66,7 +68,7 @@ export function TodoDetailHeader({
 
       <div className="flex items-start gap-3">
         <span className="mt-1.5 shrink-0">
-          <TodoChecker done={todo.done} />
+          <TodoCompletion todo={todo} />
         </span>
         <TitleEditor todo={todo} />
       </div>
@@ -150,7 +152,9 @@ export function TodoDetail({ headerActions, ...props }: TodoDetailProps) {
   // Two components rather than a conditional hook: the id form has to read the
   // query, the model form must not.
   if (props.todo !== undefined) {
-    return <TodoDetailContent todo={props.todo} headerActions={headerActions} />;
+    return (
+      <TodoDetailContent todo={props.todo} headerActions={headerActions} />
+    );
   }
 
   return (
@@ -311,6 +315,18 @@ function PropertiesPanel({ todo }: { todo: TodoEntity }) {
           {formatDate(todo.createdAt)}
         </span>
       </PropertyRow>
+
+      {/* Only once there is one: an open todo has no completion date, and a
+          row reading "—" is noise on every todo still to be done. */}
+      {todo.doneAt ? (
+        <PropertyRow label="Completed">
+          <span
+            {...testProp("todo.detail.completed.date")}
+            className="text-xs tabular-nums">
+            {formatDate(todo.doneAt)}
+          </span>
+        </PropertyRow>
+      ) : null}
     </aside>
   );
 }
@@ -351,6 +367,51 @@ function Assignee({ name }: { name: string }) {
 /* -------------------------------------------------------------------------- */
 
 /**
+ * The completion toggle beside the title.
+ *
+ * The mutation fires immediately, unlike the list row: nothing relocates when a
+ * todo is completed from its own detail, so there is no re-sort to hold still
+ * for. The burst is the same one the list plays.
+ */
+function TodoCompletion({ todo }: { todo: TodoEntity }) {
+  const { check } = useTodoUpdate();
+
+  // Keyed so each completion remounts the burst and it fires again.
+  const [burstKey, setBurstKey] = useState(0);
+  const [showBurst, setShowBurst] = useState(false);
+  const burstTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined
+  );
+
+  useEffect(() => () => window.clearTimeout(burstTimer.current), []);
+
+  const onToggle = (done: boolean) => {
+    if (done) {
+      setBurstKey((key) => key + 1);
+      setShowBurst(true);
+      burstTimer.current = setTimeout(
+        () => setShowBurst(false),
+        Timing.confettiVisibleMs
+      );
+    }
+
+    check.mutate({ id: todo.id, done });
+  };
+
+  return (
+    <div className="relative">
+      <TodoCheckerInput
+        testId="todo.detail.check.button"
+        done={todo.done}
+        aria-label={todo.done ? "Reopen this todo" : "Complete this todo"}
+        onToggle={onToggle}
+      />
+      {showBurst && <ConfettiBurst key={burstKey} />}
+    </div>
+  );
+}
+
+/**
  * Heading-sized in both states, so the text does not shift on the way into the
  * field. The two slots are styled separately, so the shared part is repeated
  * deliberately rather than inherited.
@@ -359,7 +420,7 @@ function Assignee({ name }: { name: string }) {
 // drift away from every other page heading.
 const titleType = cn(
   textVariants({ variant: "h1" }),
-  "font-display grow leading-snug"
+  "font-display grow px-2 py-0"
 );
 
 function TitleEditor({ todo }: { todo: TodoEntity }) {
@@ -375,9 +436,8 @@ function TitleEditor({ todo }: { todo: TodoEntity }) {
       <InlineEdit.Read
         asChild
         testId="todo.detail.title"
-        aria-label="Edit title"
-        className={titleType}>
-        <h1>{todo.title}</h1>
+        aria-label="Edit title">
+        <Text className={titleType}>{todo.title}</Text>
       </InlineEdit.Read>
 
       <InlineEdit.Input
@@ -388,7 +448,7 @@ function TitleEditor({ todo }: { todo: TodoEntity }) {
         // exactly where the heading had it, rather than jumping right.
         className={cn(
           titleType,
-          "h-auto rounded-lg border-transparent px-0 py-0 shadow-none focus-visible:border-transparent focus-visible:ring-2 md:text-2xl"
+          "h-auto rounded-lg border-transparent shadow-none focus-visible:border-transparent focus-visible:ring-2 md:text-2xl"
         )}
       />
     </InlineEdit>

@@ -25,6 +25,9 @@ export function makeTodo(overrides: Partial<TodoEntity> = {}): TodoEntity {
     title: faker.lorem.sentence({ min: 2, max: 6 }),
     done: faker.datatype.boolean(),
     createdAt: faker.date.recent({ days: 30 }),
+    // Left unset rather than randomised: a spec that cares when a todo was
+    // completed passes the date it wants to assert on.
+    doneAt: undefined,
     // Empty rather than random: a spec that cares about subtasks passes them,
     // and one that does not should not have to reason about surprise rows.
     subtasks: [],

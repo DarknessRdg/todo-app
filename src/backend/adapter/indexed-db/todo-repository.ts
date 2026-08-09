@@ -36,7 +36,9 @@ export class TodoRepositoryIndexedDB implements TodoRepository {
     await this.mutateTodo(id, (todo) => ({
       ...todo,
       done,
-      dueDate: new Date(),
+      // Records the completion without touching `dueDate` — that is the date
+      // the user picked, and stamping it here silently rewrote their choice.
+      doneAt: done ? new Date() : undefined,
     }));
   };
 

@@ -18,7 +18,7 @@ const COLORS = [
   "hsl(280 100% 55%)", // violet
   "hsl(320 100% 52%)", // magenta
 ];
-const PIECES = 18;
+const PIECES = 25;
 
 export function ConfettiBurst({ className }: { className?: string }) {
   const pieces = useMemo(
@@ -42,7 +42,7 @@ export function ConfettiBurst({ className }: { className?: string }) {
   return (
     <span
       aria-hidden
-      className={`pointer-events-none absolute top-1/2 left-1/2 z-10 !opacity-100 ${className ?? ""}`}>
+      className={`pointer-events-none absolute top-1/2 left-1/2 z-10 ${className ?? ""}`}>
       {pieces.map((p, i) => (
         <span
           key={i}

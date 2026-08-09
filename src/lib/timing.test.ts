@@ -52,8 +52,8 @@ describe("Timing", () => {
       vi.stubEnv("VITE_COMPLETION_RESORT_MS", "");
       vi.stubEnv("VITE_CONFETTI_VISIBLE_MS", "");
 
-      expect(Timing.completionResortMs).toBe(450);
-      expect(Timing.confettiVisibleMs).toBe(1400);
+      expect(Timing.completionResortMs).toBe(500);
+      expect(Timing.confettiVisibleMs).toBe(700);
     });
   });
 });
