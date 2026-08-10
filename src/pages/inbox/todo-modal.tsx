@@ -36,7 +36,10 @@ export function TodoModalContent({
       id={id}
       onLeave={onClose}
       headerActions={
-        <TooltipText text="Open full screen" asChild>
+        <TooltipText
+          text="Open full screen"
+          testId={`home.todo.${id}.modal.fullscreen.tooltip`}
+          asChild>
           <Button
             testId={`home.todo.${id}.modal.fullscreen.button`}
             variant="ghost"
@@ -118,8 +121,12 @@ function ModalShell({
         onPointerDownOutside={(event) => event.preventDefault()}
         onInteractOutside={(event) => event.preventDefault()}
         overlayProps={{ onClick: onClose }}
+        // 70% of the viewport, uncapped: the previous `min(1100px, …)` meant
+        // anything wider than ~1220px got 1100px rather than a share of the
+        // screen. `sm:` is repeated because the dialog primitive sets its own
+        // `sm:max-w-lg`, which would otherwise win from that breakpoint up.
         className={cn(
-          "flex w-[90vw] max-w-[min(1100px,90vw)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(1100px,90vw)]",
+          "flex w-[70vw] max-w-[70vw] flex-col gap-0 overflow-hidden p-0 sm:max-w-[70vw]",
           className
         )}>
         <DialogHeader className="sr-only">

@@ -29,10 +29,32 @@
     --code-number: #a15c2e;
     --code-function: #2f5fbf;
     --code-comment: #8c8c8c;
+    /* Marker pen. The one place the reader picks the colour, so the ramp cannot
+       be monochrome — five of them have to be told apart at a glance. Kept as
+       washed-out tints for the same reason the code palette is desaturated:
+       they are a fill behind ink-black body text, not a decoration. */
+    --highlight-yellow: #fbf1c2;
+    --highlight-green: #dcf0dd;
+    --highlight-blue: #dbe8fb;
+    --highlight-pink: #fadfe9;
+    --highlight-purple: #e8e1f8;
+    /* Callouts. One token per state, used at full strength for the icon and
+       edge and at /8 for the fill, so a single variable tunes the whole block.
+       Muted on purpose — a callout is a note in the document, not an alert. */
+    --callout-info: #2f5fbf;
+    --callout-warning: #a67117;
+    --callout-success: #3f7a52;
+    --callout-error: #d64545;
     --border: #e7e7e7; /* soft divider / input hairline */
     --input: #a8a8a8; /* control hairline — checkbox needs real contrast on mist */
     --ring: #1f1f1f; /* ink focus */
     --card-hover: #edeee1; /* sage-tinted hover — warm, never cool */
+    /* Scrollbars. A rail is chrome, not content: it sits a step above the
+       divider hairline so it can be found, and only reaches ink-adjacent grey
+       while it is under the pointer. Tune here — every scroll area reads it. */
+    --scrollbar-thumb: #d4d4d4;
+    --scrollbar-thumb-hover: #a8a8a8;
+    --scrollbar-size: 10px;
     /* Modal backdrop. The scrim dims what is behind; the blur pushes it out of
        focus so the dialog reads as the only live surface. Tune here, not on
        the overlay — every dialog draws from this. */
@@ -84,10 +106,26 @@
     --code-number: #d9a05b;
     --code-function: #7ba7f5;
     --code-comment: #8a8a8a;
+    /* Dark: the same five, dropped to a fill that carries light text. */
+    --highlight-yellow: #55491a;
+    --highlight-green: #26452e;
+    --highlight-blue: #24405f;
+    --highlight-pink: #4f2839;
+    --highlight-purple: #3a2d5b;
+    /* Dark: lifted for contrast on the near-black canvas. */
+    --callout-info: #7ba7f5;
+    --callout-warning: #d9a05b;
+    --callout-success: #86c99a;
+    --callout-error: #e5675f;
     --border: #2a2a2a;
     --input: #5c5c5c; /* control hairline — checkbox needs real contrast on card */
     --ring: #f4f4f4;
     --card-hover: #17170f; /* sage-tinted hover — warm, never cool */
+    /* Dark: the same two steps, inverted — a light rail on the near-black
+       canvas would be brighter than the text it scrolls. */
+    --scrollbar-thumb: #333333;
+    --scrollbar-thumb-hover: #565656;
+    --scrollbar-size: 10px;
     /* Heavier on the near-black canvas: the same 45% over a dark page barely
        separates the dialog from what is behind it. */
     --overlay: oklch(0% 0 0 / 65%);
@@ -126,6 +164,15 @@
     --color-destructive: var(--destructive);
     --color-destructive-foreground: var(--destructive-foreground);
     --color-link: var(--link);
+    --color-highlight-yellow: var(--highlight-yellow);
+    --color-highlight-green: var(--highlight-green);
+    --color-highlight-blue: var(--highlight-blue);
+    --color-highlight-pink: var(--highlight-pink);
+    --color-highlight-purple: var(--highlight-purple);
+    --color-callout-info: var(--callout-info);
+    --color-callout-warning: var(--callout-warning);
+    --color-callout-success: var(--callout-success);
+    --color-callout-error: var(--callout-error);
     --color-code-keyword: var(--code-keyword);
     --color-code-string: var(--code-string);
     --color-code-number: var(--code-number);
@@ -175,6 +222,44 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     font-feature-settings: "cv11", "ss01";
+  }
+
+  /* Scrollbars, everywhere at once: the page, the sidebar, the todo modal, the
+     emoji list, the language picker. The platform default is a bordered light
+     rail with arrow buttons at both ends — a chunk of someone else's design
+     system sitting on the canvas.
+
+     What replaces it is the same monochrome ramp as everything else: no track,
+     no buttons, a pill thumb held off the edge by a transparent border
+     (`background-clip: padding-box` is what makes that border read as padding
+     rather than as more thumb). Declared on `*` rather than `html` because a
+     scroll container gets its own bar and inherits none of this. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: var(--scrollbar-size);
+    height: var(--scrollbar-size);
+  }
+  /* Transparent rather than a fill: the bar has to sit on whatever surface it
+     scrolls — white canvas, mist card, popover — without painting a channel. */
+  *::-webkit-scrollbar-track,
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb);
+    background-clip: padding-box;
+    border: 3px solid transparent;
+    border-radius: 9999px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thumb-hover);
+  }
+  /* The arrow buttons at each end, which nothing in this app needs. */
+  *::-webkit-scrollbar-button {
+    display: none;
   }
 }
 
@@ -255,6 +340,134 @@
   .tiptap ol {
     @apply my-2 list-decimal pl-6;
   }
+  /* Checklists: TaskList renders its own `ul`, so it has to opt out of the
+     bullet styling above and put the checkbox on the `--input` hairline the
+     rest of the app's controls use. */
+  .tiptap ul[data-type="taskList"] {
+    @apply my-2 list-none pl-0;
+  }
+  .tiptap ul[data-type="taskList"] li {
+    @apply flex items-start gap-2;
+  }
+  /* The box is centred against the *first line* rather than the whole item:
+     `items-center` on the row would drift it to the middle of a wrapped
+     paragraph, `items-start` alone sits it high. `1lh` is exactly that first
+     line box, so both a one-liner and a wrapped item read level. */
+  .tiptap ul[data-type="taskList"] li > label {
+    @apply flex h-[1lh] flex-none items-center select-none;
+  }
+  .tiptap ul[data-type="taskList"] li > div {
+    @apply min-w-0 flex-1;
+  }
+  /* The paragraph inside a task item keeps the block spacing every other
+     paragraph gets, which pushes the text off the checkbox. Items carry their
+     own rhythm instead. */
+  .tiptap ul[data-type="taskList"] li > div > p {
+    @apply my-0;
+  }
+  .tiptap ul[data-type="taskList"] li + li {
+    @apply mt-1;
+  }
+  .tiptap ul[data-type="taskList"] input[type="checkbox"] {
+    @apply border-input accent-primary size-4 rounded-[4px] border align-middle;
+  }
+  .tiptap ul[data-type="taskList"] li[data-checked="true"] > div {
+    @apply text-muted-foreground line-through;
+  }
+  /* Collapsible sections — a filled, borderless card, the same treatment every
+     other content block gets.
+
+     Styled against the *node view*, not the `<details>`/`<summary>` the
+     extension serialises to: on screen it renders a plain `div[data-type]` with
+     a `<button>` of its own, and open/shut is the `.is-open` class rather than
+     the `[open]` attribute. That button ships with no visible content (the
+     default only sets an aria-label), so the chevron is drawn here. */
+  .tiptap [data-type="details"] {
+    @apply bg-card my-2 flex gap-2 rounded-xl p-3;
+  }
+  .tiptap [data-type="details"] > button {
+    @apply text-muted-foreground hover:text-foreground mt-[0.1lh] flex size-4 flex-none cursor-pointer items-center justify-center leading-none transition-transform;
+  }
+  .tiptap [data-type="details"] > button::before {
+    content: "▸";
+  }
+  .tiptap [data-type="details"].is-open > button {
+    @apply rotate-90;
+  }
+  .tiptap [data-type="details"] > div {
+    @apply min-w-0 flex-1;
+  }
+  .tiptap [data-type="details"] summary {
+    @apply list-none font-medium;
+  }
+  .tiptap [data-type="detailsContent"] {
+    @apply mt-1;
+  }
+  .tiptap [data-type="detailsContent"][hidden] {
+    @apply hidden;
+  }
+  .tiptap [data-type="detailsContent"] > :first-child {
+    @apply mt-0;
+  }
+  .tiptap [data-type="detailsContent"] > :last-child {
+    @apply mb-0;
+  }
+
+  /* Callout variants. Each is one `--callout-*` token doing three jobs: the
+     fill at /8, the left edge at full strength, and the chevron + summary text.
+     A variant is never colour alone — the marker in the summary carries the
+     same meaning for anyone who cannot separate the four hues. */
+  .tiptap [data-type="details"][data-variant] {
+    @apply border-l-2 pl-3;
+  }
+  .tiptap [data-type="details"][data-variant] > div > summary::before {
+    @apply mr-1.5 font-semibold;
+  }
+  .tiptap [data-type="details"][data-variant="info"] {
+    @apply bg-callout-info/8 border-l-callout-info;
+  }
+  .tiptap [data-type="details"][data-variant="info"] > button,
+  .tiptap [data-type="details"][data-variant="info"] summary {
+    @apply text-callout-info;
+  }
+  .tiptap [data-type="details"][data-variant="info"] summary::before {
+    content: "ℹ";
+  }
+  .tiptap [data-type="details"][data-variant="warning"] {
+    @apply bg-callout-warning/8 border-l-callout-warning;
+  }
+  .tiptap [data-type="details"][data-variant="warning"] > button,
+  .tiptap [data-type="details"][data-variant="warning"] summary {
+    @apply text-callout-warning;
+  }
+  .tiptap [data-type="details"][data-variant="warning"] summary::before {
+    content: "⚠";
+  }
+  .tiptap [data-type="details"][data-variant="success"] {
+    @apply bg-callout-success/8 border-l-callout-success;
+  }
+  .tiptap [data-type="details"][data-variant="success"] > button,
+  .tiptap [data-type="details"][data-variant="success"] summary {
+    @apply text-callout-success;
+  }
+  .tiptap [data-type="details"][data-variant="success"] summary::before {
+    content: "✓";
+  }
+  .tiptap [data-type="details"][data-variant="error"] {
+    @apply bg-callout-error/8 border-l-callout-error;
+  }
+  .tiptap [data-type="details"][data-variant="error"] > button,
+  .tiptap [data-type="details"][data-variant="error"] summary {
+    @apply text-callout-error;
+  }
+  .tiptap [data-type="details"][data-variant="error"] summary::before {
+    content: "✕";
+  }
+  /* The body stays ordinary body text — only the summary takes the tone, or the
+     whole callout reads as one long coloured passage. */
+  .tiptap [data-type="details"][data-variant] [data-type="detailsContent"] {
+    @apply text-foreground;
+  }
   .tiptap h1 {
     @apply mt-4 mb-2 text-lg font-semibold;
   }
@@ -272,6 +485,28 @@
   }
   .tiptap a:hover {
     @apply decoration-2;
+  }
+  /* The marker pen. Sage is the system's tint for "picked out", so an
+     uncoloured highlight lands there; naming a colour swaps the fill. The
+     colour rides as `data-highlight` rather than an inline `background-color`
+     so it stays a token and follows the theme. */
+  .tiptap mark {
+    @apply bg-accent text-accent-foreground rounded-sm px-0.5;
+  }
+  .tiptap mark[data-highlight="yellow"] {
+    @apply bg-highlight-yellow text-foreground;
+  }
+  .tiptap mark[data-highlight="green"] {
+    @apply bg-highlight-green text-foreground;
+  }
+  .tiptap mark[data-highlight="blue"] {
+    @apply bg-highlight-blue text-foreground;
+  }
+  .tiptap mark[data-highlight="pink"] {
+    @apply bg-highlight-pink text-foreground;
+  }
+  .tiptap mark[data-highlight="purple"] {
+    @apply bg-highlight-purple text-foreground;
   }
   .tiptap code {
     @apply bg-muted rounded px-1 py-0.5 text-sm;

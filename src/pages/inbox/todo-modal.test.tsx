@@ -37,6 +37,7 @@ function renderInboxWithModalOpen(overrides: Partial<TodoEntity> = {}) {
     modal: `home.todo.${todo.id}.modal`,
     rowTitle: `home.todo.${todo.id}.title`,
     fullScreenButton: `home.todo.${todo.id}.modal.fullscreen.button`,
+    fullScreenTooltip: `home.todo.${todo.id}.modal.fullscreen.tooltip`,
   };
 }
 
@@ -155,9 +156,7 @@ describe("todo detail modal", { timeout: 3000 }, () => {
 
     // The frame now opens before the read finishes, so waiting on the modal
     // itself no longer means the detail is in it — wait for the content.
-    await user.click(
-      await screen.findByTestId("todo.detail.description.read")
-    );
+    await user.click(await screen.findByTestId("todo.detail.description.read"));
     await user.click(await screen.findByTestId("editor.toolbar.link.button"));
 
     // A dialog makes everything outside it inert, so a popover portalled to the
@@ -166,6 +165,35 @@ describe("todo detail modal", { timeout: 3000 }, () => {
     await user.type(url, "https://x.dev");
 
     expect(url).toHaveValue("https://x.dev");
+  });
+
+  describe("when the modal opens", () => {
+    it("Then the full screen label stays down, though the dialog focuses its button", async () => {
+      const { modal, fullScreenButton, fullScreenTooltip } =
+        renderInboxWithModalOpen();
+
+      await screen.findByTestId(modal);
+      // The dialog moves focus onto the first control as it opens, which is
+      // what used to bring the tooltip up with it.
+      (await screen.findByTestId(fullScreenButton)).focus();
+
+      // Flushed rather than polled: `waitFor` on an absence is satisfied by the
+      // first tick, which is before the tooltip it is meant to catch would have
+      // rendered — the assertion has to run after React has settled.
+      await act(async () => {});
+
+      expect(screen.queryByTestId(fullScreenTooltip)).not.toBeInTheDocument();
+    });
+
+    it("Then pointing at that button still explains it", async () => {
+      const user = setupUser();
+      const { fullScreenButton, fullScreenTooltip } =
+        renderInboxWithModalOpen();
+
+      await user.hover(await screen.findByTestId(fullScreenButton));
+
+      expect(await screen.findByTestId(fullScreenTooltip)).toBeInTheDocument();
+    });
   });
 
   it("when I open it full screen, Then the url becomes the todo's own page", async () => {

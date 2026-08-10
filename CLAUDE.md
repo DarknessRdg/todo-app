@@ -357,19 +357,22 @@ property — and call that out when it happens.
 | Ink | `#1f1f1f` | `--foreground` + `--primary` — text, the one dark action, selected/Urgent states. |
 
 Secondary text = `--muted-foreground` `#737373`. Colour outside the ramp exists
-in exactly three places, all of them token-driven:
+in exactly four places, all of them token-driven:
 
 | Token(s) | Where | Why it is allowed |
 |---|---|---|
 | `--destructive` `#d64545` | delete only | destruction must not read as an ordinary action |
 | `--link` `#2563eb` (`#7ba7f5` dark) | `.tiptap a` | a link that looks like body text is not a link |
 | `--code-keyword` / `-string` / `-number` / `-function` / `-comment` | `.tiptap .hljs-*` | syntax highlighting is information, not decoration |
+| `--highlight-yellow` / `-green` / `-blue` / `-pink` / `-purple` | `.tiptap mark[data-highlight]` | the reader picks the pen; five colours that cannot be told apart are one colour |
 
-The code palette is deliberately desaturated to sit on the mist/ink surfaces —
-retune those five variables (in **both** `:root` and `.dark`) rather than adding
-hues elsewhere. **The chrome around code stays monochrome**: `pre` keeps its
-`bg-muted` fill, and colour appears only on the tokens inside it. Nothing outside
-this table gets a hue.
+Both ramps are deliberately desaturated to sit on the mist/ink surfaces — retune
+those variables (in **both** `:root` and `.dark`) rather than adding hues
+elsewhere. **The chrome around code stays monochrome**: `pre` keeps its
+`bg-muted` fill, and colour appears only on the tokens inside it. The marker pen
+stores a **token name** on the document (`data-highlight="green"`), never a
+literal, so a saved note follows the theme; an uncoloured `mark` falls back to
+sage. Nothing outside this table gets a hue.
 
 ### Rules
 
