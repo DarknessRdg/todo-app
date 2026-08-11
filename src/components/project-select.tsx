@@ -26,6 +26,13 @@ type ProjectSelectProps = TestIdProps & {
    * against a right-hand edge, so the panel opens inward.
    */
   align?: "start" | "center" | "end";
+  /**
+   * Shows the project without offering to change it — for a page that has
+   * already decided which one a todo belongs to. Presentation only: the caller
+   * must not trust it to hold, since the attribute can be taken off in any
+   * browser's dev tools.
+   */
+  disabled?: boolean;
 };
 
 /**
@@ -43,6 +50,7 @@ export function ProjectSelect({
   placeholder = "No project",
   className,
   align = "start",
+  disabled = false,
   testId,
 }: ProjectSelectProps) {
   const { projects } = useProjects();
@@ -89,6 +97,7 @@ export function ProjectSelect({
           variant="ghost"
           size="sm"
           type="button"
+          disabled={disabled}
           className={cn(
             "text-muted-foreground hover:text-foreground h-8 gap-1.5 px-2",
             className

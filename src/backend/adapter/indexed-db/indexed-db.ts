@@ -1,13 +1,15 @@
+import type { LabelEntity } from "@/backend/label-service";
 import type { ProjectEntity } from "@/backend/project-service";
 import type { TodoEntity } from "@/backend/todo-service";
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 
 const DatabaseName = "darknessRdg/todo-web-app";
-const DatabaseVersion = 4;
+const DatabaseVersion = 5;
 
 export const Tables = {
   Todo: "todo",
   Project: "project",
+  Label: "label",
 } as const;
 
 /**
@@ -32,6 +34,10 @@ interface Database extends DBSchema {
   project: {
     key: string;
     value: ProjectEntity;
+  };
+  label: {
+    key: string;
+    value: LabelEntity;
   };
 }
 
@@ -61,6 +67,23 @@ export function OpenDb() {
       // starts empty: it is the user's to build.
       if (oldVersion < 3) {
         db.createObjectStore(Tables.Project, { keyPath: "id" });
+      }
+
+      // v5 added labels: a store of their own, and `labelIds` on every todo.
+      // The array is backfilled rather than defended at each call site, the
+      // same way v2 backfilled subtasks — code that reads `todo.labelIds.map`
+      // must not have to ask whether the row predates the field.
+      if (oldVersion < 5) {
+        db.createObjectStore(Tables.Label, { keyPath: "id" });
+      }
+
+      if (oldVersion < 5 && oldVersion > 0) {
+        const store = transaction.objectStore(Tables.Todo);
+
+        for (const todo of await store.getAll()) {
+          if (todo.labelIds !== undefined) continue;
+          await store.put({ ...todo, labelIds: [] });
+        }
       }
 
       // v4 takes the three projects v3 seeded back out. They are matched by

@@ -27,6 +27,12 @@ const todoZodScheme = createTodoZodScheme.extend({
   // Rows written before subtasks existed have no such field, so the default
   // keeps them valid instead of failing to load.
   subtasks: z.array(subtaskZodScheme).default([]),
+  /**
+   * The labels on this todo, by id rather than by name: renaming a label is
+   * then one write, and can never leave half the todos saying the old thing.
+   * Defaulted for the same reason as `subtasks` — rows predate the field.
+   */
+  labelIds: z.array(z.string()).default([]),
 });
 
 export type SubtaskEntity = z.infer<typeof subtaskZodScheme>;
@@ -48,6 +54,9 @@ export interface TodoRepository {
     dueDate: Date | undefined;
   }): Promise<void>;
   updateDescription(params: { id: string; description: string }): Promise<void>;
+  updateLabels(params: { id: string; labelIds: string[] }): Promise<void>;
+  /** Takes one label off every todo carrying it — what deleting it means. */
+  removeLabelEverywhere(labelId: string): Promise<void>;
   count(): Promise<number>;
   getById(id: string): Promise<TodoEntity | undefined>;
   addSubtask(params: { id: string; subtask: SubtaskEntity }): Promise<void>;
@@ -84,6 +93,7 @@ export class TodoService {
       id: uuidV7(),
       createdAt: new Date(),
       subtasks: [],
+      labelIds: [],
       ...partial,
     });
 
@@ -129,6 +139,26 @@ export class TodoService {
 
   updateDescription = async (params: { id: string; description: string }) => {
     return this.repository.updateDescription(params);
+  };
+
+  /**
+   * Sets which labels a todo carries. Deduplicated, because carrying the same
+   * label twice means nothing and would draw the chip twice.
+   */
+  updateLabels = async (params: { id: string; labelIds: string[] }) => {
+    return this.repository.updateLabels({
+      id: params.id,
+      labelIds: [...new Set(params.labelIds)],
+    });
+  };
+
+  /**
+   * The other half of deleting a label. The label store and the todo store are
+   * separate, so removing the label leaves its id behind on every todo that
+   * carried it; this is what the caller runs to clean those up.
+   */
+  removeLabelEverywhere = async (labelId: string) => {
+    return this.repository.removeLabelEverywhere(labelId);
   };
 
   count = async () => this.repository.count();

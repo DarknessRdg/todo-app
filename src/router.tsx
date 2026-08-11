@@ -1,5 +1,7 @@
 import { Route, Routes } from "react-router";
 import { Inbox } from "./pages/inbox/inbox";
+import { TodayPage } from "./pages/today/today-page";
+import { LabelsPage } from "./pages/labels/labels-page";
 import { TodoPage } from "./pages/todo/todo-page";
 import { ProjectPage } from "./pages/project/project-page";
 import { ComingSoon } from "./pages/coming-soon/coming-soon";
@@ -14,8 +16,10 @@ import type { Container } from "inversify";
 
 const queryClient = new QueryClient();
 
-/** Every sidebar view except the inbox, which is the index route already. */
-const unbuiltViews = views.filter((view) => view.path !== "/");
+/** The sidebar views that have a real page; the rest get the placeholder. */
+const builtViews = ["/", "/today", "/labels"];
+
+const unbuiltViews = views.filter((view) => !builtViews.includes(view.path));
 
 export function AppRoutes() {
   const [diContainer, setDiContainer] = useState<Container | null>(null);
@@ -47,6 +51,8 @@ export function AppRouteTable() {
     <Routes>
       <Route element={<AppLayout />}>
         <Route index element={<Inbox />} />
+        <Route path="today" element={<TodayPage />} />
+        <Route path="labels" element={<LabelsPage />} />
         {/*
           The sidebar links to every view by url, so each one needs a route
           to land on. These are placeholders until the views are built.

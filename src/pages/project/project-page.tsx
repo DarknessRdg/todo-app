@@ -59,7 +59,7 @@ export function ProjectPage() {
         <TodoList projectId={project.id} />
       </div>
 
-      <RightRail />
+      <RightRail projectId={project.id} />
 
       <TodoModalRoute />
     </div>

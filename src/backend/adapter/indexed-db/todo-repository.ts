@@ -76,6 +76,38 @@ export class TodoRepositoryIndexedDB implements TodoRepository {
     await this.mutateTodo(id, (todo) => ({ ...todo, description }));
   };
 
+  updateLabels = async ({
+    id,
+    labelIds,
+  }: {
+    id: string;
+    labelIds: string[];
+  }) => {
+    await this.mutateTodo(id, (todo) => ({ ...todo, labelIds }));
+  };
+
+  /**
+   * Read-modify-write over every todo rather than an index lookup: the store
+   * holds one workspace's todos, and a label is on a handful of them. An index
+   * on an array field would be the answer at a scale this app does not have.
+   */
+  removeLabelEverywhere = async (labelId: string) => {
+    const transaction = this.db.transaction(Tables.Todo, "readwrite");
+    const store = transaction.objectStore(Tables.Todo);
+
+    for (const todo of await store.getAll()) {
+      const labelIds = todo.labelIds ?? [];
+      if (!labelIds.includes(labelId)) continue;
+
+      await store.put({
+        ...todo,
+        labelIds: labelIds.filter((id) => id !== labelId),
+      });
+    }
+
+    await transaction.done;
+  };
+
   addSubtask = async ({
     id,
     subtask,

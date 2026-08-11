@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import {
   DueBadge,
-  LabelChips,
   PriorityBadge,
   StatusBadge,
   formatDate,
@@ -33,6 +32,12 @@ import { TodoProjectBadge } from "@/pages/inbox/todo-project-badge";
 import { useTodoProjectName } from "@/pages/inbox/use-todo-project";
 import { Timing } from "@/lib/timing";
 import { Calendar } from "@/components/ui/calendar";
+import { LabelPicker } from "@/components/label-picker";
+import {
+  useLabelCreate,
+  useLabels,
+  useTodoLabels,
+} from "@/pages/inbox/use-labels";
 import {
   Popover,
   PopoverContent,
@@ -354,7 +359,7 @@ function PropertiesPanel({ todo }: { todo: TodoEntity }) {
       </PropertyRow>
 
       <PropertyRow icon={<Tag className="size-3.5" />} label="Labels">
-        <LabelChips labels={meta.labels} className="justify-end" />
+        <TodoLabelPicker todo={todo} />
       </PropertyRow>
 
       <PropertyRow icon={<CalendarIcon className="size-3.5" />} label="Due">
@@ -385,6 +390,36 @@ function PropertiesPanel({ todo }: { todo: TodoEntity }) {
         </PropertyRow>
       ) : null}
     </aside>
+  );
+}
+
+/**
+ * The labels on this todo. Creating one from here puts it straight on, so a
+ * label that does not exist yet is not a reason to leave the todo.
+ */
+function TodoLabelPicker({ todo }: { todo: TodoEntity }) {
+  const { labels } = useLabels();
+  const setLabels = useTodoLabels();
+  const create = useLabelCreate();
+
+  return (
+    <LabelPicker
+      testId={`todo.detail.labels`}
+      labels={labels}
+      selectedIds={todo.labelIds}
+      onChange={(labelIds) => setLabels.mutate({ id: todo.id, labelIds })}
+      onCreate={async (name) => {
+        const label = await create.mutateAsync(name);
+        // The service hands back the label it made — or the one already going
+        // by that name — so it can go on without re-reading the list.
+        if (label !== undefined) {
+          setLabels.mutate({
+            id: todo.id,
+            labelIds: [...todo.labelIds, label.id],
+          });
+        }
+      }}
+    />
   );
 }
 
@@ -424,7 +459,11 @@ function Assignee({ name }: { name: string }) {
 /* -------------------------------------------------------------------------- */
 
 /** The project segment of the breadcrumb, dropped when there is no project. */
-function TodoBreadcrumbProject({ projectId }: { projectId: string | undefined }) {
+function TodoBreadcrumbProject({
+  projectId,
+}: {
+  projectId: string | undefined;
+}) {
   const name = useTodoProjectName(projectId);
 
   if (name === undefined) return null;

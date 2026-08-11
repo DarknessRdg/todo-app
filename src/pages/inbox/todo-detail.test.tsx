@@ -5,13 +5,20 @@ import { describe, expect, it } from "vitest";
 import type { TodoEntity } from "@/backend/todo-service";
 import { TodoDetail } from "@/pages/inbox/todo-detail";
 import { useTodoDetails } from "@/pages/inbox/use-todo-details";
+import type { LabelEntity } from "@/backend/label-service";
 import {
   createTestContainer,
+  inMemoryLabelRepository,
   inMemoryProjectRepository,
   inMemoryTodoRepository,
   renderWithContainer,
 } from "@/test/container";
-import { makeProject, makeSubtask, makeTodo } from "@/test/todo-factory";
+import {
+  makeLabel,
+  makeProject,
+  makeSubtask,
+  makeTodo,
+} from "@/test/todo-factory";
 
 const title = "todo.detail.title";
 const titleInput = "todo.detail.title.input";
@@ -29,8 +36,7 @@ const addInput = "todo.detail.subtask.add.input";
 const addButton = "todo.detail.subtask.add.button";
 const row = (id: string) => `todo.detail.subtask.${id}`;
 const check = (id: string) => `todo.detail.subtask.${id}.check`;
-const deleteButton = (id: string) =>
-  `todo.detail.subtask.${id}.delete.button`;
+const deleteButton = (id: string) => `todo.detail.subtask.${id}.delete.button`;
 const linkButton = "editor.toolbar.link.button";
 const linkUrlInput = "editor.toolbar.link.url.input";
 
@@ -48,22 +54,28 @@ function SubscribedDetail({ id }: { id: string }) {
 
 function renderDetail(
   todo: TodoEntity,
-  projects: ReturnType<typeof makeProject>[] = []
+  projects: ReturnType<typeof makeProject>[] = [],
+  labels: LabelEntity[] = []
 ) {
   const repository = inMemoryTodoRepository([todo]);
   const projectRepository = inMemoryProjectRepository(projects);
+  const labelRepository = inMemoryLabelRepository(labels);
 
   return {
     ...renderWithContainer(<SubscribedDetail id={todo.id} />, {
-      diContainer: createTestContainer(repository, projectRepository),
+      diContainer: createTestContainer(
+        repository,
+        projectRepository,
+        labelRepository
+      ),
     }),
     repository,
     projectRepository,
+    labelRepository,
   };
 }
 
 describe("todo detail", () => {
-
   describe("when it is shown", () => {
     it("Then the todo's title is on screen", async () => {
       const todo = makeTodo({ title: "Rewire the doorbell" });
@@ -321,7 +333,9 @@ describe("todo detail", () => {
       await user.click(await screen.findByTestId(title));
       fireEvent.blur(await screen.findByTestId(titleInput));
 
-      await waitFor(() => expect(screen.getByTestId(title)).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByTestId(title)).toBeInTheDocument()
+      );
       expect(repository.updateTitle).not.toHaveBeenCalled();
     });
 
@@ -337,9 +351,13 @@ describe("todo detail", () => {
       await user.clear(field);
       fireEvent.blur(field);
 
-      await waitFor(() => expect(screen.getByTestId(title)).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByTestId(title)).toBeInTheDocument()
+      );
       expect(repository.updateTitle).not.toHaveBeenCalled();
-      expect(screen.getByTestId(title)).toHaveTextContent("Rewire the doorbell");
+      expect(screen.getByTestId(title)).toHaveTextContent(
+        "Rewire the doorbell"
+      );
     });
   });
 
@@ -486,7 +504,9 @@ describe("todo detail", () => {
       );
       await user.click(screen.getByTestId(addButton));
 
-      expect(await screen.findByText("Break it into steps")).toBeInTheDocument();
+      expect(
+        await screen.findByText("Break it into steps")
+      ).toBeInTheDocument();
     });
 
     it("Then the field clears, ready for the next one", async () => {
@@ -496,9 +516,7 @@ describe("todo detail", () => {
       await user.type(await screen.findByTestId(addInput), "Draft it");
       await user.click(screen.getByTestId(addButton));
 
-      await waitFor(() =>
-        expect(screen.getByTestId(addInput)).toHaveValue("")
-      );
+      await waitFor(() => expect(screen.getByTestId(addInput)).toHaveValue(""));
     });
 
     it("Then pressing enter adds it without reaching for the button", async () => {
@@ -625,6 +643,101 @@ describe("todo detail", () => {
       await waitFor(() =>
         expect(screen.queryByTestId(subtaskCount)).not.toBeInTheDocument()
       );
+    });
+  });
+
+  describe("when I label a todo", () => {
+    const labelPicker = "todo.detail.labels";
+
+    const openPicker = async (user: Awaited<ReturnType<typeof setupUser>>) =>
+      user.click(await screen.findByTestId(`${labelPicker}.add.button`));
+
+    it("Then the label I pick is put on it", async () => {
+      const user = setupUser();
+      const label = makeLabel({ name: "Frontend" });
+      const { repository } = renderDetail(
+        makeTodo({ labelIds: [] }),
+        [],
+        [label]
+      );
+
+      await openPicker(user);
+      await user.click(
+        await screen.findByTestId(`${labelPicker}.${label.id}.button`)
+      );
+
+      await waitFor(() =>
+        expect(repository.updateLabels).toHaveBeenCalledWith(
+          expect.objectContaining({ labelIds: [label.id] })
+        )
+      );
+    });
+
+    it("Then a label it already carries is drawn as a chip", async () => {
+      const label = makeLabel({ name: "Frontend" });
+      renderDetail(makeTodo({ labelIds: [label.id] }), [], [label]);
+
+      expect(
+        await screen.findByTestId(`${labelPicker}.${label.id}.remove.button`)
+      ).toBeInTheDocument();
+    });
+
+    it("Then taking one off asks nothing first, as nothing is destroyed", async () => {
+      const user = setupUser();
+      const label = makeLabel({ name: "Frontend" });
+      const { repository } = renderDetail(
+        makeTodo({ labelIds: [label.id] }),
+        [],
+        [label]
+      );
+
+      await user.click(
+        await screen.findByTestId(`${labelPicker}.${label.id}.remove.button`)
+      );
+
+      await waitFor(() =>
+        expect(repository.updateLabels).toHaveBeenCalledWith(
+          expect.objectContaining({ labelIds: [] })
+        )
+      );
+    });
+
+    describe("when the label I want does not exist yet", () => {
+      it("Then it is created from here", async () => {
+        const user = setupUser();
+        const { labelRepository } = renderDetail(makeTodo({ labelIds: [] }));
+
+        await openPicker(user);
+        await user.type(
+          await screen.findByTestId(`${labelPicker}.search.input`),
+          "Frontend"
+        );
+        await user.click(
+          await screen.findByTestId(`${labelPicker}.create.button`)
+        );
+
+        await waitFor(() =>
+          expect(labelRepository.create).toHaveBeenCalledWith(
+            expect.objectContaining({ name: "Frontend" })
+          )
+        );
+      });
+
+      it("Then it goes straight onto the todo", async () => {
+        const user = setupUser();
+        const { repository } = renderDetail(makeTodo({ labelIds: [] }));
+
+        await openPicker(user);
+        await user.type(
+          await screen.findByTestId(`${labelPicker}.search.input`),
+          "Frontend"
+        );
+        await user.click(
+          await screen.findByTestId(`${labelPicker}.create.button`)
+        );
+
+        await waitFor(() => expect(repository.updateLabels).toHaveBeenCalled());
+      });
     });
   });
 });

@@ -86,7 +86,10 @@ export function SidebarProjects() {
                   `asChild` so the rendered element is the Link's own anchor: a
                   real href the browser can open in a new tab or copy.
                 */}
-                <SidebarMenuButton asChild isActive={active} className="h-8 gap-1.5">
+                <SidebarMenuButton
+                  asChild
+                  isActive={active}
+                  className="h-8 gap-1.5">
                   <Link
                     to={path}
                     aria-current={active ? "page" : undefined}

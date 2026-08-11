@@ -17,19 +17,12 @@ import {
 
 /* -------------------------------------------------------------------------- */
 /* Illustrative metadata                                                       */
-/* Subtasks and the project are real and stored; labels, priority and assignee */
+/* Subtasks, the project and labels are real and stored; priority and assignee */
 /* are not — they are derived deterministically from the id so every surface   */
-/* (list, modal, page) agrees on the same made-up values.                      */
+/* (list, modal, page) agrees on the same made-up value.                       */
 /* -------------------------------------------------------------------------- */
 
 const PRIORITIES = ["Low", "Medium", "High", "Urgent"] as const;
-const LABEL_POOL = [
-  ["Design"],
-  ["Frontend", "UX"],
-  ["Bug"],
-  ["Research", "Spike"],
-  ["Chore"],
-];
 
 export function hash(id: string) {
   let h = 0;
@@ -41,7 +34,6 @@ export function metaFor(id: string) {
   const h = hash(id);
   return {
     priority: PRIORITIES[(h >>> 3) % PRIORITIES.length],
-    labels: LABEL_POOL[(h >>> 6) % LABEL_POOL.length],
   };
 }
 
@@ -75,7 +67,9 @@ export function StatusBadge({ done }: { done: boolean }) {
       Done
     </Badge>
   ) : (
-    <Badge variant="secondary" className="text-muted-foreground gap-1.5 font-normal">
+    <Badge
+      variant="secondary"
+      className="text-muted-foreground gap-1.5 font-normal">
       <CircleDot className="size-3.5" />
       Open
     </Badge>
@@ -142,9 +136,7 @@ export function DueBadge({
   className?: string;
 }) {
   return (
-    <Badge
-      variant="secondary"
-      className={cn("gap-1.5 font-normal", className)}>
+    <Badge variant="secondary" className={cn("gap-1.5 font-normal", className)}>
       <CalendarIcon className="size-3.5" />
       {formatDateShort(date)}
     </Badge>
@@ -166,10 +158,7 @@ export function LabelChips({
   return (
     <div className={cn("flex flex-wrap items-center gap-1", className)}>
       {shown.map((label) => (
-        <Badge
-          key={label}
-          variant="secondary"
-          className="gap-1.5 font-normal">
+        <Badge key={label} variant="secondary" className="gap-1.5 font-normal">
           <Tag className="size-3.5" />
           {label}
         </Badge>

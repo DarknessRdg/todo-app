@@ -1,5 +1,6 @@
 import { faker } from "@faker-js/faker";
 
+import type { LabelEntity } from "@/backend/label-service";
 import type { ProjectEntity } from "@/backend/project-service";
 import type {
   CreateTodoEntity,
@@ -32,6 +33,8 @@ export function makeTodo(overrides: Partial<TodoEntity> = {}): TodoEntity {
     // Empty rather than random: a spec that cares about subtasks passes them,
     // and one that does not should not have to reason about surprise rows.
     subtasks: [],
+    // Same for labels: a spec that cares which ones a todo carries passes them.
+    labelIds: [],
     ...overrides,
   };
 }
@@ -62,6 +65,14 @@ export function makeProject(
   return {
     id: faker.string.uuid(),
     name: faker.commerce.department(),
+    ...overrides,
+  };
+}
+
+export function makeLabel(overrides: Partial<LabelEntity> = {}): LabelEntity {
+  return {
+    id: faker.string.uuid(),
+    name: faker.word.noun(),
     ...overrides,
   };
 }

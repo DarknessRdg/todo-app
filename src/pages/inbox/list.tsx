@@ -24,17 +24,39 @@ import { flagKey } from "@/lib/persisted-flag";
 import { useStickyToggle } from "@/hooks/use-sticky-toggle";
 import { ConfettiBurst } from "@/components/confetti-burst";
 import { TodoProjectBadge } from "@/pages/inbox/todo-project-badge";
+import { useLabels } from "@/pages/inbox/use-labels";
+import type { TodoFilter } from "@/lib/todo-filter";
 
-export function TodoList({ projectId }: { projectId?: string } = {}) {
-  const { todoList, doneList, count, isLoading } = useTodoList({ projectId });
+export function TodoList({
+  projectId,
+  dueOn,
+  filter,
+  scope: scopeOverride,
+  empty,
+}: {
+  projectId?: string;
+  /** Narrows the list to one calendar day — see `useTodoList`. */
+  dueOn?: Date;
+  /** The reader's own narrowing — see `@/lib/todo-filter`. */
+  filter?: TodoFilter;
+  /** Where this list's collapsed sections are remembered. */
+  scope?: string;
+  /** What stands in for an empty list, when "Inbox zero" is the wrong words. */
+  empty?: React.ReactNode;
+} = {}) {
+  const { todoList, doneList, count, isLoading } = useTodoList({
+    projectId,
+    dueOn,
+    filter,
+  });
 
   // Each page keeps its own: collapsing Done in the inbox says nothing about
   // whether it should be collapsed in a project.
-  const scope = projectId ?? "inbox";
+  const scope = scopeOverride ?? projectId ?? "inbox";
 
   if (isLoading) return <TodoListSkeleton />;
 
-  if (count === 0) return <EmptyList />;
+  if (count === 0) return empty ?? <EmptyList />;
 
   const doneCount = doneList?.length ?? 0;
   const percentage = count > 0 ? (doneCount / count) * 100 : 0;
@@ -179,8 +201,14 @@ function TodoListContainer({ todoList }: { todoList?: TodoEntity[] }) {
 function TodoItem({ todo }: { todo: TodoEntity }) {
   const { check } = useTodoUpdate();
   const navigate = useNavigate();
+  const { labels } = useLabels();
 
   const meta = metaFor(todo.id);
+  // Resolved by id, so a renamed label reads its new name here without the row
+  // being rewritten, and a deleted one simply stops appearing.
+  const todoLabels = todo.labelIds
+    .map((id) => labels.find((label) => label.id === id)?.name)
+    .filter((name): name is string => name !== undefined);
   const subtasks = todo.subtasks;
   const subDone = subtasks.filter((s) => s.done).length;
 
@@ -239,7 +267,9 @@ function TodoItem({ todo }: { todo: TodoEntity }) {
         {showBurst && <ConfettiBurst key={burstKey} />}
       </div>
 
-      <div className="min-w-0 grow data-[done=true]:opacity-60" data-done={done}>
+      <div
+        className="min-w-0 grow data-[done=true]:opacity-60"
+        data-done={done}>
         <div className="flex items-start gap-2">
           <TodoTitle
             testId={`home.todo.${todo.id}.title`}
@@ -256,7 +286,7 @@ function TodoItem({ todo }: { todo: TodoEntity }) {
         <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5">
           <PriorityBadge priority={meta.priority} />
           <TodoProjectBadge projectId={todo.projectId} />
-          <LabelChips labels={meta.labels} max={2} />
+          <LabelChips labels={todoLabels} max={2} />
           {todo.dueDate ? <DueBadge date={todo.dueDate} /> : null}
           {subtasks.length > 0 ? (
             <SubtaskIndicator

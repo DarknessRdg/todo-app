@@ -391,6 +391,20 @@ sage. Nothing outside this table gets a hue.
   (`--font-mono`) reserved for code only. **Motion:** ~200ms ease; the check-mark
   completion pop (`.animate-check-pop`) is the one flourish.
 
+### Destructive actions — always confirm
+
+**Nothing is deleted without the user confirming it first.** Deleting a todo, a
+project, a label, a subtask — every one goes through the `AlertDialog` pattern
+`delete-button.tsx` already uses: what is about to go, named, and a destructive
+confirm the user has to press. No "undo toast instead", no silent delete because
+the row is small.
+
+The line is *destruction*, not *change*. Taking a label off a todo, moving a
+todo out of a project, clearing a due date — these unset a field and the value
+still exists elsewhere, so they apply immediately with no dialog. Deleting the
+label itself, which removes it from every todo carrying it, is destruction and
+confirms.
+
 ### Overlays
 
 Modal backdrops are driven by two tokens in `src/index.css` — `--overlay`

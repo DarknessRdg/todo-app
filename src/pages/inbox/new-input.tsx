@@ -12,17 +12,14 @@ import {
 import { toast } from "@/components/ui/sonner";
 import { Text } from "@/components/ui/text";
 import { useTodoCreate } from "@/pages/inbox/use-todo-create";
-import {
-  CalendarIcon,
-  ChevronDownIcon,
-  SendIcon,
-} from "lucide-react";
+import { CalendarIcon, ChevronDownIcon, SendIcon } from "lucide-react";
 import { useState } from "react";
+import { projectForCapture } from "@/lib/todo-capture";
 
 /**
- * `projectId` files whatever is captured into that project by default — the
- * project page passes its own, so adding from there does not mean picking it
- * again for every todo.
+ * `projectId` files whatever is captured into that project — the project page
+ * passes its own, so adding from there does not mean picking it again for
+ * every todo, and cannot file it anywhere else.
  */
 export function NewInput({ projectId }: { projectId?: string } = {}) {
   const { create, validateField } = useTodoCreate();
@@ -34,7 +31,10 @@ export function NewInput({ projectId }: { projectId?: string } = {}) {
       projectId,
     } as CreateTodoEntity,
     onSubmit: ({ value, formApi }) => {
-      create.mutate(value);
+      create.mutate({
+        ...value,
+        projectId: projectForCapture(projectId, value.projectId),
+      });
       toast.success("Captured", { description: value.title });
       formApi.reset();
     },
@@ -103,8 +103,11 @@ export function NewInput({ projectId }: { projectId?: string } = {}) {
                 <ProjectSelect
                   testId="home.todo.create.project"
                   value={field.state.value as string | undefined}
-                  onChange={(projectId) => field.handleChange(projectId)}
+                  onChange={(next) => field.handleChange(next)}
                   placeholder="Inbox"
+                  // A page that pins a project shows it, and does not offer to
+                  // change it — the submit forces it either way.
+                  disabled={projectId !== undefined}
                 />
               )}
             />

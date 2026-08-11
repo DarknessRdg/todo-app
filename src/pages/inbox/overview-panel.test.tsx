@@ -10,6 +10,7 @@ import {
   renderWithContainer,
 } from "@/test/container";
 import { makeTodo } from "@/test/todo-factory";
+import { dayKey } from "@/lib/due-dates";
 
 const openCount = "home.overview.open.count";
 
@@ -17,15 +18,23 @@ const openCount = "home.overview.open.count";
  * Rendered through `RightRail` — the wrapper is what the inbox actually mounts,
  * so this covers both it and the panel inside it.
  */
-function renderRightRail(todos: TodoEntity[]) {
+function renderRightRail(todos: TodoEntity[], projectId?: string) {
   const repository = inMemoryTodoRepository(todos);
 
   return {
-    ...renderWithContainer(<RightRail />, {
+    ...renderWithContainer(<RightRail projectId={projectId} />, {
       diContainer: createTestContainer(repository),
     }),
     repository,
   };
+}
+
+/** Whether the calendar marks one day as having anything due on it. */
+function isMarkedDue(date: Date) {
+  return (
+    screen.queryByTestId(`home.overview.calendar.${dayKey(date)}.due.dot`) !==
+    null
+  );
 }
 
 /** Every number the panel puts on screen, read in one go. */
@@ -102,6 +111,65 @@ describe("overview panel", () => {
 
       await waitFor(() => expect(shownStats().open).toBe("1"));
       expect(shownStats().dueToday).toBe("1");
+    });
+  });
+
+  describe("when todos are due on days the calendar is showing", () => {
+    it("Then every day something is due on is marked", async () => {
+      renderRightRail([
+        makeTodo({ done: false, dueDate: daysFromToday(0) }),
+        makeTodo({ done: false, dueDate: daysFromToday(0) }),
+        makeTodo({ done: false, dueDate: daysFromToday(1) }),
+      ]);
+
+      await waitFor(() => expect(isMarkedDue(daysFromToday(0))).toBe(true));
+      expect(isMarkedDue(daysFromToday(1))).toBe(true);
+    });
+
+    it("Then a day with nothing due is left unmarked", async () => {
+      renderRightRail([makeTodo({ done: false, dueDate: daysFromToday(0) })]);
+
+      await waitFor(() => expect(isMarkedDue(daysFromToday(0))).toBe(true));
+      expect(isMarkedDue(daysFromToday(2))).toBe(false);
+    });
+
+    it("Then a day whose only todo is done is left unmarked", async () => {
+      renderRightRail([
+        makeTodo({ done: false, dueDate: daysFromToday(0) }),
+        makeTodo({ done: true, dueDate: daysFromToday(1) }),
+      ]);
+
+      await waitFor(() => expect(isMarkedDue(daysFromToday(0))).toBe(true));
+      expect(isMarkedDue(daysFromToday(1))).toBe(false);
+    });
+  });
+
+  describe("when the panel is showing one project", () => {
+    it("Then the calendar marks only days that project has todos due on", async () => {
+      renderRightRail(
+        [
+          makeTodo({ done: false, dueDate: daysFromToday(0), projectId: "a" }),
+          makeTodo({ done: false, dueDate: daysFromToday(1), projectId: "b" }),
+        ],
+        "a"
+      );
+
+      await waitFor(() => expect(isMarkedDue(daysFromToday(0))).toBe(true));
+      expect(isMarkedDue(daysFromToday(1))).toBe(false);
+    });
+
+    it("Then the stats above it are narrowed the same way", async () => {
+      renderRightRail(
+        [
+          makeTodo({ done: false, projectId: "a" }),
+          makeTodo({ done: true, projectId: "a" }),
+          makeTodo({ done: false, projectId: "b" }),
+        ],
+        "a"
+      );
+
+      await waitFor(() => expect(shownStats().open).toBe("1"));
+      expect(shownStats().done).toBe("1");
     });
   });
 });

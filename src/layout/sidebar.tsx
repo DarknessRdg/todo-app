@@ -23,7 +23,7 @@ import { testProp } from "@/lib/test-id";
 import { SidebarProjects } from "@/layout/sidebar-projects";
 import { views, viewIsActive } from "@/layout/views";
 import { useTodoList } from "@/pages/inbox/use-todo-list";
-import { Search, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
 import { Link, useLocation } from "react-router";
 
 export function AppSidebar({ className }: { className?: string } = {}) {
@@ -40,14 +40,13 @@ export function AppSidebar({ className }: { className?: string } = {}) {
           "bg-sidebar mx-3 my-4 gap-0 rounded-xl border",
           className
         )}>
+        {/*
+          No search box here: the one in the inbox's filter bar is the real
+          one, and this was a button that never did anything. Two search
+          affordances, one of them dead, is worse than one that works.
+        */}
         <SidebarHeader className="gap-3 px-3 pt-4 pb-2">
           <Logo />
-          <button
-            type="button"
-            className="text-muted-foreground bg-muted hover:text-foreground flex h-9 items-center gap-2 rounded-lg px-2.5 text-sm transition-colors">
-            <Search className="size-4" />
-            <span>Search</span>
-          </button>
         </SidebarHeader>
 
         <SidebarGroup>
