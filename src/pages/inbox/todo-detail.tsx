@@ -16,12 +16,10 @@ import {
   shortId,
 } from "@/pages/inbox/todo-meta.tsx";
 import {
-  BookOpen,
   CalendarIcon,
   Check,
   CircleDot,
   FolderIcon,
-  PencilLine,
   Plus,
   SignalHigh,
   Tag,
@@ -49,8 +47,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Text, textVariants } from "@/components/ui/text";
-import { Toggle } from "@/components/ui/toggle";
-import { TooltipText } from "@/components/ui/tooltip";
 import { dialogOf } from "@/lib/dialog-container";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router";
@@ -111,8 +107,8 @@ export function TodoDetailBody({ todo }: { todo: TodoEntity }) {
   return (
     <div className="grid flex-1 items-stretch gap-8 lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_18rem]">
       <main className="flex min-w-0 flex-col gap-8">
-        {/* Keyed so read mode is dropped when the pane moves to another todo:
-            it is a way to read *this* one, not a setting. */}
+        {/* Keyed so the save notice does not follow the pane to another todo:
+            "Saved" belongs to the description it was written in. */}
         <Description key={todo.id} todo={todo} />
 
         <Subtasks todo={todo} />
@@ -673,12 +669,12 @@ function TitleEditor({ todo }: { todo: TodoEntity }) {
  * would leave the next todo mysteriously refusing to open.
  */
 function Description({ todo }: { todo: TodoEntity }) {
-  // Where the toggle starts is a setting; where it goes from there is this
-  // visit's business. Read once as the initial value rather than tracked, so
-  // changing the preference never yanks a description out from under someone
-  // who has already chosen for the todo in front of them.
+  // The setting is the only thing that decides now, and it is subscribed
+  // rather than sampled once: with no control on the description itself, a
+  // preference that did not reach the todo already open would look like it had
+  // not been taken.
   const [defaultView] = useSetting("defaultTodoView");
-  const [readOnly, setReadOnly] = useState(defaultView === "read");
+  const readOnly = defaultView === "read";
   // Owned here rather than in the editor below, because the section header is
   // where the outcome of a save is reported — and it has to be the very same
   // mutation that performed it, not a second one asked how it went.
@@ -688,45 +684,7 @@ function Description({ todo }: { todo: TodoEntity }) {
     <section className="flex flex-col gap-2.5">
       <div className="flex items-center justify-between gap-2">
         <Text variant="eyebrow">Description</Text>
-
-        {/* Status and mode together on the right: both answer "what is this
-            description doing", and split apart they read as unrelated. */}
-        <div className="flex items-center gap-2">
-          <SaveState mutation={updateDescription} />
-
-          {/*
-          The button says which mode the description is *in*, not which one the
-          click leads to — an icon alone leaves the reader guessing which of the
-          two it means, and that guess is the whole point of the control. The
-          tooltip carries the action, so both readings are answered.
-
-          Three signals move together so the state survives however it is read:
-          the word, the icon, and the sage fill that marks selected everywhere
-          else in the app. Colour alone would say nothing to a reader who cannot
-          separate it from the canvas.
-
-          The `on` hover is restated in the classes because the primitive's own
-          hover paints mist over that sage — the state would otherwise drop out
-          from under the cursor that is about to click it.
-        */}
-          <TooltipText
-            testId="todo.detail.description.readonly.tooltip"
-            text={readOnly ? "Switch back to editing" : "Switch to reading"}
-            asChild>
-            <Toggle
-              testId="todo.detail.description.readonly.toggle"
-              size="sm"
-              pressed={readOnly}
-              onPressedChange={setReadOnly}
-              // No `aria-label`: it would replace the visible word as the
-              // accessible name, leaving what is read aloud and what is on screen
-              // saying different things. Radix supplies the pressed state.
-              className="text-muted-foreground data-[state=on]:text-foreground data-[state=on]:hover:bg-accent data-[state=on]:hover:text-foreground -mr-1.5 h-7 gap-1.5 rounded-full px-2.5 text-xs font-medium [&_svg]:size-3.5">
-              {readOnly ? <BookOpen /> : <PencilLine />}
-              {readOnly ? "Reading" : "Editing"}
-            </Toggle>
-          </TooltipText>
-        </div>
+        <SaveState mutation={updateDescription} />
       </div>
 
       <DescriptionEditor

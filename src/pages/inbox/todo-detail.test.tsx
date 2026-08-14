@@ -34,7 +34,6 @@ const dueToday = "todo.detail.duedate.today";
 const projectOption = (id: string) => `todo.detail.project.option.${id}`;
 const readView = "todo.detail.description.read";
 const editor = "todo.detail.description.editor";
-const readOnlyToggle = "todo.detail.description.readonly.toggle";
 const saving = "todo.detail.description.saving";
 const saved = "todo.detail.description.saved";
 const subtaskCount = "todo.detail.subtask.count";
@@ -595,37 +594,35 @@ describe("todo detail", () => {
    * Which way round a description opens is a preference — some people come to
    * their todos to read them, some to write in them.
    */
-  describe("when descriptions are set to open ready to read", () => {
-    it("Then clicking one does not put it into the editor", async () => {
-      const user = setupUser();
-      writeSetting("defaultTodoView", "read");
-      renderDetail(makeTodo({ description: "the old notes" }));
+  it("when descriptions are set to open ready to read, Then clicking one does not put it into the editor", async () => {
+    const user = setupUser();
+    writeSetting("defaultTodoView", "read");
+    renderDetail(makeTodo({ description: "the old notes" }));
 
-      await user.click(await screen.findByTestId(readView));
+    await user.click(await screen.findByTestId(readView));
 
-      expect(screen.queryByTestId(editor)).not.toBeInTheDocument();
-    });
+    expect(screen.queryByTestId(editor)).not.toBeInTheDocument();
+  });
 
-    it("Then the toggle says it is reading, without being touched", async () => {
-      writeSetting("defaultTodoView", "read");
-      renderDetail(makeTodo({ description: "the old notes" }));
+  /**
+   * Replaces the per-todo toggle that used to sit beside the eyebrow. With
+   * nothing on the description to override it, the setting has to reach a todo
+   * that is already open — sampling it once on mount would leave the preference
+   * looking like it had not been taken.
+   */
+  it("when the setting changes while a todo is open, Then its description follows", async () => {
+    const user = setupUser();
+    renderDetail(makeTodo({ description: "the old notes" }));
 
-      expect(await screen.findByTestId(readOnlyToggle)).toHaveAttribute(
-        "aria-pressed",
-        "true"
-      );
-    });
+    await user.click(await screen.findByTestId(readView));
+    await screen.findByTestId(editor);
 
-    it("Then it can still be switched to writing for this todo", async () => {
-      const user = setupUser();
-      writeSetting("defaultTodoView", "read");
-      renderDetail(makeTodo({ description: "the old notes" }));
+    writeSetting("defaultTodoView", "read");
 
-      await user.click(await screen.findByTestId(readOnlyToggle));
-      await user.click(screen.getByTestId(readView));
-
-      expect(await screen.findByTestId(editor)).toBeInTheDocument();
-    });
+    await waitFor(() =>
+      expect(screen.queryByTestId(editor)).not.toBeInTheDocument()
+    );
+    expect(screen.getByTestId(readView)).toBeInTheDocument();
   });
 
   it("when descriptions are left opening ready to write, Then clicking one opens the editor", async () => {
@@ -635,22 +632,6 @@ describe("todo detail", () => {
     await user.click(await screen.findByTestId(readView));
 
     expect(await screen.findByTestId(editor)).toBeInTheDocument();
-  });
-
-  /**
-   * What read mode *does* is `InlineEdit`'s, and is specified there — cheaply,
-   * without the editor. This is the wiring: that the toggle beside the eyebrow
-   * is the thing holding the description's end of it.
-   */
-  it("when I put the description into read mode, Then clicking it no longer opens the editor", async () => {
-    const user = setupUser();
-    renderDetail(makeTodo({ description: "the old notes" }));
-
-    await user.click(await screen.findByTestId(readOnlyToggle));
-    await user.click(screen.getByTestId(readView));
-
-    expect(screen.queryByTestId(editor)).not.toBeInTheDocument();
-    expect(screen.getByTestId(readView)).toBeInTheDocument();
   });
 
   describe("when I add a subtask", () => {
