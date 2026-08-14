@@ -4,6 +4,7 @@ import { TodayPage } from "./pages/today/today-page";
 import { LabelsPage } from "./pages/labels/labels-page";
 import { TodoPage } from "./pages/todo/todo-page";
 import { ProjectPage } from "./pages/project/project-page";
+import { SettingsPage } from "./pages/settings/settings-page";
 import { ComingSoon } from "./pages/coming-soon/coming-soon";
 import { NotFound } from "./pages/not-found/not-found";
 import { AppLayout } from "./layout/layout";
@@ -60,6 +61,9 @@ export function AppRouteTable() {
         {unbuiltViews.map((view) => (
           <Route key={view.id} path={view.path} element={<ComingSoon />} />
         ))}
+        {/* Not one of `views`: settings is reached from the sidebar footer,
+            not from the list of things to look at. */}
+        <Route path="settings" element={<SettingsPage />} />
         <Route path="todo/:id" element={<TodoPage />} />
         <Route path="project/:id" element={<ProjectPage />} />
         {/*

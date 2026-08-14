@@ -1,5 +1,4 @@
 import { Logo } from "@/components/logo";
-import { Text } from "@/components/ui/text";
 import {
   Sidebar,
   SidebarContent,
@@ -12,11 +11,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils.ts";
 import { testProp } from "@/lib/test-id";
@@ -32,6 +26,7 @@ export function AppSidebar({ className }: { className?: string } = {}) {
   // that includes finished work never goes down.
   const { todoList } = useTodoList();
   const openCount = todoList?.length ?? 0;
+  const settingsActive = pathname === "/settings";
 
   return (
     <Sidebar className="border-none">
@@ -94,23 +89,28 @@ export function AppSidebar({ className }: { className?: string } = {}) {
 
         <SidebarProjects />
 
+        {/*
+          Settings is a page now, so this is a real anchor like every view
+          above it — it was a popover holding a single switch, which made the
+          one setting the app has reachable only by knowing to look inside a
+          menu. The switch keeps its place beside it: changing the theme is
+          something you do while reading, and sending someone to another page
+          to do it is a round trip for a thing that takes one click.
+        */}
         <SidebarFooter className="px-2 pb-3">
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex h-9 items-center gap-2 rounded-lg px-2.5 text-sm transition-colors">
-                <Settings className="size-4" />
-                Settings
-              </button>
-            </PopoverTrigger>
-            <PopoverContent side="right" align="end" className="w-56 p-2">
-              <Text variant="eyebrow" className="px-2 pt-1 pb-2">
-                Appearance
-              </Text>
-              <ThemeToggle />
-            </PopoverContent>
-          </Popover>
+          <div className="flex items-center gap-1">
+            <Link
+              to="/settings"
+              aria-current={settingsActive ? "page" : undefined}
+              data-active={settingsActive}
+              {...testProp("sidebar.settings.link")}
+              className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground flex h-9 grow items-center gap-2 rounded-lg px-2.5 text-sm transition-colors">
+              <Settings className="size-4" />
+              Settings
+            </Link>
+
+            <ThemeToggle testId="sidebar.theme.toggle" variant="icon" />
+          </div>
         </SidebarFooter>
       </SidebarContent>
     </Sidebar>

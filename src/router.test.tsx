@@ -53,6 +53,16 @@ describe("routing", () => {
       expect(screen.queryByTestId(notFound)).not.toBeInTheDocument();
     });
 
+    it("Then /settings is a page of its own, not the placeholder", async () => {
+      renderAt("/settings");
+
+      expect(
+        await screen.findByTestId("settings.page.title")
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId(comingSoon)).not.toBeInTheDocument();
+      expect(screen.queryByTestId(notFound)).not.toBeInTheDocument();
+    });
+
     it("Then /labels is the built view, not the placeholder", async () => {
       renderAt("/labels");
 
