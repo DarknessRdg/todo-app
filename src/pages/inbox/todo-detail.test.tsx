@@ -13,7 +13,7 @@ import {
   inMemoryTodoRepository,
   renderWithContainer,
 } from "@/test/container";
-import { writeSetting } from "@/lib/settings";
+import { readSetting, writeSetting } from "@/lib/settings";
 import {
   makeLabel,
   makeProject,
@@ -33,6 +33,7 @@ const dueClear = "todo.detail.duedate.clear";
 const dueToday = "todo.detail.duedate.today";
 const projectOption = (id: string) => `todo.detail.project.option.${id}`;
 const readView = "todo.detail.description.read";
+const readOnlyToggle = "todo.detail.description.readonly.toggle";
 const editor = "todo.detail.description.editor";
 const saving = "todo.detail.description.saving";
 const saved = "todo.detail.description.saved";
@@ -594,6 +595,55 @@ describe("todo detail", () => {
    * Which way round a description opens is a preference — some people come to
    * their todos to read them, some to write in them.
    */
+  describe("when I flip the description to reading from the todo itself", () => {
+    it("Then clicking it no longer opens the editor", async () => {
+      const user = setupUser();
+      renderDetail(makeTodo({ description: "the old notes" }));
+
+      await user.click(await screen.findByTestId(readOnlyToggle));
+      await user.click(screen.getByTestId(readView));
+
+      expect(screen.queryByTestId(editor)).not.toBeInTheDocument();
+      expect(screen.getByTestId(readView)).toBeInTheDocument();
+    });
+
+    /**
+     * The whole point of it being on the todo: a quick look at this one,
+     * without going to settings and without changing anything for the next.
+     */
+    it("Then the setting is left exactly as it was", async () => {
+      const user = setupUser();
+      renderDetail(makeTodo({ description: "the old notes" }));
+
+      await user.click(await screen.findByTestId(readOnlyToggle));
+
+      expect(readSetting("defaultTodoView")).toBe("write");
+    });
+  });
+
+  describe("when descriptions are set to open ready to read", () => {
+    it("Then the toggle says it is reading, without being touched", async () => {
+      writeSetting("defaultTodoView", "read");
+      renderDetail(makeTodo({ description: "the old notes" }));
+
+      expect(await screen.findByTestId(readOnlyToggle)).toHaveAttribute(
+        "aria-pressed",
+        "true"
+      );
+    });
+
+    it("Then it can still be flipped to writing for this todo", async () => {
+      const user = setupUser();
+      writeSetting("defaultTodoView", "read");
+      renderDetail(makeTodo({ description: "the old notes" }));
+
+      await user.click(await screen.findByTestId(readOnlyToggle));
+      await user.click(screen.getByTestId(readView));
+
+      expect(await screen.findByTestId(editor)).toBeInTheDocument();
+    });
+  });
+
   it("when descriptions are set to open ready to read, Then clicking one does not put it into the editor", async () => {
     const user = setupUser();
     writeSetting("defaultTodoView", "read");
