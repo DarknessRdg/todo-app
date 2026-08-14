@@ -47,7 +47,6 @@ export type InlineEditControls = {
 type InlineEditContextValue = InlineEditControls & {
   editing: boolean;
   open: () => void;
-  readOnly: boolean;
 };
 
 const InlineEditContext = createContext<InlineEditContextValue | null>(null);
@@ -71,19 +70,12 @@ type InlineEditProps = PropsWithChildren<{
   onCommit: (next: string) => void;
   /** Refuse a blank value, keeping the stored one, rather than saving it. */
   required?: boolean;
-  /**
-   * Show the value as plain content: no field, and no click-to-edit. What it
-   * buys is the thing edit-in-place otherwise costs — text that can be selected
-   * with the mouse, rather than turning into an input under the cursor.
-   */
-  readOnly?: boolean;
 }>;
 
 export function InlineEdit({
   value,
   onCommit,
   required = false,
-  readOnly = false,
   children,
 }: InlineEditProps) {
   const [editing, setEditing] = useState(false);
@@ -92,15 +84,7 @@ export function InlineEdit({
   // own — without this the same edit would be reported twice.
   const settled = useRef(false);
 
-  // Read-only arriving mid-edit closes the field rather than leaving it open
-  // and uneditable. Nothing is committed here: whatever moved the caller into
-  // read mode took focus out of the control first, and that blur is what saves
-  // — commit is guarded by `settled`, so it cannot run twice either way.
-  if (readOnly && editing) setEditing(false);
-
   const open = () => {
-    if (readOnly) return;
-
     // Every entry, not just the first: the stored value moves on as edits are
     // saved, and a stale draft would silently undo the last one.
     setDraft(value);
@@ -132,7 +116,6 @@ export function InlineEdit({
       value={{
         editing,
         open,
-        readOnly,
         value: draft,
         onChange: setDraft,
         commit,
@@ -174,43 +157,30 @@ InlineEdit.Read = function InlineEditRead({
   "aria-label": ariaLabel,
   ...props
 }: InlineEditReadProps) {
-  const { editing, open, readOnly } = useInlineEditContext("Read");
+  const { editing, open } = useInlineEditContext("Read");
 
   if (editing) return null;
 
   const Comp = asChild ? Slot : "div";
 
-  // Read-only is not a disabled control, it is ordinary content: no tab stop,
-  // no affordance, and no `aria-label` promising an edit that will not happen.
-  const editable = readOnly
-    ? {}
-    : {
-        "aria-label": ariaLabel,
-        // Deliberately not `role="button"`: it would replace the element's own
-        // role, and a heading that announces itself as a button is no longer a
-        // heading to a screen reader. Focusable and labelled is enough.
-        tabIndex: 0,
-        onClick: open,
-        onKeyDown: (event: React.KeyboardEvent) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            open();
-          }
-        },
-      };
-
   return (
     <Comp
       {...props}
       {...testProp(testId)}
-      {...editable}
+      aria-label={ariaLabel}
+      // Deliberately not `role="button"`: it would replace the element's own
+      // role, and a heading that announces itself as a button is no longer a
+      // heading to a screen reader. Focusable and labelled is enough.
+      tabIndex={0}
+      onClick={open}
+      onKeyDown={(event: React.KeyboardEvent) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          open();
+        }
+      }}
       className={cn(
-        "rounded-lg border border-transparent transition-colors",
-        // The point of read mode: a caret and a selectable range where there
-        // would otherwise be a target that swallows the click.
-        readOnly
-          ? "cursor-auto select-text"
-          : "hover:border-border cursor-text",
+        "hover:border-border cursor-text rounded-lg border border-transparent transition-colors",
         className
       )}>
       {children}

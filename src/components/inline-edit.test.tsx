@@ -11,16 +11,11 @@ const input = "field.input";
 function renderInlineEdit({
   value = "the stored value",
   required = false,
-  readOnly = false,
-}: { value?: string; required?: boolean; readOnly?: boolean } = {}) {
+}: { value?: string; required?: boolean } = {}) {
   const onCommit = vi.fn<(next: string) => void>();
 
-  const field = (isReadOnly: boolean) => (
-    <InlineEdit
-      value={value}
-      required={required}
-      readOnly={isReadOnly}
-      onCommit={onCommit}>
+  render(
+    <InlineEdit value={value} required={required} onCommit={onCommit}>
       <InlineEdit.Read asChild testId={read} aria-label="Edit it">
         <h1>{value}</h1>
       </InlineEdit.Read>
@@ -28,11 +23,7 @@ function renderInlineEdit({
     </InlineEdit>
   );
 
-  const { rerender } = render(field(readOnly));
-
-  // Read-only is a prop the caller flips while this stays mounted — a toggle
-  // beside the value, not a different screen — so specs drive it the same way.
-  return { onCommit, setReadOnly: (next: boolean) => rerender(field(next)) };
+  return { onCommit };
 }
 
 describe("inline edit", () => {
@@ -198,51 +189,6 @@ describe("inline edit", () => {
     fireEvent.blur(field);
 
     await waitFor(() => expect(onCommit).toHaveBeenCalledWith(""));
-  });
-
-  describe("when it is read only", () => {
-    it("Then clicking the read view leaves it as content", async () => {
-      const user = setupUser();
-      renderInlineEdit({ readOnly: true });
-
-      await user.click(screen.getByTestId(read));
-
-      expect(screen.queryByTestId(input)).not.toBeInTheDocument();
-      expect(screen.getByTestId(read)).toBeInTheDocument();
-    });
-
-    it("Then the keyboard route into the field is gone too", async () => {
-      renderInlineEdit({ readOnly: true });
-
-      fireEvent.keyDown(screen.getByTestId(read), { key: "Enter" });
-
-      expect(screen.queryByTestId(input)).not.toBeInTheDocument();
-    });
-  });
-
-  describe("when it turns read only while I am editing", () => {
-    it("Then the open field gives way to the read view", async () => {
-      const user = setupUser();
-      const { setReadOnly } = renderInlineEdit();
-
-      await user.click(screen.getByTestId(read));
-      await screen.findByTestId(input);
-
-      setReadOnly(true);
-
-      expect(await screen.findByTestId(read)).toBeInTheDocument();
-      expect(screen.queryByTestId(input)).not.toBeInTheDocument();
-    });
-  });
-
-  it("when read only is lifted, Then the value can be edited again", async () => {
-    const user = setupUser();
-    const { setReadOnly } = renderInlineEdit({ readOnly: true });
-
-    setReadOnly(false);
-    await user.click(screen.getByTestId(read));
-
-    expect(await screen.findByTestId(input)).toBeInTheDocument();
   });
 
   describe("when the control is not a plain field", () => {
