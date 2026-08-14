@@ -35,3 +35,53 @@ jobs:
 
       - name: Test
         run: npx vitest run
+
+  deploy:
+    name: Publish to GitHub Pages
+    # Pushes to main only: a pull request must never publish, and this is the
+    # step that makes "merged" and "live" the same event.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # The gate. A deploy is the one place a red suite must not reach, so this
+    # waits for the same type-check and specs every other change answers to.
+    needs: test
+    runs-on: ubuntu-latest
+
+    # Only what pushing a branch takes. The default token is read-only under
+    # the stricter repository settings, and nothing here needs more than this.
+    permissions:
+      contents: write
+
+    # Two deploys racing would publish whichever finished last rather than
+    # whichever is newer, so they queue. Not cancelled in flight: a half-run
+    # deploy is worse than a redundant one.
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Built again rather than carried over from `test` as an artifact: the
+      # build is seconds, and an artifact is one more thing that can be stale
+      # or missing between two jobs.
+      - name: Build
+        run: npm run build
+
+      # Publishes the contents of `dist` as the whole of the `gh-pages` branch.
+      # `force_orphan` keeps that branch a single commit: it is generated
+      # output, and its history is noise nobody reads or bisects.
+      - name: Publish to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          publish_branch: gh-pages
+          force_orphan: true
