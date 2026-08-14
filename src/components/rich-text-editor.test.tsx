@@ -3,6 +3,7 @@ import { setupUser, waitFor, type User } from "@/test/user";
 import { describe, expect, it, vi } from "vitest";
 
 import { RichTextEditor } from "@/components/rich-text-editor";
+import type { RichTextValue } from "@/lib/rich-text";
 
 const editor = "editor.content";
 const codeBlockButton = "editor.toolbar.codeblock.button";
@@ -16,21 +17,35 @@ const toolbar = "editor.toolbar";
 function renderEditor(
   props: Partial<Parameters<typeof RichTextEditor>[0]> = {}
 ) {
-  /** The markdown the editor hands back when focus leaves it. */
+  /**
+   * The markdown the editor hands back when focus leaves it.
+   *
+   * The editor reports both spellings of the document at once; these specs are
+   * about the markdown round trip, so the helper unwraps it and they assert on
+   * the string as they always have. `onSave` is the whole value, for the specs
+   * that are about the doc stored beside it.
+   */
   const onBlur = vi.fn<(markdown: string) => void>();
+  const onSave = vi.fn<(value: RichTextValue) => void>();
 
   const { rerender } = render(
-    <RichTextEditor testId={editor} onBlur={onBlur} {...props} />
+    <RichTextEditor
+      testId={editor}
+      onBlur={(value) => {
+        onSave(value);
+        onBlur(value.markdown);
+      }}
+      {...props}
+    />
   );
 
-  return { onBlur, rerender };
+  return { onBlur, onSave, rerender };
 }
 
 const blurEditor = () => fireEvent.blur(screen.getByTestId(editor));
 
 /** Selects the whole document, so a spec can act on "the selected text". */
-const selectAll = (user: User) =>
-  user.keyboard("{Control>}a{/Control}");
+const selectAll = (user: User) => user.keyboard("{Control>}a{/Control}");
 
 describe("rich text editor", () => {
   describe("when I mark the selected text from the toolbar", () => {
@@ -40,8 +55,16 @@ describe("rich text editor", () => {
      * outcome, where the `<strong>` in the DOM is just how it is drawn.
      */
     const marks = [
-      { name: "bold", button: "editor.toolbar.bold.button", wrapped: "**words**" },
-      { name: "italic", button: "editor.toolbar.italic.button", wrapped: "*words*" },
+      {
+        name: "bold",
+        button: "editor.toolbar.bold.button",
+        wrapped: "**words**",
+      },
+      {
+        name: "italic",
+        button: "editor.toolbar.italic.button",
+        wrapped: "*words*",
+      },
       {
         name: "strikethrough",
         button: "editor.toolbar.strike.button",
@@ -51,6 +74,13 @@ describe("rich text editor", () => {
         name: "inline code",
         button: "editor.toolbar.code.button",
         wrapped: "`words`",
+      },
+      // Markdown has no underline or highlight, so both go out as the inline
+      // HTML markdown does carry — which is what comes back on reload.
+      {
+        name: "underline",
+        button: "editor.toolbar.underline.button",
+        wrapped: "<u>words</u>",
       },
     ];
 
@@ -87,25 +117,104 @@ describe("rich text editor", () => {
     });
   });
 
+  describe("when I highlight the selected text", () => {
+    /** Opens the pen menu with the whole document selected. */
+    const openPen = async (user: User) => {
+      await user.click(screen.getByTestId(editor));
+      await selectAll(user);
+      await user.click(screen.getByTestId("editor.toolbar.highlight.menu"));
+    };
+
+    it("Then the colour I picked is what gets saved", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor({ content: "words" });
+
+      await openPen(user);
+      await user.click(
+        await screen.findByTestId("editor.toolbar.highlight.green.button")
+      );
+      blurEditor();
+
+      // The colour rides as a token name, not a literal — that is what lets it
+      // follow the theme instead of freezing a pastel into the document.
+      await waitFor(() =>
+        expect(onBlur).toHaveBeenCalledWith(
+          expect.stringContaining('<mark data-highlight="green">words</mark>')
+        )
+      );
+    });
+
+    it("Then picking another colour replaces it rather than nesting", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor({ content: "words" });
+
+      await openPen(user);
+      await user.click(
+        await screen.findByTestId("editor.toolbar.highlight.green.button")
+      );
+      await openPen(user);
+      await user.click(
+        await screen.findByTestId("editor.toolbar.highlight.pink.button")
+      );
+      blurEditor();
+
+      await waitFor(() => expect(onBlur).toHaveBeenCalled());
+      expect(onBlur.mock.lastCall?.[0]).toContain('data-highlight="pink"');
+      expect(onBlur.mock.lastCall?.[0]).not.toContain("green");
+    });
+
+    it("Then choosing none takes the highlight off again", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor({ content: "words" });
+
+      await openPen(user);
+      await user.click(
+        await screen.findByTestId("editor.toolbar.highlight.blue.button")
+      );
+      await openPen(user);
+      await user.click(
+        await screen.findByTestId("editor.toolbar.highlight.none.button")
+      );
+      blurEditor();
+
+      await waitFor(() => expect(onBlur).toHaveBeenCalled());
+      expect(onBlur.mock.lastCall?.[0]).toContain("words");
+      expect(onBlur.mock.lastCall?.[0]).not.toContain("<mark");
+    });
+  });
+
   describe("when I turn the current block into something else", () => {
     const blocks = [
-      { name: "a heading", button: "editor.toolbar.h1.button", prefix: "# words" },
+      {
+        name: "a heading",
+        menu: "editor.toolbar.block.menu",
+        item: "editor.toolbar.block.h1.button",
+        prefix: "# words",
+      },
       {
         name: "a smaller heading",
-        button: "editor.toolbar.h2.button",
+        menu: "editor.toolbar.block.menu",
+        item: "editor.toolbar.block.h2.button",
         prefix: "## words",
       },
       {
         name: "a bullet list",
-        button: "editor.toolbar.bulletlist.button",
+        menu: "editor.toolbar.list.menu",
+        item: "editor.toolbar.list.bulletlist.button",
         prefix: "- words",
       },
       {
         name: "a numbered list",
-        button: "editor.toolbar.orderedlist.button",
+        menu: "editor.toolbar.list.menu",
+        item: "editor.toolbar.list.orderedlist.button",
         prefix: "1. words",
       },
-      { name: "a quote", button: "editor.toolbar.quote.button", prefix: "> words" },
+      {
+        name: "a checklist",
+        menu: "editor.toolbar.list.menu",
+        item: "editor.toolbar.list.tasklist.button",
+        prefix: "- [ ] words",
+      },
     ];
 
     for (const block of blocks) {
@@ -114,7 +223,8 @@ describe("rich text editor", () => {
         const { onBlur } = renderEditor({ content: "words" });
 
         await user.click(screen.getByTestId(editor));
-        await user.click(screen.getByTestId(block.button));
+        await user.click(screen.getByTestId(block.menu));
+        await user.click(await screen.findByTestId(block.item));
         blurEditor();
 
         await waitFor(() =>
@@ -124,6 +234,436 @@ describe("rich text editor", () => {
         );
       });
     }
+
+    it("Then a quote, straight from the toolbar, is what gets saved", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor({ content: "words" });
+
+      await user.click(screen.getByTestId(editor));
+      await user.click(screen.getByTestId("editor.toolbar.quote.button"));
+      blurEditor();
+
+      await waitFor(() =>
+        expect(onBlur).toHaveBeenCalledWith(expect.stringContaining("> words"))
+      );
+    });
+  });
+
+  describe("when I fold a block into a collapsible section", () => {
+    /** Opens the section menu with the cursor in the document. */
+    const openSections = async (user: User) => {
+      await user.click(screen.getByTestId(editor));
+      await user.click(screen.getByTestId("editor.toolbar.details.menu"));
+    };
+
+    const pick = async (user: User, variant: string) =>
+      user.click(
+        await screen.findByTestId(`editor.toolbar.details.${variant}.button`)
+      );
+
+    it("Then the text I had becomes the section's body", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor({ content: "the long version" });
+
+      await openSections(user);
+      await pick(user, "plain");
+      blurEditor();
+
+      await waitFor(() => expect(onBlur).toHaveBeenCalled());
+      expect(onBlur.mock.lastCall?.[0]).toContain("<details");
+      expect(onBlur.mock.lastCall?.[0]).toContain("the long version");
+    });
+
+    it("Then removing it unfolds the section again", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor({ content: "the long version" });
+
+      await openSections(user);
+      await pick(user, "plain");
+      await openSections(user);
+      await pick(user, "remove");
+      blurEditor();
+
+      await waitFor(() => expect(onBlur).toHaveBeenCalled());
+      expect(onBlur.mock.lastCall?.[0]).not.toContain("<details");
+      expect(onBlur.mock.lastCall?.[0]).toContain("the long version");
+    });
+
+    /**
+     * One case per callout, asserted on the variant that reaches the saved
+     * document — the tint is presentation, the attribute is the outcome.
+     */
+    for (const variant of ["info", "warning", "success", "error"]) {
+      it(`Then dressing it as ${variant} is what gets saved`, async () => {
+        const user = setupUser();
+        const { onBlur } = renderEditor({ content: "the long version" });
+
+        await openSections(user);
+        await pick(user, variant);
+        blurEditor();
+
+        await waitFor(() => expect(onBlur).toHaveBeenCalled());
+        expect(onBlur.mock.lastCall?.[0]).toContain(
+          `data-variant="${variant}"`
+        );
+      });
+    }
+
+    /**
+     * The saved attribute is not enough: on screen the section is drawn by
+     * Tiptap's own node view, and only `data-variant` on *that* element turns
+     * it into a callout. Reached through the editor's own DOM because
+     * ProseMirror renders the node — there is no element to hang a test id on.
+     */
+    for (const variant of ["info", "warning", "success", "error"]) {
+      it(`Then it is dressed as ${variant} on screen straight away`, async () => {
+        const user = setupUser();
+        renderEditor({ content: "the long version" });
+
+        await openSections(user);
+        await pick(user, variant);
+
+        await waitFor(() =>
+          expect(
+            screen
+              .getByTestId(editor)
+              .querySelector('[data-type="details"]')
+              ?.getAttribute("data-variant")
+          ).toBe(variant)
+        );
+      });
+    }
+
+    it("Then dressing one I already folded shows the callout without a reload", async () => {
+      const user = setupUser();
+      renderEditor({ content: "the long version" });
+
+      await openSections(user);
+      await pick(user, "plain");
+      await openSections(user);
+      await pick(user, "info");
+
+      await waitFor(() =>
+        expect(
+          screen
+            .getByTestId(editor)
+            .querySelector('[data-type="details"]')
+            ?.getAttribute("data-variant")
+        ).toBe("info")
+      );
+    });
+
+    it("Then undressing it back to plain drops the callout from the screen", async () => {
+      const user = setupUser();
+      renderEditor({ content: "the long version" });
+
+      await openSections(user);
+      await pick(user, "info");
+      await openSections(user);
+      await pick(user, "plain");
+
+      await waitFor(() =>
+        expect(
+          screen.getByTestId(editor).querySelector('[data-type="details"]')
+        ).not.toHaveAttribute("data-variant")
+      );
+    });
+
+    it("Then re-dressing one swaps its look instead of nesting a second", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor({ content: "the long version" });
+
+      await openSections(user);
+      await pick(user, "info");
+      await openSections(user);
+      await pick(user, "error");
+      blurEditor();
+
+      await waitFor(() => expect(onBlur).toHaveBeenCalled());
+      const saved = onBlur.mock.lastCall?.[0] as string;
+      expect(saved).toContain('data-variant="error"');
+      expect(saved).not.toContain("info");
+      expect(saved.match(/<details/g)).toHaveLength(1);
+    });
+
+    it("Then an unstyled one is saved carrying no variant at all", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor({ content: "the long version" });
+
+      await openSections(user);
+      await pick(user, "plain");
+      blurEditor();
+
+      await waitFor(() => expect(onBlur).toHaveBeenCalled());
+      expect(onBlur.mock.lastCall?.[0]).not.toContain("data-variant");
+    });
+  });
+
+  describe("when I type a shortcode in the text", () => {
+    const suggestions = "editor.emoji.suggestions";
+
+    /** Types `:tada` where the cursor is, which is what opens the list. */
+    const typeShortcode = async (user: User, shortcode = ":tada") => {
+      await user.click(screen.getByTestId(editor));
+      await user.keyboard(shortcode);
+    };
+
+    it("Then the emoji it names is offered", async () => {
+      const user = setupUser();
+      renderEditor();
+
+      await typeShortcode(user);
+
+      expect(
+        await screen.findByTestId(`${suggestions}.tada.button`)
+      ).toBeInTheDocument();
+    });
+
+    it("Then picking one replaces the shortcode with the emoji", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor();
+
+      await typeShortcode(user);
+      await user.click(await screen.findByTestId(`${suggestions}.tada.button`));
+      blurEditor();
+
+      await waitFor(() => expect(onBlur).toHaveBeenCalled());
+      expect(onBlur.mock.lastCall?.[0]).toContain("🎉");
+      expect(onBlur.mock.lastCall?.[0]).not.toContain("tada");
+    });
+
+    it("Then enter takes the one at the top of the list", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor();
+
+      await typeShortcode(user);
+      await screen.findByTestId(`${suggestions}.tada.button`);
+      await user.keyboard("{Enter}");
+      blurEditor();
+
+      await waitFor(() => expect(onBlur).toHaveBeenCalled());
+      expect(onBlur.mock.lastCall?.[0]).toContain("🎉");
+    });
+
+    it("Then escape leaves the shortcode as the text I typed", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor();
+
+      await typeShortcode(user);
+      await screen.findByTestId(`${suggestions}.tada.button`);
+      await user.keyboard("{Escape}");
+
+      await waitFor(() =>
+        expect(screen.queryByTestId(suggestions)).not.toBeInTheDocument()
+      );
+
+      blurEditor();
+      await waitFor(() => expect(onBlur).toHaveBeenCalled());
+      expect(onBlur.mock.lastCall?.[0]).toContain(":tada");
+    });
+
+    it("Then typing on past every match closes the list again", async () => {
+      const user = setupUser();
+      renderEditor();
+
+      await typeShortcode(user);
+      await screen.findByTestId(`${suggestions}.tada.button`);
+      await user.keyboard("zzzqqq");
+
+      await waitFor(() =>
+        expect(screen.queryByTestId(suggestions)).not.toBeInTheDocument()
+      );
+    });
+  });
+
+  describe("when I pick an emoji from the toolbar", () => {
+    const picker = "editor.toolbar.emoji";
+
+    const openPicker = async (user: User) => {
+      await user.click(screen.getByTestId(editor));
+      await user.click(screen.getByTestId(`${picker}.button`));
+    };
+
+    it("Then searching narrows the picker to what I asked for", async () => {
+      const user = setupUser();
+      renderEditor();
+
+      await openPicker(user);
+      await user.type(
+        await screen.findByTestId(`${picker}.search.input`),
+        "tada"
+      );
+
+      expect(
+        await screen.findByTestId(`${picker}.tada.button`)
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId(`${picker}.rocket.button`)).toBeNull();
+    });
+
+    it("Then the one I choose lands in the note", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor({ content: "party time " });
+
+      await openPicker(user);
+      await user.type(
+        await screen.findByTestId(`${picker}.search.input`),
+        "tada"
+      );
+      await user.click(await screen.findByTestId(`${picker}.tada.button`));
+      blurEditor();
+
+      await waitFor(() => expect(onBlur).toHaveBeenCalled());
+      expect(onBlur.mock.lastCall?.[0]).toContain("🎉");
+    });
+  });
+
+  describe("when I open a callout to write its body", () => {
+    /**
+     * The fold arrow belongs to Tiptap's node view, so it is reached through
+     * the editor's DOM — there is no element of ours to hang a test id on.
+     */
+    const fold = (user: User) =>
+      user.click(
+        screen
+          .getByTestId(editor)
+          .querySelector('[data-type="details"] > button') as HTMLElement
+      );
+
+    const dressed = () =>
+      screen
+        .getByTestId(editor)
+        .querySelector('[data-type="details"]')
+        ?.getAttribute("data-variant");
+
+    it("Then it keeps its look on screen", async () => {
+      const user = setupUser();
+      renderEditor({
+        content:
+          '<details data-variant="info"><summary>Heads up</summary><p>the long version</p></details>',
+      });
+
+      await waitFor(() => expect(dressed()).toBe("info"));
+      await fold(user);
+
+      await waitFor(() => expect(dressed()).toBe("info"));
+    });
+
+    it("Then it is still saved as a callout", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor({
+        content:
+          '<details data-variant="info"><summary>Heads up</summary><p>the long version</p></details>',
+      });
+
+      await waitFor(() => expect(dressed()).toBe("info"));
+      await fold(user);
+      blurEditor();
+
+      await waitFor(() => expect(onBlur).toHaveBeenCalled());
+      expect(onBlur.mock.lastCall?.[0]).toContain('data-variant="info"');
+    });
+
+    it("Then it stays open, as folding a plain section already does", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor({
+        content:
+          '<details data-variant="info"><summary>Heads up</summary><p>the long version</p></details>',
+      });
+
+      await waitFor(() => expect(dressed()).toBe("info"));
+      await fold(user);
+      blurEditor();
+
+      await waitFor(() => expect(onBlur).toHaveBeenCalled());
+      expect(onBlur.mock.lastCall?.[0]).toContain("open");
+    });
+  });
+
+  describe("when the content already holds a collapsible section", () => {
+    it("Then it survives a round trip, still folded", async () => {
+      const { onBlur } = renderEditor({
+        content:
+          "<details><summary>Notes</summary><p>the long version</p></details>",
+      });
+
+      await waitFor(() =>
+        expect(screen.getByTestId(editor)).toHaveTextContent("Notes")
+      );
+      blurEditor();
+
+      await waitFor(() => expect(onBlur).toHaveBeenCalled());
+      expect(onBlur.mock.lastCall?.[0]).toContain("<details");
+      expect(onBlur.mock.lastCall?.[0]).toContain("Notes");
+      expect(onBlur.mock.lastCall?.[0]).toContain("the long version");
+    });
+  });
+
+  describe("when the content already holds a checklist", () => {
+    /**
+     * Driven through the content rather than by clicking the box: TaskItem's
+     * checkbox is rendered by ProseMirror, so there is no test id to click and
+     * walking to it is banned. What matters here is that the tick persists.
+     */
+    it("Then which items are ticked survives a round trip", async () => {
+      const { onBlur } = renderEditor({
+        content: "- [x] packed\n- [ ] posted",
+      });
+
+      await waitFor(() =>
+        expect(screen.getByTestId(editor)).toHaveTextContent("packed")
+      );
+      blurEditor();
+
+      await waitFor(() => expect(onBlur).toHaveBeenCalled());
+      expect(onBlur.mock.lastCall?.[0]).toContain("[x] packed");
+      expect(onBlur.mock.lastCall?.[0]).toContain("[ ] posted");
+    });
+  });
+
+  describe("when I align the current block", () => {
+    it("Then the alignment survives being saved and reopened", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor({ content: "words" });
+
+      await user.click(screen.getByTestId(editor));
+      await user.click(screen.getByTestId("editor.toolbar.align.menu"));
+      await user.click(
+        await screen.findByTestId("editor.toolbar.align.center.button")
+      );
+      blurEditor();
+
+      await waitFor(() => expect(onBlur).toHaveBeenCalled());
+      const saved = onBlur.mock.lastCall?.[0] as string;
+
+      cleanup();
+      const reopened = renderEditor({ content: saved });
+
+      await waitFor(() =>
+        expect(screen.getByTestId(editor)).toHaveTextContent("words")
+      );
+      blurEditor();
+
+      await waitFor(() =>
+        expect(reopened.onBlur).toHaveBeenCalledWith(
+          expect.stringContaining("center")
+        )
+      );
+    });
+
+    it("Then a block left where it was is still saved as plain markdown", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor({ content: "words" });
+
+      await user.click(screen.getByTestId(editor));
+      await user.click(screen.getByTestId("editor.toolbar.align.menu"));
+      await user.click(
+        await screen.findByTestId("editor.toolbar.align.left.button")
+      );
+      blurEditor();
+
+      await waitFor(() => expect(onBlur).toHaveBeenCalled());
+      expect(onBlur.mock.lastCall?.[0]).not.toContain("<p");
+    });
   });
 
   /**
@@ -569,6 +1109,130 @@ describe("rich text editor", () => {
           expect.stringContaining("```ts\nfirst()\nsecond()\n```")
         )
       );
+    });
+  });
+
+  /**
+   * The parsed doc is stored beside the markdown so a description does not have
+   * to be re-parsed every time it is shown — the markdown stays the record, the
+   * doc is the copy that loads fast.
+   */
+  /**
+   * Handing one mounted editor between reading and writing, rather than
+   * building a second one: the document is already parsed and on screen, and
+   * rebuilding it to make it typeable is most of what opening a description
+   * costs.
+   */
+  describe("when a mounted editor is handed over for editing", () => {
+    it("Then the text can be typed into, not just the toolbar shown", async () => {
+      const user = setupUser();
+      const onBlur = vi.fn<(value: RichTextValue) => void>();
+
+      const { rerender } = render(
+        <RichTextEditor testId={editor} editable={false} onBlur={onBlur} />
+      );
+      rerender(<RichTextEditor testId={editor} editable onBlur={onBlur} />);
+
+      await user.click(screen.getByTestId(editor));
+      await user.keyboard("typed after the handover");
+      blurEditor();
+
+      await waitFor(() => expect(onBlur).toHaveBeenCalled());
+      expect(onBlur.mock.lastCall?.[0].markdown).toContain(
+        "typed after the handover"
+      );
+    });
+
+    it("Then handing it back stops it taking text again", async () => {
+      const user = setupUser();
+      const onBlur = vi.fn<(value: RichTextValue) => void>();
+
+      const { rerender } = render(
+        <RichTextEditor testId={editor} editable onBlur={onBlur} />
+      );
+      await user.click(screen.getByTestId(editor));
+      await user.keyboard("while it was open");
+
+      rerender(
+        <RichTextEditor testId={editor} editable={false} onBlur={onBlur} />
+      );
+      await user.click(screen.getByTestId(editor));
+      await user.keyboard("after it was closed");
+      blurEditor();
+
+      await waitFor(() => expect(onBlur).toHaveBeenCalled());
+      expect(onBlur.mock.lastCall?.[0].markdown).not.toContain(
+        "after it was closed"
+      );
+    });
+  });
+
+  describe("when I leave the editor", () => {
+    it("Then the document is handed back parsed as well as as markdown", async () => {
+      const user = setupUser();
+      const { onSave } = renderEditor();
+
+      await user.click(screen.getByTestId(editor));
+      await user.keyboard("the notes");
+      blurEditor();
+
+      await waitFor(() => expect(onSave).toHaveBeenCalled());
+      const value = onSave.mock.lastCall?.[0];
+      expect(value?.markdown).toContain("the notes");
+      expect(value?.doc).toMatchObject({ type: "doc" });
+    });
+
+    it("Then that doc is enough to show the same document again, with no markdown", async () => {
+      const user = setupUser();
+      const { onSave } = renderEditor();
+
+      await user.click(screen.getByTestId(editor));
+      await user.keyboard("the notes");
+      blurEditor();
+      await waitFor(() => expect(onSave).toHaveBeenCalled());
+
+      cleanup();
+      renderEditor({ content: onSave.mock.lastCall?.[0].doc });
+
+      expect(await screen.findByTestId(editor)).toHaveTextContent("the notes");
+    });
+  });
+
+  describe("when I press escape in the text", () => {
+    it("Then what I wrote is handed back, the same as leaving the editor would", async () => {
+      const user = setupUser();
+      const onEscape = vi.fn<(value: RichTextValue) => void>();
+      renderEditor({ onEscape });
+
+      await user.click(screen.getByTestId(editor));
+      await user.keyboard("some notes{Escape}");
+
+      await waitFor(() => expect(onEscape).toHaveBeenCalled());
+      expect(onEscape.mock.lastCall?.[0].markdown).toContain("some notes");
+    });
+
+    /**
+     * Escape belongs to the innermost thing that can answer it, and while the
+     * shortcode list is up that is the list. Answering both would close the
+     * editor out from under someone who only meant to dismiss a menu.
+     */
+    it("Then the emoji list takes it first, leaving the editor alone", async () => {
+      const user = setupUser();
+      const onEscape = vi.fn<(value: RichTextValue) => void>();
+      renderEditor({ onEscape });
+
+      await user.click(screen.getByTestId(editor));
+      await user.keyboard(":tada");
+      await screen.findByTestId("editor.emoji.suggestions.tada.button");
+
+      await user.keyboard("{Escape}");
+
+      await waitFor(() =>
+        expect(
+          screen.queryByTestId("editor.emoji.suggestions")
+        ).not.toBeInTheDocument()
+      );
+      expect(onEscape).not.toHaveBeenCalled();
     });
   });
 

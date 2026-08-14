@@ -60,7 +60,9 @@ describe("inline edit", () => {
       await user.type(field, "something else");
       fireEvent.blur(field);
 
-      await waitFor(() => expect(onCommit).toHaveBeenCalledWith("something else"));
+      await waitFor(() =>
+        expect(onCommit).toHaveBeenCalledWith("something else")
+      );
     });
 
     it("Then it is reported trimmed", async () => {
@@ -110,7 +112,9 @@ describe("inline edit", () => {
       await user.clear(field);
       await user.type(field, "something else{Enter}");
 
-      await waitFor(() => expect(onCommit).toHaveBeenCalledWith("something else"));
+      await waitFor(() =>
+        expect(onCommit).toHaveBeenCalledWith("something else")
+      );
     });
 
     /** Closing the field on enter also blurs it, which would commit twice. */

@@ -40,7 +40,7 @@ const selectTriggerVariants = cva(
   dark:bg-input/30
   dark:hover:bg-input/50
 
-  focus-visible:ring-[3px]
+  focus-visible:ring-1
   
   disabled:cursor-not-allowed
   disabled:opacity-50

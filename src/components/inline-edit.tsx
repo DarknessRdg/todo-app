@@ -55,7 +55,9 @@ function useInlineEditContext(slot: string) {
   const context = useContext(InlineEditContext);
 
   if (context === null) {
-    throw new Error(`<InlineEdit.${slot}> must be rendered inside <InlineEdit>`);
+    throw new Error(
+      `<InlineEdit.${slot}> must be rendered inside <InlineEdit>`
+    );
   }
 
   return context;
@@ -152,6 +154,7 @@ InlineEdit.Read = function InlineEditRead({
   testId,
   className,
   children,
+  "aria-label": ariaLabel,
   ...props
 }: InlineEditReadProps) {
   const { editing, open } = useInlineEditContext("Read");
@@ -164,6 +167,7 @@ InlineEdit.Read = function InlineEditRead({
     <Comp
       {...props}
       {...testProp(testId)}
+      aria-label={ariaLabel}
       // Deliberately not `role="button"`: it would replace the element's own
       // role, and a heading that announces itself as a button is no longer a
       // heading to a screen reader. Focusable and labelled is enough.

@@ -10,6 +10,7 @@ import { TodoDetail, type TodoDetailView } from "@/pages/inbox/todo-detail.tsx";
 import { Button } from "@/components/ui/button";
 import { TooltipText } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { isEditingRichText } from "@/lib/rich-text";
 import { Maximize2 } from "lucide-react";
 import type { PropsWithChildren } from "react";
 
@@ -36,7 +37,10 @@ export function TodoModalContent({
       id={id}
       onLeave={onClose}
       headerActions={
-        <TooltipText text="Open full screen" asChild>
+        <TooltipText
+          text="Open full screen"
+          testId={`home.todo.${id}.modal.fullscreen.tooltip`}
+          asChild>
           <Button
             testId={`home.todo.${id}.modal.fullscreen.button`}
             variant="ghost"
@@ -48,25 +52,24 @@ export function TodoModalContent({
           </Button>
         </TooltipText>
       }>
-      {(view) => {
-        // Nothing at all while the read is in flight: a dialog that pops open
-        // empty and resizes a beat later is worse than one that arrives whole.
-        if (view.status === "loading") return <></>;
-
-        return (
-          <ModalShell
-            id={id}
-            title={titleFor(view)}
-            onClose={onClose}
-            // Only the real detail needs the tall pane; a message in an 85vh
-            // dialog is mostly empty space.
-            className={
-              view.status === "ready" ? "h-[85vh] max-h-[85vh]" : undefined
-            }>
-            {view.content}
-          </ModalShell>
-        );
-      }}
+      {(view) => (
+        <ModalShell
+          id={id}
+          title={titleFor(view)}
+          onClose={onClose}
+          // The tall pane is for the real detail — a message in an 85vh dialog
+          // is mostly empty space. Loading takes it too, though: the read is
+          // what it is about to become, and opening at the final size means
+          // the content fills a frame that is already there rather than the
+          // frame resizing under it.
+          className={
+            view.status === "ready" || view.status === "loading"
+              ? "h-[85vh] max-h-[85vh]"
+              : undefined
+          }>
+          {view.content}
+        </ModalShell>
+      )}
     </TodoDetail>
   );
 }
@@ -78,6 +81,8 @@ function titleFor(view: TodoDetailView) {
       return "This todo could not be read";
     case "missing":
       return "This todo is no longer here";
+    case "loading":
+      return "Loading this todo";
     default:
       return view.status === "ready" ? view.todo.title : "";
   }
@@ -114,11 +119,24 @@ function ModalShell({
         // click is dispatched — the click then hit-tests onto the row underneath
         // and re-navigates to ?todo=<id>, so the modal blinks back open. Keep the
         // backdrop up for the whole gesture and close on its click instead.
+        // Escape belongs to the innermost thing that can answer it. With the
+        // description open for editing that is the editor, which saves and
+        // closes itself — taking the key here as well would shut the todo out
+        // from under an edit, on the keystroke meant to finish it. Radix reads
+        // `defaultPrevented` as "handled elsewhere", and the editor's own
+        // listener still runs afterwards, so preventing here costs it nothing.
+        onEscapeKeyDown={(event) => {
+          if (isEditingRichText(event.target)) event.preventDefault();
+        }}
         onPointerDownOutside={(event) => event.preventDefault()}
         onInteractOutside={(event) => event.preventDefault()}
         overlayProps={{ onClick: onClose }}
+        // 70% of the viewport, uncapped: the previous `min(1100px, …)` meant
+        // anything wider than ~1220px got 1100px rather than a share of the
+        // screen. `sm:` is repeated because the dialog primitive sets its own
+        // `sm:max-w-lg`, which would otherwise win from that breakpoint up.
         className={cn(
-          "flex w-[90vw] max-w-[min(1100px,90vw)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(1100px,90vw)]",
+          "flex w-[70vw] max-w-[70vw] flex-col gap-0 overflow-hidden p-0 sm:max-w-[70vw]",
           className
         )}>
         <DialogHeader className="sr-only">

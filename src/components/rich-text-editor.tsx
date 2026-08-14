@@ -12,25 +12,55 @@ import {
 } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
+import { Highlight } from "@tiptap/extension-highlight";
+import { TaskItem, TaskList } from "@tiptap/extension-list";
+import {
+  Details,
+  DetailsContent,
+  DetailsSummary,
+} from "@tiptap/extension-details";
+import { TextAlign } from "@tiptap/extension-text-align";
 import { Paragraph } from "@tiptap/extension-paragraph";
-import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
+import { Heading } from "@tiptap/extension-heading";
+import { Extension, getHTMLFromFragment } from "@tiptap/core";
+import { Fragment, type Node as ProseMirrorNode } from "@tiptap/pm/model";
+import { PluginKey } from "@tiptap/pm/state";
+import Suggestion, { type SuggestionProps } from "@tiptap/suggestion";
+import { loadEmojis, searchEmojis, type Emoji } from "@/lib/emoji";
 import type { MarkdownSerializerState } from "prosemirror-markdown";
 import { createLowlight, common } from "lowlight";
 import { Markdown } from "tiptap-markdown";
 import {
+  AlignCenter,
+  AlignJustify,
+  AlignLeft,
+  AlignRight,
+  Ban,
   Bold,
+  ChevronDown,
+  CircleCheck,
+  CircleX,
   Code,
+  Info,
   SquareCode,
   Heading1,
   Heading2,
+  Heading3,
+  Highlighter,
   Italic,
   Link as LinkIcon,
   List,
+  ListCollapse,
   ListOrdered,
+  ListTodo,
+  Pilcrow,
   Quote,
   Redo2,
+  Smile,
   Strikethrough,
+  TriangleAlert,
   Type as TypeIcon,
+  Underline as UnderlineIcon,
   Undo2,
 } from "lucide-react";
 import {
@@ -55,7 +85,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Toggle } from "@/components/ui/toggle";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { testProp, type TestIdProps } from "@/lib/test-id";
+import type { RichTextDoc, RichTextValue } from "@/lib/rich-text";
 
 /**
  * `common` is lowlight's curated grammar set (~35 languages) rather than `all`
@@ -215,11 +256,281 @@ function codeBlockIndex(
   return index;
 }
 
+/* -------------------------------------------------------------------------- */
+/* Collapsible sections, and the callout they can be dressed as                */
+/* -------------------------------------------------------------------------- */
+
+/** The looks a collapsible section can wear. `plain` is the undressed one. */
+const detailsVariants = [
+  "plain",
+  "info",
+  "warning",
+  "success",
+  "error",
+] as const;
+
+type DetailsVariant = (typeof detailsVariants)[number];
+
+/**
+ * A collapsible section that can also be a callout.
+ *
+ * The variant rides as `data-variant`, resolved to a `--callout-*` token in
+ * `index.css` — the same arrangement as the marker pen, and for the same
+ * reason: a literal colour saved into a note could not follow the theme.
+ *
+ * `persist` writes the open/shut state into the document, so a section left
+ * folded is still folded when the todo is reopened rather than springing open.
+ */
+const CalloutDetails = Details.extend({
+  addAttributes() {
+    return {
+      // `persist` contributes the `open` attribute here — dropping the parent
+      // would quietly turn persistence back off.
+      ...this.parent?.(),
+      variant: {
+        default: "plain" satisfies DetailsVariant,
+        parseHTML: (element: HTMLElement) =>
+          element.getAttribute("data-variant") ?? "plain",
+        renderHTML: (attributes: { variant?: string }) =>
+          attributes.variant === undefined || attributes.variant === "plain"
+            ? {}
+            : { "data-variant": attributes.variant },
+      },
+    };
+  },
+
+  /**
+   * The section is drawn by the extension's own node view, which has two habits
+   * that lose the variant — both fixed here by wrapping it rather than
+   * reimplementing it:
+   *
+   * 1. It stamps the attributes onto its `<div>` once, when the view is built,
+   *    and its `update` only syncs the open/shut class. Dressing a section that
+   *    was already on screen changed the document but not the pixels, so the
+   *    callout only appeared after a reload. Hence `paint` on every update.
+   * 2. Its fold arrow writes `setNodeMarkup(pos, undefined, { open })` — a
+   *    *replacement* of the whole attribute set, which drops `variant` on the
+   *    floor. Since a callout has to be opened to write its body, that turned
+   *    every finished callout back into a plain collapsible. So the click is
+   *    caught on the wrapper during capture — before the button's own listener
+   *    ever runs — and re-dispatched keeping the rest of the attributes.
+   */
+  addNodeView() {
+    const parent = this.parent?.();
+    if (!parent) return null;
+
+    return (props) => {
+      const view = parent(props);
+      const dom = view.dom instanceof HTMLElement ? view.dom : null;
+
+      const paint = (variant: unknown) => {
+        if (!dom) return;
+        if (typeof variant === "string" && variant !== "plain") {
+          dom.setAttribute("data-variant", variant);
+        } else {
+          dom.removeAttribute("data-variant");
+        }
+      };
+
+      paint(props.node.attrs.variant);
+
+      const { editor, getPos } = props;
+
+      const fold = (event: MouseEvent) => {
+        // Read-only falls through to the extension: it only toggles the class
+        // there, touching no attributes, so there is nothing to preserve.
+        if (!dom || !editor.isEditable) return;
+        const target = event.target;
+        const button = dom.querySelector(":scope > button");
+        if (!button || !(target instanceof Node) || !button.contains(target)) {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        const pos = typeof getPos === "function" ? getPos() : undefined;
+        if (typeof pos !== "number") return;
+        const node = editor.state.doc.nodeAt(pos);
+        if (node?.type.name !== this.name) return;
+
+        const { from, to } = editor.state.selection;
+        editor
+          .chain()
+          .command(({ tr }) => {
+            tr.setNodeMarkup(pos, undefined, {
+              ...node.attrs,
+              open: !node.attrs.open,
+            });
+            return true;
+          })
+          .setTextSelection({ from, to })
+          .focus(undefined, { scrollIntoView: false })
+          .run();
+      };
+
+      dom?.addEventListener("click", fold, true);
+
+      return {
+        ...view,
+        update: (node, decorations, innerDecorations) => {
+          const handled =
+            view.update?.(node, decorations, innerDecorations) ?? true;
+          if (handled) paint(node.attrs.variant);
+          return handled;
+        },
+        destroy: () => {
+          dom?.removeEventListener("click", fold, true);
+          view.destroy?.();
+        },
+      };
+    };
+  },
+}).configure({ persist: true });
+
+/* -------------------------------------------------------------------------- */
+/* The marker pen                                                              */
+/* -------------------------------------------------------------------------- */
+
+/** The pen colours, in the order the menu offers them. */
+const highlightColours = ["yellow", "green", "blue", "pink", "purple"] as const;
+
+/**
+ * Highlight, but carrying the colour as a token *name* rather than the inline
+ * `background-color` the extension ships. A literal colour baked into the saved
+ * document could never follow the theme — it would stay a light pastel on the
+ * near-black dark canvas — and the design system keeps colour in `index.css`.
+ * The name resolves to `--highlight-*` there, per theme, via `mark[data-highlight]`.
+ */
+const HighlightPen = Highlight.extend({
+  addAttributes() {
+    return {
+      color: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-highlight"),
+        renderHTML: (attributes: { color?: string | null }) =>
+          attributes.color === null || attributes.color === undefined
+            ? {}
+            : { "data-highlight": attributes.color },
+      },
+    };
+  },
+}).configure({ multicolor: true });
+
+/* -------------------------------------------------------------------------- */
+/* Emoji                                                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * An emoji goes into the document as the plain character, not as a node of its
+ * own: 🎉 is text everywhere it is ever read, so it round trips through the
+ * saved markdown with no serializer, no parse rule and nothing to regenerate.
+ * What the extension contributes is the `:shortcode` autocomplete — the list
+ * and the search behind it live in `@/lib/emoji`, loaded on demand.
+ */
+type EmojiSuggestionState = {
+  /** The matches for what has been typed so far, best first. */
+  items: Emoji[];
+  /** Where the shortcode sits on screen, so the list can point at it. */
+  rect: DOMRect | null;
+  /** Puts one into the document, replacing the shortcode. */
+  select: (emoji: Emoji) => void;
+};
+
+type EmojiSuggestionOptions = {
+  /** The list opened, moved, or (null) closed. */
+  onChange: (state: EmojiSuggestionState | null) => void;
+  /** A key pressed while the list is open. True when the list consumed it. */
+  onKeyDown: (event: KeyboardEvent) => boolean;
+};
+
+/**
+ * How many letters after the `:` before the list appears. One would offer the
+ * first dozen of nineteen hundred emoji, which is noise; two narrows it enough
+ * to be a menu rather than a catalogue.
+ */
+const EmojiQueryMinimum = 2;
+
+/** How many matches the list shows — enough to choose from without scrolling. */
+const EmojiSuggestionLimit = 12;
+
+const EmojiSuggestion = Extension.create<EmojiSuggestionOptions>({
+  name: "emojiSuggestion",
+
+  addOptions() {
+    return { onChange: () => {}, onKeyDown: () => false };
+  },
+
+  addProseMirrorPlugins() {
+    const { onChange, onKeyDown } = this.options;
+
+    const read = (props: SuggestionProps<Emoji>): EmojiSuggestionState => ({
+      items: props.items,
+      rect: props.clientRect?.() ?? null,
+      select: (emoji) => props.command(emoji),
+    });
+
+    return [
+      Suggestion<Emoji>({
+        editor: this.editor,
+        pluginKey: new PluginKey("emojiSuggestion"),
+        char: ":",
+        // A shortcode is one word, and the default prefix rule keeps `10:30`
+        // and `https://` from being read as the start of one.
+        allowSpaces: false,
+        items: async ({ query }) =>
+          query.length < EmojiQueryMinimum
+            ? []
+            : searchEmojis(await loadEmojis(), query, EmojiSuggestionLimit),
+        command: ({ editor, range, props }) => {
+          editor.chain().focus().insertContentAt(range, props.emoji).run();
+        },
+        render: () => ({
+          onStart: (props) => onChange(read(props)),
+          onUpdate: (props) => onChange(read(props)),
+          onKeyDown: ({ event }) => onKeyDown(event),
+          onExit: () => onChange(null),
+        }),
+      }),
+    ];
+  },
+});
+
+/* -------------------------------------------------------------------------- */
+/* Alignment: an attribute markdown has no spelling for                        */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Alignment lives as an *attribute* on the paragraph/heading, so tiptap-markdown's
+ * html fallback — which only catches whole nodes and marks it does not know —
+ * never sees it, and a centred paragraph comes back left-aligned.
+ *
+ * So an aligned block is written as the one thing markdown does carry losslessly:
+ * inline HTML. Its content goes out as HTML too (`<strong>` rather than `**`),
+ * because markdown nested inside a block-level tag is not re-parsed on the way
+ * back in — the round trip has to be HTML the whole way down or not at all.
+ *
+ * Unaligned blocks, which is nearly all of them, are untouched and stay markdown.
+ */
+function writeAligned(
+  state: MarkdownSerializerState,
+  node: ProseMirrorNode
+): boolean {
+  const align: string | null = node.attrs.textAlign;
+  if (align === null || align === "left") return false;
+
+  state.write(getHTMLFromFragment(Fragment.from(node), node.type.schema));
+  state.closeBlock(node);
+  return true;
+}
+
 const ParagraphKeepingBlanks = Paragraph.extend({
   addStorage() {
     return {
       markdown: {
         serialize(state: MarkdownSerializerState, node: ProseMirrorNode) {
+          if (writeAligned(state, node)) return;
+
           if (node.childCount === 0) {
             state.write(BlankLine);
           } else {
@@ -233,13 +544,34 @@ const ParagraphKeepingBlanks = Paragraph.extend({
   },
 });
 
+const HeadingKeepingAlignment = Heading.extend({
+  addStorage() {
+    return {
+      markdown: {
+        serialize(state: MarkdownSerializerState, node: ProseMirrorNode) {
+          if (writeAligned(state, node)) return;
+
+          state.write(`${state.repeat("#", node.attrs.level)} `);
+          state.renderInline(node);
+          state.closeBlock(node);
+        },
+        parse: {},
+      },
+    };
+  },
+});
+
 type RichTextEditorProps = {
   /**
-   * The document content, stored/exchanged as Markdown. Markdown is a
-   * portable, human-readable format so persisted values are not locked into
-   * Tiptap's internal ProseMirror JSON representation.
+   * The document to load, in either spelling.
+   *
+   * Markdown is the portable one and stays the record of truth, so a stored
+   * value is never locked into ProseMirror's JSON. A `RichTextDoc` is that same
+   * document already parsed: handing one over skips the markdown parse, which
+   * is most of what mounting a description costs. Callers with both should pass
+   * the doc — see `richTextContent`.
    */
-  content?: string;
+  content?: string | RichTextDoc;
   editable?: boolean;
   autoFocus?: boolean;
   placeholder?: string;
@@ -247,8 +579,19 @@ type RichTextEditorProps = {
   /** When true, wraps the editor in a bordered box with the formatting toolbar.
    * When false, renders just the (read-only) content — for click-to-edit views. */
   chrome?: boolean;
-  /** Called with the current document as a Markdown string when focus leaves. */
-  onBlur?: (markdown: string) => void;
+  /**
+   * Called when focus leaves, with the document in both spellings so the caller
+   * can store the portable one and the fast one together. Handing back a single
+   * value rather than two arguments is deliberate: saving the markdown and
+   * forgetting the doc would leave a stale cache behind.
+   */
+  onBlur?: (value: RichTextValue) => void;
+  /**
+   * Called with the same value when Escape is pressed in the text — the
+   * keyboard's way out of the editor, which keeps what was written rather than
+   * discarding it. Left unset, Escape passes through untouched.
+   */
+  onEscape?: (value: RichTextValue) => void;
 } & TestIdProps;
 
 export function RichTextEditor({
@@ -259,63 +602,297 @@ export function RichTextEditor({
   className,
   chrome = true,
   onBlur,
+  onEscape,
   testId,
 }: RichTextEditorProps) {
+  // The `:` autocomplete: the plugin owns when it opens, React owns how it is
+  // drawn. Both halves of that also have to be readable from the ProseMirror
+  // keymap, which is built once and never sees a re-render — hence the refs.
+  const [suggestion, setSuggestion] = useState<EmojiSuggestionState | null>(
+    null
+  );
+  const [highlighted, setHighlighted] = useState(0);
+  const suggestionRef = useRef<EmojiSuggestionState | null>(null);
+  const highlightedRef = useRef(0);
+  // Escape dismisses the list without ending the shortcode, so the plugin stays
+  // active and keeps reporting matches — this is what keeps them off screen
+  // until the cursor has left the word it was offering for.
+  const dismissedRef = useRef(false);
+  suggestionRef.current = suggestion;
+  highlightedRef.current = highlighted;
+
+  /**
+   * What the editable element wears. Recomputed every render and re-applied
+   * below, because `useEditor` builds the editor once: everything passed here
+   * is a snapshot of the first render unless something says otherwise.
+   */
+  const editorAttributes = {
+    class: cn(
+      chrome ? "min-h-24 p-2" : "",
+      "outline-none md:text-sm",
+      className
+    ),
+    ...testProp(testId),
+  };
+
   const editor = useEditor({
     extensions: [
       // StarterKit ships a plain code block; swap it for the lowlight one so
       // fenced blocks are tokenised. Registering both would duplicate the node.
-      StarterKit.configure({ codeBlock: false, paragraph: false }),
+      StarterKit.configure({
+        codeBlock: false,
+        paragraph: false,
+        heading: false,
+      }),
       ParagraphKeepingBlanks,
+      HeadingKeepingAlignment,
       CodeBlockWithLanguage.configure({ lowlight }),
+      // Neither has a Markdown spelling. tiptap-markdown's `html: true` default
+      // catches them anyway: an unknown *mark* falls back to inline HTML
+      // (`<u>`, `<mark>`), which markdown carries and parses straight back.
+      // Alignment is an attribute rather than a mark, so it needs its own
+      // serializer — see `AlignedBlock`.
+      HighlightPen,
+      TextAlign.configure({ types: ["heading", "paragraph"] }),
+      // Checklists do have a markdown spelling (GFM `- [x]`), and tiptap-markdown
+      // ships the spec for it — so these round trip with no help from us.
+      TaskList,
+      TaskItem.configure({ nested: true }),
+      // A collapsible block, which is three nodes: the `<details>` wrapper, the
+      // always-visible `<summary>`, and the body that folds away. `persist`
+      // writes the open/shut state into the document, so a section left folded
+      // is still folded when the todo is reopened.
+      CalloutDetails,
+      DetailsSummary,
+      DetailsContent,
+      EmojiSuggestion.configure({
+        onChange: (next) => {
+          if (next === null) dismissedRef.current = false;
+          if (dismissedRef.current) return;
+          setSuggestion(next);
+          setHighlighted(0);
+        },
+        onKeyDown: (event) => {
+          const open = suggestionRef.current;
+          if (open === null || open.items.length === 0) return false;
+
+          if (event.key === "ArrowDown") {
+            setHighlighted((at) => (at + 1) % open.items.length);
+            return true;
+          }
+          if (event.key === "ArrowUp") {
+            setHighlighted(
+              (at) => (at - 1 + open.items.length) % open.items.length
+            );
+            return true;
+          }
+          if (event.key === "Enter" || event.key === "Tab") {
+            open.select(open.items[highlightedRef.current] ?? open.items[0]);
+            return true;
+          }
+          return false;
+        },
+      }),
       Markdown,
       Placeholder.configure({ placeholder }),
     ],
     content,
     editable,
-    autofocus: autoFocus ? "end" : false,
-    editorProps: {
-      attributes: {
-        class: cn(chrome ? "min-h-24 p-2" : "", "outline-none md:text-sm", className),
-        ...testProp(testId),
-      },
-    },
+    // Only when it is born editable. A mounted editor is handed over by the
+    // effect below, which focuses it then — autofocusing a read-only editor
+    // on page load would take the caret for a document nobody asked to write
+    // in.
+    autofocus: autoFocus && editable ? "end" : false,
+    editorProps: { attributes: editorAttributes },
     // Focus moving into the editor's own chrome (the toolbar, the link popover)
     // is not the user leaving the editor — reporting a blur there tears down
     // click-to-edit views mid-interaction, closing the editor as the popover
     // opens. Only a blur that lands outside counts.
     onBlur: ({ editor, event }) => {
       if (movedIntoEditorChrome(event)) return;
-      onBlur?.(getMarkdown(editor));
+      onBlur?.(valueOf(editor));
     },
+  });
+
+  /**
+   * Keeps a mounted editor in step with its props.
+   *
+   * `useEditor` reads its options once, at creation, and never looks at them
+   * again — so before this, flipping `editable` on a mounted editor changed
+   * nothing but the toolbar, leaving a full set of controls above a surface
+   * that could not be typed into. That is what lets one editor be handed
+   * between reading and writing instead of a second one being built: the
+   * document stays parsed and on screen, and only its editability changes.
+   *
+   * `autoFocus` is honoured on the handover rather than at mount, so the caret
+   * lands in the text at the moment it becomes writable.
+   */
+  useEffect(() => {
+    if (!editor) return;
+
+    const wasEditable = editor.isEditable;
+
+    if (wasEditable !== editable) editor.setEditable(editable);
+    editor.setOptions({ editorProps: { attributes: editorAttributes } });
+
+    if (autoFocus && editable && !wasEditable) {
+      editor.commands.focus("end");
+    }
+    // `editorAttributes` is a fresh object every render; the values inside it
+    // are what matter, so the effect keys on those instead.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, editable, autoFocus, editorAttributes.class, testId]);
+
+  /**
+   * Escape hands the document back and leaves the editor.
+   *
+   * Bound as a plain listener on the editable — the same route ctrl+K takes —
+   * rather than through ProseMirror's keymap, because a dialog above answers
+   * Escape from a *document-level capture* listener. That runs before anything
+   * here whatever the mount order, so the dialog cannot be beaten to the key;
+   * it is instead told to stand down (see `isEditingRichText`), and this fires
+   * afterwards on the way down to the target.
+   *
+   * No dependency array, matching the ctrl+K handler below: the listener closes
+   * over props that change, and re-binding each render is cheaper than the
+   * stale callback the alternative buys.
+   */
+  useEffect(() => {
+    if (!editor || onEscape === undefined) return;
+
+    const dom = editor.view.dom;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      // A layer inside the editor — the shortcode list — answers Escape by
+      // closing itself, and stops the key here so the editor stays open. See
+      // `EmojiSuggestions`.
+      onEscape(valueOf(editor));
+    };
+
+    dom.addEventListener("keydown", onKeyDown);
+    return () => dom.removeEventListener("keydown", onKeyDown);
   });
 
   // Sync when the content prop changes from the outside (e.g. after a refetch),
   // but never while the user is typing to avoid clobbering the cursor.
   useEffect(() => {
     if (!editor || editor.isFocused) return;
-    if (content === getMarkdown(editor)) return;
+    if (holdsContent(editor, content)) return;
     editor.commands.setContent(content);
   }, [content, editor]);
 
-  if (!chrome) {
-    return <EditorContent editor={editor} />;
-  }
+  const emojiList = editor && (
+    <EmojiSuggestions
+      editor={editor}
+      state={suggestion}
+      highlighted={highlighted}
+      onHighlight={setHighlighted}
+      onDismiss={() => {
+        dismissedRef.current = true;
+        setSuggestion(null);
+      }}
+    />
+  );
 
+  // One root either way. Returning a fragment when there is no chrome would
+  // put `EditorContent` under a different parent as `chrome` flips, which
+  // unmounts it — and rebuilding the view is the whole thing being avoided.
   return (
     <div
       data-editor-chrome=""
-      className="focus-within:ring-ring rounded-lg border focus-within:ring-1">
-      {editable && editor && <Toolbar editor={editor} />}
+      className={cn(
+        "rounded-lg",
+        chrome && "focus-within:ring-ring border focus-within:ring-1"
+      )}>
+      {chrome && editable && editor && <Toolbar editor={editor} />}
       <EditorContent editor={editor} />
+      {emojiList}
     </div>
+  );
+}
+
+/**
+ * The `:shortcode` list, anchored to the shortcode itself rather than to any
+ * element — same virtual-anchor trick as the link popover, and for the same
+ * reason (see `LinkButton`). It never takes focus: the user is mid-word, and
+ * the arrow keys are answered by the editor's own keymap.
+ */
+function EmojiSuggestions({
+  editor,
+  state,
+  highlighted,
+  onHighlight,
+  onDismiss,
+}: {
+  editor: Editor;
+  state: EmojiSuggestionState | null;
+  highlighted: number;
+  onHighlight: (at: number) => void;
+  onDismiss: () => void;
+}) {
+  const rect = useRef<DOMRect | null>(null);
+  const anchor = useRef({
+    getBoundingClientRect: () => rect.current ?? new DOMRect(),
+  });
+
+  if (state?.rect != null) rect.current = state.rect;
+
+  const items = state?.items ?? [];
+
+  return (
+    <Popover open={items.length > 0}>
+      <PopoverAnchor virtualRef={anchor} />
+      <PopoverContent
+        testId="editor.emoji.suggestions"
+        container={chrome(editor)}
+        data-editor-chrome=""
+        onOpenAutoFocus={(event) => event.preventDefault()}
+        // Escape is answered here rather than in the suggestion plugin's keymap:
+        // Radix marks the event handled from a document-level listener, and
+        // ProseMirror drops any key that already carries `defaultPrevented`, so
+        // the editor genuinely never sees it while this list is on screen.
+        //
+        // `stopPropagation` covers the editor's *own* Escape listener, which is
+        // a plain DOM handler on the editable and so is not bound by that. This
+        // runs in the capture phase on the way down, and the list is the
+        // innermost thing on screen: dismissing it must not also close the
+        // editor it was offering into.
+        onEscapeKeyDown={(event) => {
+          event.stopPropagation();
+          onDismiss();
+        }}
+        align="start"
+        side="bottom"
+        sideOffset={6}
+        className="max-h-64 w-56 overflow-y-auto p-1">
+        {items.map((emoji, at) => (
+          <button
+            key={emoji.name}
+            type="button"
+            {...testProp(`editor.emoji.suggestions.${emoji.name}.button`)}
+            onMouseDown={(event) => event.preventDefault()}
+            onMouseEnter={() => onHighlight(at)}
+            onClick={() => state?.select(emoji)}
+            className={cn(
+              "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm",
+              at === highlighted && "bg-accent"
+            )}>
+            <span className="text-base">{emoji.emoji}</span>
+            <span className="truncate">{emoji.shortcodes[0]}</span>
+          </button>
+        ))}
+      </PopoverContent>
+    </Popover>
   );
 }
 
 /** True when focus left for the toolbar or the link popover, not the page. */
 function movedIntoEditorChrome(event: FocusEvent) {
   const next = event.relatedTarget;
-  return next instanceof Element && next.closest("[data-editor-chrome]") !== null;
+  return (
+    next instanceof Element && next.closest("[data-editor-chrome]") !== null
+  );
 }
 
 // tiptap-markdown augments the editor storage at runtime but ships no types
@@ -324,6 +901,28 @@ type MarkdownStorage = { markdown: { getMarkdown: () => string } };
 
 function getMarkdown(editor: Editor): string {
   return (editor.storage as unknown as MarkdownStorage).markdown.getMarkdown();
+}
+
+/** The document the editor is holding, in both spellings. */
+function valueOf(editor: Editor): RichTextValue {
+  return {
+    doc: editor.getJSON() as RichTextDoc,
+    markdown: getMarkdown(editor),
+  };
+}
+
+/**
+ * Whether the editor already holds what it is being given, so a re-render does
+ * not reset the document under the user.
+ *
+ * Each spelling is compared in its own terms: markdown as text, a doc against
+ * the editor's own JSON. Serialising to compare is cheap next to the
+ * `setContent` it avoids, which tears the document down and rebuilds it.
+ */
+function holdsContent(editor: Editor, content: string | RichTextDoc): boolean {
+  return typeof content === "string"
+    ? content === getMarkdown(editor)
+    : JSON.stringify(content) === JSON.stringify(editor.getJSON());
 }
 
 function Toolbar({ editor }: { editor: Editor }) {
@@ -336,11 +935,13 @@ function Toolbar({ editor }: { editor: Editor }) {
       code: editor.isActive("code"),
       codeBlock: editor.isActive("codeBlock"),
       link: editor.isActive("link"),
-      h1: editor.isActive("heading", { level: 1 }),
-      h2: editor.isActive("heading", { level: 2 }),
-      bulletList: editor.isActive("bulletList"),
-      orderedList: editor.isActive("orderedList"),
+      underline: editor.isActive("underline"),
       blockquote: editor.isActive("blockquote"),
+      details: activeDetails(editor),
+      highlight: activeHighlight(editor),
+      block: activeBlock(editor),
+      list: activeList(editor),
+      align: activeAlign(editor),
       canUndo: editor.can().undo(),
       canRedo: editor.can().redo(),
     }),
@@ -349,111 +950,566 @@ function Toolbar({ editor }: { editor: Editor }) {
   return (
     <div
       {...testProp("editor.toolbar")}
-      className="flex flex-wrap items-center gap-0.5 border-b p-1">
-      <ToolbarButton
-        testId="editor.toolbar.bold.button"
-        label="Bold"
-        active={state.bold}
-        onClick={() => editor.chain().focus().toggleBold().run()}>
-        <Bold className="h-4 w-4" />
-      </ToolbarButton>
-      <ToolbarButton
-        testId="editor.toolbar.italic.button"
-        label="Italic"
-        active={state.italic}
-        onClick={() => editor.chain().focus().toggleItalic().run()}>
-        <Italic className="h-4 w-4" />
-      </ToolbarButton>
-      <ToolbarButton
-        testId="editor.toolbar.strike.button"
-        label="Strikethrough"
-        active={state.strike}
-        onClick={() => editor.chain().focus().toggleStrike().run()}>
-        <Strikethrough className="h-4 w-4" />
-      </ToolbarButton>
-      <ToolbarButton
-        testId="editor.toolbar.code.button"
-        label="Inline code"
-        active={state.code}
-        onClick={() => editor.chain().focus().toggleCode().run()}>
-        <Code className="h-4 w-4" />
-      </ToolbarButton>
-      <ToolbarButton
-        testId="editor.toolbar.codeblock.button"
-        label="Code block"
-        active={state.codeBlock}
-        onClick={() => editor.chain().focus().toggleCodeBlock().run()}>
-        <SquareCode className="h-4 w-4" />
-      </ToolbarButton>
-      <LinkButton editor={editor} active={state.link} />
-
-      <Divider />
-
-      <ToolbarButton
-        testId="editor.toolbar.h1.button"
-        label="Heading 1"
-        active={state.h1}
-        onClick={() =>
-          editor.chain().focus().toggleHeading({ level: 1 }).run()
-        }>
-        <Heading1 className="h-4 w-4" />
-      </ToolbarButton>
-      <ToolbarButton
-        testId="editor.toolbar.h2.button"
-        label="Heading 2"
-        active={state.h2}
-        onClick={() =>
-          editor.chain().focus().toggleHeading({ level: 2 }).run()
-        }>
-        <Heading2 className="h-4 w-4" />
-      </ToolbarButton>
-
-      <Divider />
-
-      <ToolbarButton
-        testId="editor.toolbar.bulletlist.button"
-        label="Bullet list"
-        active={state.bulletList}
-        onClick={() => editor.chain().focus().toggleBulletList().run()}>
-        <List className="h-4 w-4" />
-      </ToolbarButton>
-      <ToolbarButton
-        testId="editor.toolbar.orderedlist.button"
-        label="Numbered list"
-        active={state.orderedList}
-        onClick={() => editor.chain().focus().toggleOrderedList().run()}>
-        <ListOrdered className="h-4 w-4" />
-      </ToolbarButton>
-      <ToolbarButton
-        testId="editor.toolbar.quote.button"
-        label="Quote"
-        active={state.blockquote}
-        onClick={() => editor.chain().focus().toggleBlockquote().run()}>
-        <Quote className="h-4 w-4" />
-      </ToolbarButton>
-
-      <Divider />
-
+      className="flex flex-wrap items-center gap-0.5 border-b px-1.5 py-1">
       <ToolbarButton
         testId="editor.toolbar.undo.button"
         label="Undo"
         disabled={!state.canUndo}
         onClick={() => editor.chain().focus().undo().run()}>
-        <Undo2 className="h-4 w-4" />
+        <Undo2 />
       </ToolbarButton>
       <ToolbarButton
         testId="editor.toolbar.redo.button"
         label="Redo"
         disabled={!state.canRedo}
         onClick={() => editor.chain().focus().redo().run()}>
-        <Redo2 className="h-4 w-4" />
+        <Redo2 />
       </ToolbarButton>
+
+      <Divider />
+
+      <ToolbarMenu
+        editor={editor}
+        testId="editor.toolbar.block"
+        label="Turn into"
+        icon={blocks[state.block].icon}
+        options={blocks}
+        active={state.block}
+      />
+      <ToolbarMenu
+        editor={editor}
+        testId="editor.toolbar.list"
+        label="List"
+        icon={lists[state.list].icon}
+        options={lists}
+        active={state.list}
+      />
+      {/* Flat rather than inside the list menu: a quote is not a list, and it
+          is reached often enough to earn a button of its own. */}
+      <ToolbarButton
+        testId="editor.toolbar.quote.button"
+        label="Quote"
+        active={state.blockquote}
+        onClick={() => editor.chain().focus().toggleBlockquote().run()}>
+        <Quote />
+      </ToolbarButton>
+      <DetailsMenu editor={editor} variant={state.details} />
+
+      <Divider />
+
+      <ToolbarButton
+        testId="editor.toolbar.bold.button"
+        label="Bold"
+        active={state.bold}
+        onClick={() => editor.chain().focus().toggleBold().run()}>
+        <Bold />
+      </ToolbarButton>
+      <ToolbarButton
+        testId="editor.toolbar.italic.button"
+        label="Italic"
+        active={state.italic}
+        onClick={() => editor.chain().focus().toggleItalic().run()}>
+        <Italic />
+      </ToolbarButton>
+      <ToolbarButton
+        testId="editor.toolbar.strike.button"
+        label="Strikethrough"
+        active={state.strike}
+        onClick={() => editor.chain().focus().toggleStrike().run()}>
+        <Strikethrough />
+      </ToolbarButton>
+      <ToolbarButton
+        testId="editor.toolbar.underline.button"
+        label="Underline"
+        active={state.underline}
+        onClick={() => editor.chain().focus().toggleUnderline().run()}>
+        <UnderlineIcon />
+      </ToolbarButton>
+      <HighlightMenu editor={editor} colour={state.highlight} />
+
+      <Divider />
+
+      <ToolbarButton
+        testId="editor.toolbar.code.button"
+        label="Inline code"
+        active={state.code}
+        onClick={() => editor.chain().focus().toggleCode().run()}>
+        <Code />
+      </ToolbarButton>
+      <ToolbarButton
+        testId="editor.toolbar.codeblock.button"
+        label="Code block"
+        active={state.codeBlock}
+        onClick={() => editor.chain().focus().toggleCodeBlock().run()}>
+        <SquareCode />
+      </ToolbarButton>
+      <LinkButton editor={editor} active={state.link} />
+
+      <Divider />
+
+      <ToolbarMenu
+        editor={editor}
+        testId="editor.toolbar.align"
+        label="Align"
+        icon={alignments[state.align].icon}
+        options={alignments}
+        active={state.align}
+      />
+      <EmojiButton editor={editor} />
     </div>
   );
 }
 
+/**
+ * The emoji picker: the route for people who do not know the shortcode by
+ * heart, where typing `:tada` is the route for people who do.
+ *
+ * The catalogue is fetched the first time the picker is opened rather than with
+ * the editor — see `@/lib/emoji` — so the grid stands in as a skeleton for the
+ * moment that takes.
+ */
+function EmojiButton({ editor }: { editor: Editor }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [catalogue, setCatalogue] = useState<Emoji[] | null>(null);
+
+  useEffect(() => {
+    if (!open || catalogue !== null) return;
+
+    let live = true;
+    loadEmojis().then((emojis) => {
+      if (live) setCatalogue(emojis);
+    });
+    return () => {
+      live = false;
+    };
+  }, [open, catalogue]);
+
+  const results =
+    catalogue === null ? [] : searchEmojis(catalogue, query, EmojiPickerLimit);
+
+  const insert = (emoji: Emoji) => {
+    editor.chain().focus().insertContent(emoji.emoji).run();
+    setOpen(false);
+  };
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) setQuery("");
+      }}>
+      <PopoverTrigger asChild>
+        <ToolbarButton testId="editor.toolbar.emoji.button" label="Emoji">
+          <Smile />
+        </ToolbarButton>
+      </PopoverTrigger>
+
+      <PopoverContent
+        // Portalled into the editor for the same reason as the link popover.
+        container={chrome(editor)}
+        data-editor-chrome=""
+        align="start"
+        side="bottom"
+        sideOffset={8}
+        className="w-64 p-2">
+        <Input
+          testId="editor.toolbar.emoji.search.input"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search emoji"
+          autoFocus
+          className="h-8"
+        />
+
+        {catalogue === null ? (
+          <div
+            aria-busy
+            aria-label="Loading emoji"
+            {...testProp("editor.toolbar.emoji.loading")}
+            className="mt-2 grid grid-cols-8 gap-1">
+            {Array.from({ length: EmojiPickerSkeletons }, (_, at) => (
+              <Skeleton key={at} className="size-7 rounded-md" />
+            ))}
+          </div>
+        ) : (
+          <div className="mt-2 grid max-h-48 grid-cols-8 gap-1 overflow-y-auto">
+            {results.map((emoji) => (
+              <button
+                key={emoji.name}
+                type="button"
+                title={emoji.shortcodes[0]}
+                aria-label={emoji.name}
+                {...testProp(`editor.toolbar.emoji.${emoji.name}.button`)}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => insert(emoji)}
+                className="hover:bg-accent flex size-7 items-center justify-center rounded-md text-base">
+                {emoji.emoji}
+              </button>
+            ))}
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/** As many as the grid shows before it asks for a narrower search. */
+const EmojiPickerLimit = 64;
+
+/** One skeleton per cell of the grid the emoji will land in. */
+const EmojiPickerSkeletons = 24;
+
+/* -------------------------------------------------------------------------- */
+/* The grouped menus                                                           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * One entry in a toolbar menu: what it is called, the icon that stands for it
+ * both in the list and on the trigger while it is the current one, and the
+ * command that applies it.
+ */
+type ToolbarOption = {
+  label: string;
+  icon: ReactNode;
+  apply: (editor: Editor) => void;
+};
+
+/**
+ * The block the cursor sits in. Keyed rather than listed so the trigger can look
+ * the current one up to borrow its icon, the way the tiptap toolbar does.
+ */
+const blocks: Record<string, ToolbarOption> = {
+  paragraph: {
+    label: "Paragraph",
+    icon: <Pilcrow />,
+    apply: (editor) => editor.chain().focus().setParagraph().run(),
+  },
+  h1: {
+    label: "Heading 1",
+    icon: <Heading1 />,
+    apply: (editor) => editor.chain().focus().toggleHeading({ level: 1 }).run(),
+  },
+  h2: {
+    label: "Heading 2",
+    icon: <Heading2 />,
+    apply: (editor) => editor.chain().focus().toggleHeading({ level: 2 }).run(),
+  },
+  h3: {
+    label: "Heading 3",
+    icon: <Heading3 />,
+    apply: (editor) => editor.chain().focus().toggleHeading({ level: 3 }).run(),
+  },
+};
+
+const lists: Record<string, ToolbarOption> = {
+  none: {
+    label: "No list",
+    icon: <List />,
+    apply: (editor) => editor.chain().focus().clearNodes().setParagraph().run(),
+  },
+  bulletlist: {
+    label: "Bullet list",
+    icon: <List />,
+    apply: (editor) => editor.chain().focus().toggleBulletList().run(),
+  },
+  orderedlist: {
+    label: "Numbered list",
+    icon: <ListOrdered />,
+    apply: (editor) => editor.chain().focus().toggleOrderedList().run(),
+  },
+  tasklist: {
+    label: "To-do list",
+    icon: <ListTodo />,
+    apply: (editor) => editor.chain().focus().toggleTaskList().run(),
+  },
+};
+
+const alignments: Record<string, ToolbarOption> = {
+  left: {
+    label: "Align left",
+    icon: <AlignLeft />,
+    apply: (editor) => editor.chain().focus().setTextAlign("left").run(),
+  },
+  center: {
+    label: "Align center",
+    icon: <AlignCenter />,
+    apply: (editor) => editor.chain().focus().setTextAlign("center").run(),
+  },
+  right: {
+    label: "Align right",
+    icon: <AlignRight />,
+    apply: (editor) => editor.chain().focus().setTextAlign("right").run(),
+  },
+  justify: {
+    label: "Justify",
+    icon: <AlignJustify />,
+    apply: (editor) => editor.chain().focus().setTextAlign("justify").run(),
+  },
+};
+
+/** The variant of the section the cursor is in, or null when it is in none. */
+function activeDetails(editor: Editor): DetailsVariant | null {
+  if (!editor.isActive("details")) return null;
+  return editor.getAttributes("details").variant ?? "plain";
+}
+
+/** How each variant names and draws itself in the menu. */
+const detailsLooks: Record<
+  DetailsVariant,
+  { label: string; icon: ReactNode; tone: string }
+> = {
+  plain: { label: "Collapsible", icon: <ListCollapse />, tone: "" },
+  info: { label: "Info", icon: <Info />, tone: "text-callout-info" },
+  warning: {
+    label: "Warning",
+    icon: <TriangleAlert />,
+    tone: "text-callout-warning",
+  },
+  success: {
+    label: "Success",
+    icon: <CircleCheck />,
+    tone: "text-callout-success",
+  },
+  error: { label: "Error", icon: <CircleX />, tone: "text-callout-error" },
+};
+
+/**
+ * The collapsible section, and the four callouts it can be dressed as.
+ *
+ * Picking a look while the cursor already sits in a section re-dresses that one
+ * rather than nesting a second inside it. "Remove" is the only way back out —
+ * the extension ships no toggle, and without it a section could be created but
+ * never undone.
+ */
+function DetailsMenu({
+  editor,
+  variant,
+}: {
+  editor: Editor;
+  variant: DetailsVariant | null;
+}) {
+  const apply = (next: DetailsVariant) => {
+    const chain = editor.chain().focus();
+    if (variant === null) chain.setDetails();
+    chain.updateAttributes("details", { variant: next }).run();
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <ToolbarButton
+          testId="editor.toolbar.details.menu"
+          label="Collapsible section"
+          active={variant !== null}
+          width="wide">
+          <span className={variant === null ? "" : detailsLooks[variant].tone}>
+            {variant === null
+              ? detailsLooks.plain.icon
+              : detailsLooks[variant].icon}
+          </span>
+          <ChevronDown className="size-3 opacity-50" />
+        </ToolbarButton>
+      </DropdownMenuTrigger>
+
+      <DropdownMenuContent
+        container={chrome(editor)}
+        data-editor-chrome=""
+        align="start"
+        className="min-w-44">
+        {detailsVariants.map((option) => (
+          <DropdownMenuItem
+            key={option}
+            testId={`editor.toolbar.details.${option}.button`}
+            onMouseDown={(event) => event.preventDefault()}
+            onSelect={() => apply(option)}
+            className={cn(option === variant && "bg-accent")}>
+            <span className={detailsLooks[option].tone}>
+              {detailsLooks[option].icon}
+            </span>
+            {detailsLooks[option].label}
+          </DropdownMenuItem>
+        ))}
+
+        {variant !== null && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              testId="editor.toolbar.details.remove.button"
+              onMouseDown={(event) => event.preventDefault()}
+              onSelect={() => editor.chain().focus().unsetDetails().run()}>
+              <Ban />
+              Remove
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** The pen colour on the selection, or null when it is not highlighted. */
+function activeHighlight(editor: Editor): string | null {
+  if (!editor.isActive("highlight")) return null;
+  return editor.getAttributes("highlight").color ?? "yellow";
+}
+
+/**
+ * The pen, and the six ways to set it. Its trigger carries a bar in whatever
+ * colour is currently on the selection, so the toolbar says which pen is loaded
+ * without opening the menu.
+ */
+function HighlightMenu({
+  editor,
+  colour,
+}: {
+  editor: Editor;
+  colour: string | null;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <ToolbarButton
+          testId="editor.toolbar.highlight.menu"
+          label="Highlight"
+          active={colour !== null}
+          width="wide">
+          <span className="relative flex flex-col items-center">
+            <Highlighter />
+            <span
+              className={cn(
+                "mt-px h-[3px] w-4 rounded-full",
+                colour === null ? "bg-transparent" : swatch[colour]
+              )}
+            />
+          </span>
+          <ChevronDown className="size-3 opacity-50" />
+        </ToolbarButton>
+      </DropdownMenuTrigger>
+
+      <DropdownMenuContent
+        container={chrome(editor)}
+        data-editor-chrome=""
+        align="start"
+        className="min-w-40">
+        {highlightColours.map((option) => (
+          <DropdownMenuItem
+            key={option}
+            testId={`editor.toolbar.highlight.${option}.button`}
+            onMouseDown={(event) => event.preventDefault()}
+            onSelect={() =>
+              editor.chain().focus().setHighlight({ color: option }).run()
+            }
+            className={cn("capitalize", option === colour && "bg-accent")}>
+            <span className={cn("size-4 rounded-sm border", swatch[option])} />
+            {option}
+          </DropdownMenuItem>
+        ))}
+
+        <DropdownMenuSeparator />
+
+        <DropdownMenuItem
+          testId="editor.toolbar.highlight.none.button"
+          onMouseDown={(event) => event.preventDefault()}
+          onSelect={() => editor.chain().focus().unsetHighlight().run()}>
+          <Ban />
+          None
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/**
+ * Tailwind scans for whole class names, so the five have to appear literally —
+ * a `bg-highlight-${colour}` template would compile to nothing.
+ */
+const swatch: Record<string, string> = {
+  yellow: "bg-highlight-yellow",
+  green: "bg-highlight-green",
+  blue: "bg-highlight-blue",
+  pink: "bg-highlight-pink",
+  purple: "bg-highlight-purple",
+};
+
+function activeBlock(editor: Editor): string {
+  for (const level of [1, 2, 3]) {
+    if (editor.isActive("heading", { level })) return `h${level}`;
+  }
+  return "paragraph";
+}
+
+function activeList(editor: Editor): string {
+  if (editor.isActive("bulletList")) return "bulletlist";
+  if (editor.isActive("orderedList")) return "orderedlist";
+  if (editor.isActive("taskList")) return "tasklist";
+  return "none";
+}
+
+function activeAlign(editor: Editor): string {
+  for (const align of ["center", "right", "justify"]) {
+    if (editor.isActive({ textAlign: align })) return align;
+  }
+  return "left";
+}
+
+/**
+ * A group of related block commands collapsed behind one trigger, which wears
+ * the icon of whichever option is currently in effect. Keeps the toolbar to a
+ * single row in the ~600px description column, where fifteen flat buttons wrap.
+ */
+function ToolbarMenu({
+  editor,
+  testId,
+  label,
+  icon,
+  options,
+  active,
+}: TestIdProps & {
+  editor: Editor;
+  label: string;
+  icon: ReactNode;
+  options: Record<string, ToolbarOption>;
+  active: string;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <ToolbarButton testId={`${testId}.menu`} label={label} width="wide">
+          {icon}
+          <ChevronDown className="size-3 opacity-50" />
+        </ToolbarButton>
+      </DropdownMenuTrigger>
+
+      <DropdownMenuContent
+        // Same reason the link popover portals here: a modal dialog makes
+        // everything outside itself inert, and a blur landing outside the
+        // editor's chrome tears down click-to-edit views mid-interaction.
+        container={chrome(editor)}
+        data-editor-chrome=""
+        align="start"
+        className="min-w-44">
+        {Object.entries(options).map(([key, option]) => (
+          <DropdownMenuItem
+            key={key}
+            testId={`${testId}.${key}.button`}
+            // Keep the ProseMirror selection: without this the menu's own
+            // focus handling blurs the editor before the command runs.
+            onMouseDown={(event) => event.preventDefault()}
+            onSelect={() => option.apply(editor)}
+            className={cn(key === active && "bg-accent")}>
+            {option.icon}
+            {option.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function Divider() {
-  return <div className="bg-border mx-1 h-5 w-px" />;
+  return <Separator orientation="vertical" className="mx-1 !h-5" />;
 }
 
 /**
@@ -709,43 +1765,47 @@ function selectionViewportRect(editor: Editor): DOMRect | null {
   }
 }
 
-type ToolbarButtonProps = Omit<ComponentProps<"button">, "onClick"> &
-  TestIdProps & {
-    label: string;
-    active?: boolean;
-    disabled?: boolean;
-    /** Optional: a button inside a Radix trigger lets the trigger do the work. */
-    onClick?: () => void;
-    children: ReactNode;
-  };
+type ToolbarButtonProps = Omit<
+  ComponentProps<typeof Toggle>,
+  "onClick" | "pressed"
+> & {
+  label: string;
+  active?: boolean;
+  /** `wide` leaves room for the chevron a menu trigger carries. */
+  width?: "icon" | "wide";
+  /** Optional: a button inside a Radix trigger lets the trigger do the work. */
+  onClick?: () => void;
+  children: ReactNode;
+};
 
 function ToolbarButton({
   label,
   active = false,
-  disabled = false,
+  width = "icon",
   onClick,
-  testId,
+  className,
   children,
   ...props
 }: ToolbarButtonProps) {
   return (
-    <button
+    <Toggle
       {...props}
-      type="button"
+      size="sm"
+      pressed={active}
       aria-label={label}
-      aria-pressed={active}
       title={label}
-      disabled={disabled}
       // Keep the editor selection: prevent the click from blurring it.
       onMouseDown={(event) => event.preventDefault()}
       onClick={onClick}
-      {...testProp(testId)}
       className={cn(
-        "hover:bg-muted inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors",
-        "disabled:pointer-events-none disabled:opacity-40",
-        active && "bg-muted text-foreground"
+        // Full-strength ink rather than the muted grey a toolbar usually wears:
+        // that grey means "the editor is not focused", and this toolbar is only
+        // ever on screen while it is.
+        "text-foreground hover:text-foreground gap-0.5 disabled:opacity-40",
+        width === "icon" ? "w-8" : "px-1.5",
+        className
       )}>
       {children}
-    </button>
+    </Toggle>
   );
 }

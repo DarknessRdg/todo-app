@@ -1,26 +1,72 @@
 import { TodoList } from "./list";
-import { TodoModalContent } from "@/pages/inbox/todo-modal.tsx";
+import { TodoModalRoute } from "@/pages/inbox/todo-modal-route.tsx";
 import { RightRail } from "@/pages/inbox/right-rail.tsx";
-import { useNavigation } from "@/hooks/navigation.ts";
 import { NewInput } from "@/pages/inbox/new-input";
 import { useTodoList } from "@/pages/inbox/use-todo-list";
 import { Text } from "@/components/ui/text";
 import { type TestIdProps } from "@/lib/test-id";
+import { EmptyList } from "@/pages/inbox/empty-list";
+import { FilterBar } from "@/pages/inbox/filter-bar";
+import { useTodoFilter } from "@/pages/inbox/use-todo-filter";
+import { dayKey } from "@/lib/due-dates";
+import {
+  dayFromKey,
+  dueWindow,
+  isTodoFilterActive,
+  type TodoFilter,
+} from "@/lib/todo-filter";
+import { SearchX } from "lucide-react";
+import { useCallback, useMemo } from "react";
 
-const QueryParamsKeys = {
-  TodoId: "todo",
-};
+/** A due filter as one string, so it can be compared by value in a dep list. */
+function dueParam(due: TodoFilter["due"]): string {
+  return due.kind === "day"
+    ? due.day
+    : due.kind === "preset"
+      ? due.preset
+      : due.kind;
+}
 
 export function Inbox() {
+  // The hero reads the whole workspace, filtered or not: it is the summary the
+  // page is titled after, and a number that moves when you type in the search
+  // box is not a summary of anything.
   const { count, doneList } = useTodoList();
-  const { searchParams, removeQueryParms } = useNavigation();
-  const todoId = searchParams.get(QueryParamsKeys.TodoId);
+  const { filter, setFilter, updateFilter } = useTodoFilter();
 
   const doneCount = doneList?.length ?? 0;
   const openCount = count - doneCount;
   const percentage = count > 0 ? Math.round((doneCount / count) * 100) : 0;
 
-  const closeTodo = () => removeQueryParms(QueryParamsKeys.TodoId);
+  // The rail is a month of day buttons, and every keystroke in the search box
+  // is a new filter object. Memoised against what the calendar actually draws —
+  // the due window, and nothing else — so typing does not redraw the calendar.
+  const due = dueParam(filter.due);
+  const calendar = useMemo(
+    () => {
+      const today = new Date();
+      return {
+        highlight: dueWindow(filter.due, today),
+        selectedDay:
+          filter.due.kind === "day" ? dayFromKey(filter.due.day) : undefined,
+      };
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `due` is `filter.due`, by value
+    [due]
+  );
+
+  /** Clicking a day filters to it; clicking it again clears the filter. */
+  const pickDay = useCallback(
+    (day: Date | undefined) =>
+      updateFilter((previous) => ({
+        ...previous,
+        due:
+          day === undefined
+            ? { kind: "any" }
+            : { kind: "day", day: dayKey(day) },
+      })),
+    [updateFilter]
+  );
 
   return (
     <div className="flex items-start gap-8">
@@ -44,12 +90,37 @@ export function Inbox() {
           <NewInput />
         </div>
 
-        <TodoList />
+        <div className="mb-5">
+          <FilterBar filter={filter} onChange={setFilter} />
+        </div>
+
+        <TodoList
+          filter={filter}
+          empty={
+            isTodoFilterActive(filter) ? (
+              <EmptyList
+                testId="home.todo.empty.filtered"
+                icon={<SearchX className="size-5" />}
+                title="Nothing matches"
+                message="No todo fits the filters above. Widen them, or clear them to see the lot."
+              />
+            ) : undefined
+          }
+        />
       </div>
 
-      <RightRail />
+      {/*
+        The rail stays unfiltered on purpose: its calendar is how a day gets
+        picked, and a calendar showing only the day already picked cannot be
+        used to pick another. It highlights the filter instead of obeying it.
+      */}
+      <RightRail
+        highlight={calendar.highlight}
+        selectedDay={calendar.selectedDay}
+        onSelectDay={pickDay}
+      />
 
-      {todoId && <TodoModalContent id={todoId} onClose={closeTodo} />}
+      <TodoModalRoute />
     </div>
   );
 }

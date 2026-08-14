@@ -1,5 +1,6 @@
 import type { CreateTodoEntity } from "@/backend/todo-service";
 import { useAppForm, useFieldContext } from "@/components/app-form/app-form";
+import { ProjectSelect } from "@/components/project-select";
 import { TodoCheckerInput } from "@/components/todo";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -8,36 +9,32 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
 import { Text } from "@/components/ui/text";
 import { useTodoCreate } from "@/pages/inbox/use-todo-create";
-import {
-  CalendarIcon,
-  ChevronDownIcon,
-  FolderIcon,
-  SendIcon,
-} from "lucide-react";
+import { CalendarIcon, ChevronDownIcon, SendIcon } from "lucide-react";
 import { useState } from "react";
+import { projectForCapture } from "@/lib/todo-capture";
 
-export function NewInput() {
+/**
+ * `projectId` files whatever is captured into that project — the project page
+ * passes its own, so adding from there does not mean picking it again for
+ * every todo, and cannot file it anywhere else.
+ */
+export function NewInput({ projectId }: { projectId?: string } = {}) {
   const { create, validateField } = useTodoCreate();
 
   const form = useAppForm({
     defaultValues: {
       title: "",
       dueDate: new Date(),
+      projectId,
     } as CreateTodoEntity,
     onSubmit: ({ value, formApi }) => {
-      create.mutate(value);
+      create.mutate({
+        ...value,
+        projectId: projectForCapture(projectId, value.projectId),
+      });
       toast.success("Captured", { description: value.title });
       formApi.reset();
     },
@@ -100,9 +97,20 @@ export function NewInput() {
               )}
             />
 
-            <SelectProjectsButton />
-
-            <span className="kbd mr-0.5 hidden sm:inline-flex">↵</span>
+            <form.AppField
+              name="projectId"
+              children={(field) => (
+                <ProjectSelect
+                  testId="home.todo.create.project"
+                  value={field.state.value as string | undefined}
+                  onChange={(next) => field.handleChange(next)}
+                  placeholder="Inbox"
+                  // A page that pins a project shows it, and does not offer to
+                  // change it — the submit forces it either way.
+                  disabled={projectId !== undefined}
+                />
+              )}
+            />
 
             <form.SubmitButton
               testId="home.todo.create.submit"
@@ -180,27 +188,5 @@ function DueDateButton({ initial }: { initial: Date }) {
         />
       </PopoverContent>
     </Popover>
-  );
-}
-
-function SelectProjectsButton() {
-  return (
-    <Select>
-      <SelectTrigger
-        testId="home.todo.create.project.button"
-        className="text-muted-foreground hover:text-foreground h-8 gap-1.5 border-0 bg-transparent px-2 shadow-none"
-        size="sm">
-        <FolderIcon className="size-4" />
-        <SelectValue placeholder="Inbox" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectGroup>
-          <SelectLabel>Areas</SelectLabel>
-          <SelectItem value="personal">Personal</SelectItem>
-          <SelectItem value="work">Work</SelectItem>
-          <SelectItem value="learning">Learning</SelectItem>
-        </SelectGroup>
-      </SelectContent>
-    </Select>
   );
 }

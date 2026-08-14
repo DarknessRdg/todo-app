@@ -44,12 +44,46 @@ export function useTodoUpdate() {
     },
   });
 
+  const projectMutation = useMutation({
+    mutationFn: todoService.updateProject,
+    // The project is shown on the list row and throughout the detail, so both
+    // have to be refreshed.
+    onSuccess: (_data, { id }) => {
+      queryClient.invalidateQueries({ queryKey: [QueryTodoKey] });
+      queryClient.invalidateQueries({ queryKey: [QueryTodoDetailsKey, id] });
+    },
+    onError: (error) => {
+      console.error(error);
+
+      toast.error("Error", {
+        description: "An internal error happened while moving your todo",
+      });
+    },
+  });
+
+  const dueDateMutation = useMutation({
+    mutationFn: todoService.updateDueDate,
+    // The due date is a badge on the list row and a property on the detail.
+    onSuccess: (_data, { id }) => {
+      queryClient.invalidateQueries({ queryKey: [QueryTodoKey] });
+      queryClient.invalidateQueries({ queryKey: [QueryTodoDetailsKey, id] });
+    },
+    onError: (error) => {
+      console.error(error);
+
+      toast.error("Error", {
+        description: "An internal error happened while saving your due date",
+      });
+    },
+  });
+
   const checkMutation = useMutation({
     mutationFn: todoService.updateDone,
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: [QueryTodoKey],
-      });
+    // Done is shown in both places, so both have to be refreshed: the list this
+    // may have been toggled from, and the detail, which can toggle it too.
+    onSuccess: (_data, { id }) => {
+      queryClient.invalidateQueries({ queryKey: [QueryTodoKey] });
+      queryClient.invalidateQueries({ queryKey: [QueryTodoDetailsKey, id] });
     },
     onError: (error, params) => {
       console.error(error);
@@ -67,6 +101,8 @@ export function useTodoUpdate() {
   return {
     check: checkMutation,
     updateTitle: titleMutation,
+    updateProject: projectMutation,
+    updateDueDate: dueDateMutation,
     updateDescription: descriptionMutation,
   };
 }

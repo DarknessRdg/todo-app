@@ -18,7 +18,10 @@ export function TodoPage() {
   return (
     <TodoDetail id={id}>
       {(view) => (
-        <div className="mx-auto w-full max-w-5xl">
+        // Full width: the detail's own two-column grid already holds the
+        // reading measure, so capping the page as well only squeezed the
+        // properties column against the description.
+        <div className="w-full">
           <Button
             testId="todo.page.back.button"
             variant="ghost"

@@ -15,9 +15,15 @@
 
 const Defaults = {
   /** How long a just-completed row is held in place before it re-sorts. */
-  completionResortMs: 450,
+  completionResortMs: 500,
   /** How long the confetti burst stays mounted after a completion. */
-  confettiVisibleMs: 1400,
+  confettiVisibleMs: 700,
+  /**
+   * How long "Saved" stays on screen after a description is written, fade
+   * included. Long enough to be caught by someone looking away from the exact
+   * spot, short enough that it does not become part of the furniture.
+   */
+  savedVisibleMs: 2400,
 } as const;
 
 /**
@@ -46,6 +52,12 @@ export const Timing = {
     return readDelay(
       import.meta.env.VITE_CONFETTI_VISIBLE_MS,
       Defaults.confettiVisibleMs
+    );
+  },
+  get savedVisibleMs() {
+    return readDelay(
+      import.meta.env.VITE_SAVED_VISIBLE_MS,
+      Defaults.savedVisibleMs
     );
   },
 };

@@ -78,6 +78,106 @@ describe("TodoRepositoryIndexedDB", () => {
     });
   });
 
+  describe("when I complete a todo", () => {
+    it("Then it is stamped with when it was completed", async () => {
+      const todo = makeTodo({ done: false, doneAt: undefined });
+      const repository = await repositoryWith([todo]);
+      const before = Date.now();
+
+      await repository.updateDone({ id: todo.id, done: true });
+
+      const stored = await repository.getById(todo.id);
+      expect(stored?.doneAt).toBeInstanceOf(Date);
+      expect(stored!.doneAt!.getTime()).toBeGreaterThanOrEqual(before);
+    });
+
+    /**
+     * The completion stamp used to be written over `dueDate`, which silently
+     * rewrote a date the user had chosen every time they ticked the box.
+     */
+    it("Then the due date it was given is left alone", async () => {
+      const dueDate = new Date("2026-03-01T00:00:00.000Z");
+      const todo = makeTodo({ done: false, dueDate });
+      const repository = await repositoryWith([todo]);
+
+      await repository.updateDone({ id: todo.id, done: true });
+
+      const stored = await repository.getById(todo.id);
+      expect(stored?.dueDate).toEqual(dueDate);
+    });
+  });
+
+  describe("when I reopen a todo", () => {
+    it("Then the completion stamp is cleared, so it claims no completion date", async () => {
+      const todo = makeTodo({ done: true, doneAt: new Date() });
+      const repository = await repositoryWith([todo]);
+
+      await repository.updateDone({ id: todo.id, done: false });
+
+      const stored = await repository.getById(todo.id);
+      expect(stored?.doneAt).toBeUndefined();
+    });
+  });
+
+  describe("when I give a todo a due date", () => {
+    it("Then the stored todo carries it", async () => {
+      const todo = makeTodo({ dueDate: undefined });
+      const repository = await repositoryWith([todo]);
+      const dueDate = new Date("2026-09-01T00:00:00.000Z");
+
+      await repository.updateDueDate({ id: todo.id, dueDate });
+
+      const stored = await repository.getById(todo.id);
+      expect(stored?.dueDate).toEqual(dueDate);
+    });
+
+    it("Then clearing it takes the date away rather than zeroing it", async () => {
+      const todo = makeTodo({ dueDate: new Date("2026-09-01T00:00:00.000Z") });
+      const repository = await repositoryWith([todo]);
+
+      await repository.updateDueDate({ id: todo.id, dueDate: undefined });
+
+      const stored = await repository.getById(todo.id);
+      expect(stored?.dueDate).toBeUndefined();
+    });
+
+    it("Then the rest of the todo is left untouched", async () => {
+      const todo = makeTodo({ dueDate: undefined, done: true });
+      const repository = await repositoryWith([todo]);
+      const dueDate = new Date("2026-09-01T00:00:00.000Z");
+
+      await repository.updateDueDate({ id: todo.id, dueDate });
+
+      const stored = await repository.getById(todo.id);
+      expect(stored).toEqual({ ...todo, dueDate });
+    });
+  });
+
+  describe("when I move a todo to a project", () => {
+    it("Then the stored todo carries that project", async () => {
+      const todo = makeTodo({ projectId: undefined });
+      const repository = await repositoryWith([todo]);
+
+      await repository.updateProject({
+        id: todo.id,
+        projectId: "project-work",
+      });
+
+      const stored = await repository.getById(todo.id);
+      expect(stored?.projectId).toBe("project-work");
+    });
+
+    it("Then taking it out of every project clears the field", async () => {
+      const todo = makeTodo({ projectId: "project-work" });
+      const repository = await repositoryWith([todo]);
+
+      await repository.updateProject({ id: todo.id, projectId: undefined });
+
+      const stored = await repository.getById(todo.id);
+      expect(stored?.projectId).toBeUndefined();
+    });
+  });
+
   describe("when I retitle a todo", () => {
     it("Then the stored title is the new one", async () => {
       const todo = makeTodo({ title: "Water the plants" });
@@ -110,6 +210,48 @@ describe("TodoRepositoryIndexedDB", () => {
       ).rejects.toBeDefined();
 
       expect(await repository.count()).toBe(0);
+    });
+  });
+
+  describe("when I save a description", () => {
+    const doc = { type: "doc", content: [{ type: "paragraph" }] };
+
+    it("Then both the markdown and the parsed copy are stored", async () => {
+      const todo = makeTodo({ description: "the old notes" });
+      const repository = await repositoryWith([todo]);
+
+      await repository.updateDescription({
+        id: todo.id,
+        description: "the new notes",
+        descriptionDoc: doc,
+      });
+
+      const stored = await repository.getById(todo.id);
+      expect(stored?.description).toBe("the new notes");
+      expect(stored?.descriptionDoc).toEqual(doc);
+    });
+
+    /**
+     * The parsed copy is only ever valid for the markdown it was saved with, so
+     * a write that brings none has to take the old one away — left behind, it
+     * would be what the description is drawn from, showing text the todo no
+     * longer says.
+     */
+    it("Then saving without one clears the copy already there", async () => {
+      const todo = makeTodo({
+        description: "the old notes",
+        descriptionDoc: doc,
+      });
+      const repository = await repositoryWith([todo]);
+
+      await repository.updateDescription({
+        id: todo.id,
+        description: "the new notes",
+        descriptionDoc: undefined,
+      });
+
+      const stored = await repository.getById(todo.id);
+      expect(stored?.descriptionDoc).toBeUndefined();
     });
   });
 

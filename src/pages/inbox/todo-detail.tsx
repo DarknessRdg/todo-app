@@ -1,6 +1,6 @@
 import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { Progress } from "@/components/ui/progress.tsx";
-import { TodoChecker } from "@/components/todo.tsx";
+import { TodoCheckerInput } from "@/components/todo.tsx";
 import type { TodoEntity } from "@/backend/todo-service.ts";
 import { RichTextEditor } from "@/components/rich-text-editor.tsx";
 import { useTodoUpdate } from "@/pages/inbox/use-todo-update.ts";
@@ -9,32 +9,55 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import {
   DueBadge,
-  LabelChips,
   PriorityBadge,
-  ProjectBadge,
   StatusBadge,
   formatDate,
   metaFor,
   shortId,
 } from "@/pages/inbox/todo-meta.tsx";
 import {
+  BookOpen,
   CalendarIcon,
+  Check,
   CircleDot,
   FolderIcon,
+  PencilLine,
   Plus,
   SignalHigh,
   Tag,
   Trash2Icon,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ConfettiBurst } from "@/components/confetti-burst";
 import { InlineEdit } from "@/components/inline-edit";
+import { ProjectSelect } from "@/components/project-select";
+import { TodoProjectBadge } from "@/pages/inbox/todo-project-badge";
+import { useTodoProjectName } from "@/pages/inbox/use-todo-project";
+import { Timing } from "@/lib/timing";
+import { richTextContent, type RichTextValue } from "@/lib/rich-text";
+import { useSetting } from "@/hooks/use-setting";
+import { Calendar } from "@/components/ui/calendar";
+import { LabelPicker } from "@/components/label-picker";
+import {
+  useLabelCreate,
+  useLabels,
+  useTodoLabels,
+} from "@/pages/inbox/use-labels";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Text, textVariants } from "@/components/ui/text";
+import { Toggle } from "@/components/ui/toggle";
+import { TooltipText } from "@/components/ui/tooltip";
+import { dialogOf } from "@/lib/dialog-container";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router";
 import { testProp } from "@/lib/test-id";
 import { useTodoDetails } from "@/pages/inbox/use-todo-details.ts";
 import { TodoLookupFailed } from "@/components/todo-lookup-failed";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 /* -------------------------------------------------------------------------- */
 /* Header                                                                      */
@@ -55,8 +78,7 @@ export function TodoDetailHeader({
         <div className="text-muted-foreground flex items-center gap-2 text-xs font-medium">
           <span className="text-foreground/70">Inbox</span>
           <span className="opacity-40">/</span>
-          <span className="text-foreground/70">{meta.project}</span>
-          <span className="opacity-40">/</span>
+          <TodoBreadcrumbProject projectId={todo.projectId} />
           <span>{shortId(todo.id)}</span>
         </div>
         {actions ? (
@@ -66,7 +88,7 @@ export function TodoDetailHeader({
 
       <div className="flex items-start gap-3">
         <span className="mt-1.5 shrink-0">
-          <TodoChecker done={todo.done} />
+          <TodoCompletion todo={todo} />
         </span>
         <TitleEditor todo={todo} />
       </div>
@@ -75,7 +97,7 @@ export function TodoDetailHeader({
         <StatusBadge done={todo.done} />
         <PriorityBadge priority={meta.priority} />
         {todo.dueDate ? <DueBadge date={todo.dueDate} /> : null}
-        <ProjectBadge project={meta.project} />
+        <TodoProjectBadge projectId={todo.projectId} />
       </div>
     </header>
   );
@@ -89,10 +111,10 @@ export function TodoDetailBody({ todo }: { todo: TodoEntity }) {
   return (
     <div className="grid flex-1 items-stretch gap-8 lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_18rem]">
       <main className="flex min-w-0 flex-col gap-8">
-        <section className="flex flex-col gap-2.5">
-          <Text variant="eyebrow">Description</Text>
-          <DescriptionEditor todo={todo} />
-        </section>
+        {/* Keyed so nothing follows the pane to another todo: the save notice
+            belongs to the description it was written in, and read mode is a
+            way to read *this* one rather than a setting. */}
+        <Description key={todo.id} todo={todo} />
 
         <Subtasks todo={todo} />
       </main>
@@ -150,7 +172,9 @@ export function TodoDetail({ headerActions, ...props }: TodoDetailProps) {
   // Two components rather than a conditional hook: the id form has to read the
   // query, the model form must not.
   if (props.todo !== undefined) {
-    return <TodoDetailContent todo={props.todo} headerActions={headerActions} />;
+    return (
+      <TodoDetailContent todo={props.todo} headerActions={headerActions} />
+    );
   }
 
   return (
@@ -233,12 +257,63 @@ function ResolvedTodoDetail({
   });
 }
 
+/**
+ * Stands in for the detail while it is read, shaped like what is about to
+ * arrive: the header, the description block and the properties column all
+ * occupy the space they will take, so nothing jumps when the data lands.
+ */
 function DetailLoading() {
   return (
     <div
       {...testProp("todo.detail.loading")}
-      className="text-muted-foreground flex items-center gap-2 py-10 text-sm">
-      <Spinner /> Loading…
+      aria-busy
+      aria-label="Loading this todo"
+      className="flex min-h-full flex-col gap-8">
+      <header className="flex flex-col gap-4">
+        <Skeleton className="h-3 w-40" />
+
+        <div className="flex items-start gap-3">
+          <Skeleton className="mt-1 size-5 shrink-0 rounded-full" />
+          <Skeleton className="h-7 w-2/3" />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Skeleton className="h-6 w-20 rounded-full" />
+          <Skeleton className="h-6 w-16 rounded-full" />
+          <Skeleton className="h-6 w-24 rounded-full" />
+        </div>
+      </header>
+
+      <div className="grid flex-1 items-stretch gap-8 lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="flex min-w-0 flex-col gap-8">
+          <section className="flex flex-col gap-2.5">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-5/6" />
+            <Skeleton className="h-4 w-3/4" />
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <Skeleton className="h-3 w-20" />
+            {[0, 1, 2].map((row) => (
+              <div key={row} className="flex items-center gap-3">
+                <Skeleton className="size-5 shrink-0 rounded-full" />
+                <Skeleton className="h-4 w-1/2" />
+              </div>
+            ))}
+          </section>
+        </div>
+
+        <aside className="lg:border-border flex flex-col gap-3 lg:border-l lg:pl-8">
+          <Skeleton className="h-3 w-20" />
+          {[0, 1, 2, 3, 4].map((row) => (
+            <div key={row} className="flex items-center justify-between gap-3">
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-4 w-16" />
+            </div>
+          ))}
+        </aside>
+      </div>
     </div>
   );
 }
@@ -287,17 +362,15 @@ function PropertiesPanel({ todo }: { todo: TodoEntity }) {
       </PropertyRow>
 
       <PropertyRow icon={<FolderIcon className="size-3.5" />} label="Project">
-        <span className="text-sm">{meta.project}</span>
+        <TodoProjectPicker todo={todo} />
       </PropertyRow>
 
       <PropertyRow icon={<Tag className="size-3.5" />} label="Labels">
-        <LabelChips labels={meta.labels} className="justify-end" />
+        <TodoLabelPicker todo={todo} />
       </PropertyRow>
 
       <PropertyRow icon={<CalendarIcon className="size-3.5" />} label="Due">
-        <span className="text-xs tabular-nums">
-          {todo.dueDate ? formatDate(todo.dueDate) : "—"}
-        </span>
+        <DueDatePicker todo={todo} />
       </PropertyRow>
 
       <div className="my-3 border-t" />
@@ -311,7 +384,49 @@ function PropertiesPanel({ todo }: { todo: TodoEntity }) {
           {formatDate(todo.createdAt)}
         </span>
       </PropertyRow>
+
+      {/* Only once there is one: an open todo has no completion date, and a
+          row reading "—" is noise on every todo still to be done. */}
+      {todo.doneAt ? (
+        <PropertyRow label="Completed">
+          <span
+            {...testProp("todo.detail.completed.date")}
+            className="text-xs tabular-nums">
+            {formatDate(todo.doneAt)}
+          </span>
+        </PropertyRow>
+      ) : null}
     </aside>
+  );
+}
+
+/**
+ * The labels on this todo. Creating one from here puts it straight on, so a
+ * label that does not exist yet is not a reason to leave the todo.
+ */
+function TodoLabelPicker({ todo }: { todo: TodoEntity }) {
+  const { labels } = useLabels();
+  const setLabels = useTodoLabels();
+  const create = useLabelCreate();
+
+  return (
+    <LabelPicker
+      testId={`todo.detail.labels`}
+      labels={labels}
+      selectedIds={todo.labelIds}
+      onChange={(labelIds) => setLabels.mutate({ id: todo.id, labelIds })}
+      onCreate={async (name) => {
+        const label = await create.mutateAsync(name);
+        // The service hands back the label it made — or the one already going
+        // by that name — so it can go on without re-reading the list.
+        if (label !== undefined) {
+          setLabels.mutate({
+            id: todo.id,
+            labelIds: [...todo.labelIds, label.id],
+          });
+        }
+      }}
+    />
   );
 }
 
@@ -350,6 +465,159 @@ function Assignee({ name }: { name: string }) {
 /* Description + Subtasks                                                       */
 /* -------------------------------------------------------------------------- */
 
+/** The project segment of the breadcrumb, dropped when there is no project. */
+function TodoBreadcrumbProject({
+  projectId,
+}: {
+  projectId: string | undefined;
+}) {
+  const name = useTodoProjectName(projectId);
+
+  if (name === undefined) return null;
+
+  return (
+    <>
+      <span className="text-foreground/70">{name}</span>
+      <span className="opacity-40">/</span>
+    </>
+  );
+}
+
+/**
+ * Sets or clears the due date from the properties panel.
+ *
+ * Clearing is offered as plainly as picking: a date set by mistake is as
+ * common as one that was never wanted, and the only other way out would be
+ * choosing an arbitrary day to mean "none".
+ */
+function DueDatePicker({ todo }: { todo: TodoEntity }) {
+  const { updateDueDate } = useTodoUpdate();
+  const [open, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const dialog = dialogOf(trigger.current);
+
+  const choose = (dueDate: Date | undefined) => {
+    updateDueDate.mutate({ id: todo.id, dueDate });
+    setOpen(false);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          ref={trigger}
+          testId="todo.detail.duedate.button"
+          variant="ghost"
+          size="sm"
+          type="button"
+          className="text-muted-foreground hover:text-foreground -mr-2 h-7 gap-1.5 px-2">
+          <span className="text-xs tabular-nums">
+            {todo.dueDate ? formatDate(todo.dueDate) : "Add a date"}
+          </span>
+        </Button>
+      </PopoverTrigger>
+
+      <PopoverContent
+        container={dialog}
+        collisionBoundary={dialog}
+        collisionPadding={12}
+        align="end"
+        className="w-auto overflow-hidden p-0">
+        <Calendar
+          mode="single"
+          selected={todo.dueDate}
+          defaultMonth={todo.dueDate}
+          onSelect={(date) => (date ? choose(date) : undefined)}
+        />
+
+        <div className="flex items-center gap-1 border-t p-2">
+          <Button
+            testId="todo.detail.duedate.today"
+            variant="ghost"
+            size="sm"
+            className="grow"
+            onClick={() => choose(new Date())}>
+            Today
+          </Button>
+          {todo.dueDate ? (
+            <Button
+              testId="todo.detail.duedate.clear"
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-foreground grow"
+              onClick={() => choose(undefined)}>
+              Clear
+            </Button>
+          ) : null}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/** Moves the todo between projects, from the properties panel. */
+function TodoProjectPicker({ todo }: { todo: TodoEntity }) {
+  const { updateProject } = useTodoUpdate();
+
+  return (
+    <ProjectSelect
+      testId="todo.detail.project"
+      value={todo.projectId}
+      placeholder="No project"
+      onChange={(projectId) => updateProject.mutate({ id: todo.id, projectId })}
+      // The properties panel sits against the right edge, so the panel lines
+      // up with the trigger's right and opens inward.
+      align="end"
+      className="-mr-2 h-7"
+    />
+  );
+}
+
+/**
+ * The completion toggle beside the title.
+ *
+ * The mutation fires immediately, unlike the list row: nothing relocates when a
+ * todo is completed from its own detail, so there is no re-sort to hold still
+ * for. The burst is the same one the list plays.
+ */
+function TodoCompletion({ todo }: { todo: TodoEntity }) {
+  const { check } = useTodoUpdate();
+
+  // Keyed so each completion remounts the burst and it fires again.
+  const [burstKey, setBurstKey] = useState(0);
+  const [showBurst, setShowBurst] = useState(false);
+  const burstTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined
+  );
+
+  useEffect(() => () => window.clearTimeout(burstTimer.current), []);
+
+  const onToggle = (done: boolean) => {
+    if (done) {
+      setBurstKey((key) => key + 1);
+      setShowBurst(true);
+      burstTimer.current = setTimeout(
+        () => setShowBurst(false),
+        Timing.confettiVisibleMs
+      );
+    }
+
+    check.mutate({ id: todo.id, done });
+  };
+
+  return (
+    <div className="relative">
+      <TodoCheckerInput
+        testId="todo.detail.check.button"
+        done={todo.done}
+        aria-label={todo.done ? "Reopen this todo" : "Complete this todo"}
+        onToggle={onToggle}
+      />
+      {showBurst && <ConfettiBurst key={burstKey} />}
+    </div>
+  );
+}
+
 /**
  * Heading-sized in both states, so the text does not shift on the way into the
  * field. The two slots are styled separately, so the shared part is repeated
@@ -359,7 +627,7 @@ function Assignee({ name }: { name: string }) {
 // drift away from every other page heading.
 const titleType = cn(
   textVariants({ variant: "h1" }),
-  "font-display grow leading-snug"
+  "font-display grow px-2 py-0"
 );
 
 function TitleEditor({ todo }: { todo: TodoEntity }) {
@@ -375,9 +643,8 @@ function TitleEditor({ todo }: { todo: TodoEntity }) {
       <InlineEdit.Read
         asChild
         testId="todo.detail.title"
-        aria-label="Edit title"
-        className={titleType}>
-        <h1>{todo.title}</h1>
+        aria-label="Edit title">
+        <Text className={titleType}>{todo.title}</Text>
       </InlineEdit.Read>
 
       <InlineEdit.Input
@@ -388,57 +655,314 @@ function TitleEditor({ todo }: { todo: TodoEntity }) {
         // exactly where the heading had it, rather than jumping right.
         className={cn(
           titleType,
-          "h-auto rounded-lg border-transparent px-0 py-0 shadow-none focus-visible:border-transparent focus-visible:ring-2 md:text-2xl"
+          "h-auto rounded-lg border-transparent shadow-none focus-visible:border-transparent focus-visible:ring-2 md:text-2xl"
         )}
       />
     </InlineEdit>
   );
 }
 
-function DescriptionEditor({ todo }: { todo: TodoEntity }) {
+/**
+ * The description, and the switch that decides whether it is a field or a
+ * document.
+ *
+ * Click-to-edit costs the one thing reading needs: a click that would select a
+ * word instead turns the text into an editor, so a description cannot be
+ * skimmed with the cursor, quoted, or copied out of. Read mode gives that back
+ * for as long as it is on, and is per todo per visit rather than remembered —
+ * editing is what the detail is for, and a preference that quietly persisted
+ * would leave the next todo mysteriously refusing to open.
+ */
+function Description({ todo }: { todo: TodoEntity }) {
+  /**
+   * Which way this description is being read *right now*.
+   *
+   * `null` means nobody has said, so the setting decides and keeps deciding —
+   * changing the preference reaches a todo that is already open. Touching the
+   * toggle pins it for this visit only: it is keyed by todo above, so the next
+   * one starts from the setting again, and nothing is written anywhere.
+   */
+  const [override, setOverride] = useState<boolean | null>(null);
+  const [defaultView] = useSetting("defaultTodoView");
+  const readOnly = override ?? defaultView === "read";
+  // Owned here rather than in the editor below, because the section header is
+  // where the outcome of a save is reported — and it has to be the very same
+  // mutation that performed it, not a second one asked how it went.
   const { updateDescription } = useTodoUpdate();
 
   return (
-    <InlineEdit
-      value={todo.description ?? ""}
-      onCommit={(description) =>
-        updateDescription.mutate({ id: todo.id, description })
-      }>
-      <InlineEdit.Read
-        testId="todo.detail.description.read"
-        aria-label="Edit description"
-        // Read view only — the editor brings its own chrome and padding.
-        className="p-2">
-        {todo.description?.trim() ? (
-          <RichTextEditor
-            content={todo.description}
-            editable={false}
-            chrome={false}
-          />
-        ) : (
-          <Text variant="muted">Add a description…</Text>
-        )}
-      </InlineEdit.Read>
+    <section className="flex flex-col gap-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <Text variant="eyebrow">Description</Text>
 
-      {/*
-        Not `InlineEdit.Input`: the editor holds its own content and hands the
-        markdown back on blur, and Enter has to stay a newline rather than
-        saving.
-      */}
-      <InlineEdit.Edit>
-        {({ commit }) => (
-          <RichTextEditor
-            testId="todo.detail.description.editor"
-            content={todo.description}
-            placeholder="Add a description…"
-            editable
-            autoFocus
-            onBlur={commit}
-          />
-        )}
-      </InlineEdit.Edit>
-    </InlineEdit>
+        {/* Status and mode together on the right: both answer "what is this
+            description doing", and split apart they read as unrelated. */}
+        <div className="flex items-center gap-2">
+          <SaveState mutation={updateDescription} />
+
+          {/*
+            The button says which mode the description is *in*, not which one
+            the click leads to — an icon alone leaves the reader guessing which
+            of the two it means, and that guess is the whole point of the
+            control. The tooltip carries the action, so both readings are
+            answered.
+
+            Three signals move together so the state survives however it is
+            read: the word, the icon, and the sage fill that marks selected
+            everywhere else in the app. Colour alone would say nothing to a
+            reader who cannot separate it from the canvas.
+
+            The `on` hover is restated in the classes because the primitive's
+            own hover paints mist over that sage — the state would otherwise
+            drop out from under the cursor that is about to click it.
+          */}
+          <TooltipText
+            testId="todo.detail.description.readonly.tooltip"
+            text={readOnly ? "Switch back to editing" : "Switch to reading"}
+            asChild>
+            <Toggle
+              testId="todo.detail.description.readonly.toggle"
+              size="sm"
+              pressed={readOnly}
+              onPressedChange={setOverride}
+              // No `aria-label`: it would replace the visible word as the
+              // accessible name, leaving what is read aloud and what is on
+              // screen saying different things. Radix supplies the pressed
+              // state.
+              className="text-muted-foreground data-[state=on]:text-foreground data-[state=on]:hover:bg-accent data-[state=on]:hover:text-foreground -mr-1.5 h-7 gap-1.5 rounded-full px-2.5 text-xs font-medium [&_svg]:size-3.5">
+              {readOnly ? <BookOpen /> : <PencilLine />}
+              {readOnly ? "Reading" : "Editing"}
+            </Toggle>
+          </TooltipText>
+        </div>
+      </div>
+
+      <DescriptionEditor
+        todo={todo}
+        readOnly={readOnly}
+        updateDescription={updateDescription}
+      />
+    </section>
   );
+}
+
+/**
+ * Whether the description is being written, and whether the last write landed.
+ *
+ * The in-flight half is read straight off the mutation — the answer is already
+ * there, and it cannot drift from what actually happened. The confirmation is
+ * held for a beat and then goes, which is the one thing the mutation cannot say
+ * on its own: `isSuccess` stays true forever, and a permanent tick becomes part
+ * of the furniture rather than news.
+ *
+ * A failure says nothing here — the mutation raises a toast for that, and a
+ * quiet marker in a header is the wrong place to report something that needs
+ * acting on.
+ */
+function SaveState({
+  mutation,
+}: {
+  mutation: ReturnType<typeof useTodoUpdate>["updateDescription"];
+}) {
+  const { isPending, isSuccess, submittedAt } = mutation;
+  const [confirming, setConfirming] = useState(false);
+
+  // Keyed on `submittedAt` rather than on success alone: it changes with every
+  // write, so a second save re-arms the notice instead of the first one's timer
+  // deciding how long the second is seen for.
+  useEffect(() => {
+    if (!isSuccess) return;
+
+    setConfirming(true);
+    const timer = setTimeout(() => setConfirming(false), Timing.savedVisibleMs);
+
+    return () => clearTimeout(timer);
+  }, [isSuccess, submittedAt]);
+
+  if (isPending) {
+    return (
+      <span
+        {...testProp("todo.detail.description.saving")}
+        role="status"
+        className="text-muted-foreground text-xs">
+        Saving…
+      </span>
+    );
+  }
+
+  if (!confirming) return null;
+
+  return (
+    <span
+      {...testProp("todo.detail.description.saved")}
+      // Announced rather than only drawn: the tick and the colour are the whole
+      // message, and neither reaches a screen reader.
+      role="status"
+      // The fade is CSS and the unmount is the timer above, both running off
+      // `savedVisibleMs` — so the notice cannot finish fading and then sit
+      // there invisible, or vanish mid-fade.
+      style={{ animationDuration: `${Timing.savedVisibleMs}ms` }}
+      className="text-success animate-saved-notice flex items-center gap-1 text-xs font-medium">
+      <Check className="size-3.5" />
+      Saved
+    </span>
+  );
+}
+
+/**
+ * The description: one editor, handed between reading and writing rather than
+ * torn down and rebuilt.
+ *
+ * It used to be two `RichTextEditor`s in `InlineEdit`'s mutually exclusive
+ * slots, so every click destroyed a ProseMirror instance and constructed a
+ * second — 48ms of teardown and rebuild to make text typeable that was already
+ * parsed and on screen. Handing one over instead costs 14ms, and the document
+ * never leaves the page.
+ *
+ * `InlineEdit` still owns the title, where the two states are genuinely
+ * different controls (a heading and an input) and nothing expensive is built.
+ */
+function DescriptionEditor({
+  todo,
+  readOnly,
+  updateDescription,
+}: {
+  todo: TodoEntity;
+  readOnly: boolean;
+  updateDescription: ReturnType<typeof useTodoUpdate>["updateDescription"];
+}) {
+  const [editing, setEditing] = useState(false);
+  // Escape saves and closes, and closing blurs the editor, which saves again.
+  // The same guard `InlineEdit` keeps, for the same reason.
+  const settled = useRef(false);
+
+  const editable = editing && !readOnly;
+
+  // Read mode arriving mid-edit closes the editor rather than leaving it open
+  // and inert. Nothing is committed here: whatever turned read mode on took
+  // focus out of the editor first, and that blur is what saves.
+  if (readOnly && editing) setEditing(false);
+
+  const open = () => {
+    if (readOnly) return;
+
+    settled.current = false;
+    setEditing(true);
+  };
+
+  const commit = (value: RichTextValue) => {
+    if (settled.current) return;
+    settled.current = true;
+    setEditing(false);
+
+    const next = value.markdown.trim();
+
+    // An unchanged description is not worth a write, and the parsed copy
+    // beside it is only ever saved with the markdown it belongs to.
+    if (next === (todo.description ?? "").trim()) return;
+
+    updateDescription.mutate({
+      id: todo.id,
+      description: next,
+      descriptionDoc: value.doc,
+    });
+  };
+
+  // Nothing written yet: the invitation stands in for the editor, and the
+  // editor is built when it is accepted. There is no parsed document to keep
+  // alive in this state, so nothing is saved by holding one open.
+  if (!todo.description?.trim() && !editing) {
+    return (
+      <div
+        {...testProp("todo.detail.description.read")}
+        {...openers({ readOnly, open })}
+        className={cn(
+          "rounded-lg border border-transparent p-2 transition-colors",
+          readOnly ? "cursor-auto" : "hover:border-border cursor-text"
+        )}>
+        {/* In read mode there is nothing to add either — the invitation would
+            name an action the click cannot perform. */}
+        <Text variant="muted">
+          {readOnly ? "No description" : "Add a description…"}
+        </Text>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      {...openers({ readOnly, open, editable })}
+      className={cn(
+        "rounded-lg transition-colors",
+        // The editor brings its own chrome and padding once it is open; until
+        // then this stands in for it, so the text does not shift on the way in.
+        editable
+          ? "border border-transparent"
+          : cn(
+              "border border-transparent p-2",
+              readOnly ? "cursor-auto" : "hover:border-border cursor-text"
+            )
+      )}>
+      <RichTextEditor
+        /*
+          Two names for one element, by the state it is in. A spec asking
+          whether the read view or the editor is on screen is asking which of
+          the two this description is currently being — which is exactly what
+          it was asking when they were separate components.
+        */
+        testId={
+          editable
+            ? "todo.detail.description.editor"
+            : "todo.detail.description.read"
+        }
+        // The parsed copy when the todo has one, the markdown when it does
+        // not — which is what makes an old row still readable.
+        content={richTextContent(todo.description, todo.descriptionDoc)}
+        placeholder="Add a description…"
+        editable={editable}
+        chrome={editable}
+        autoFocus
+        onBlur={commit}
+        // Escape is the keyboard's way out, and it keeps the writing: the same
+        // commit clicking away performs. Deliberately not the `cancel` that
+        // Escape means in a single-line field — a description is long enough
+        // that discarding it silently would be a loss, where a title can be
+        // retyped in seconds.
+        onEscape={commit}
+      />
+    </div>
+  );
+}
+
+/**
+ * What makes the resting description openable: a click, a tab stop and a key.
+ *
+ * Nothing at all while it is already open, or while read mode is on — that is
+ * the whole point of read mode, and a tab stop onto something that cannot be
+ * activated is a dead end for anyone using the keyboard.
+ */
+function openers({
+  readOnly,
+  open,
+  editable = false,
+}: {
+  readOnly: boolean;
+  open: () => void;
+  editable?: boolean;
+}) {
+  if (readOnly || editable) return {};
+
+  return {
+    "aria-label": "Edit description",
+    tabIndex: 0,
+    onClick: open,
+    onKeyDown: (event: React.KeyboardEvent) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        open();
+      }
+    },
+  };
 }
 
 function Subtasks({ todo }: { todo: TodoEntity }) {

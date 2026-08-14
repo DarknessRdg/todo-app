@@ -52,5 +52,31 @@ describe("routing", () => {
       expect(await screen.findByTestId(comingSoon)).toBeInTheDocument();
       expect(screen.queryByTestId(notFound)).not.toBeInTheDocument();
     });
+
+    it("Then /settings is a page of its own, not the placeholder", async () => {
+      renderAt("/settings");
+
+      expect(
+        await screen.findByTestId("settings.page.title")
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId(comingSoon)).not.toBeInTheDocument();
+      expect(screen.queryByTestId(notFound)).not.toBeInTheDocument();
+    });
+
+    it("Then /labels is the built view, not the placeholder", async () => {
+      renderAt("/labels");
+
+      expect(
+        await screen.findByTestId("labels.page.title")
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId(comingSoon)).not.toBeInTheDocument();
+    });
+
+    it("Then /today is the built view, not the placeholder", async () => {
+      renderAt("/today");
+
+      expect(await screen.findByTestId("today.page.title")).toBeInTheDocument();
+      expect(screen.queryByTestId(comingSoon)).not.toBeInTheDocument();
+    });
   });
 });

@@ -23,9 +23,28 @@ contrast, not decoration.
 | Ink | `#1f1f1f` | Primary text; the single dark action button; selected/Urgent | `--foreground`, `--primary`, `--color-ink` |
 
 Supporting: `--muted-foreground` `#737373` (secondary text), `--border` `#e7e7e7`
-(soft dividers / input hairline), `--destructive` `#d64545` (the only non-mono color,
-delete only), `--ring` `#1f1f1f` (ink focus). Registered neutral-named brand
-constants: `--color-ink`, `--color-sage`, `--color-mist`.
+(soft dividers / input hairline), `--input` `#a8a8a8` (control hairline),
+`--ring` `#1f1f1f` (ink focus). Registered neutral-named brand constants:
+`--color-ink`, `--color-sage`, `--color-mist`.
+
+### Color outside the ramp
+
+Four places, all token-driven. Retune the variables — in **both** `:root` and
+`.dark` — rather than introducing a hue anywhere else.
+
+| Token(s) | Where | Why it is allowed |
+|---|---|---|
+| `--destructive` `#d64545` | delete only | destruction must not read as an ordinary action |
+| `--link` `#2563eb` (`#7ba7f5` dark) | `.tiptap a` | a link that looks like body text is not a link |
+| `--code-keyword` / `-string` / `-number` / `-function` / `-comment` | `.tiptap .hljs-*` | syntax highlighting is information, not decoration |
+| `--highlight-yellow` / `-green` / `-blue` / `-pink` / `-purple` | `.tiptap mark[data-highlight]` | the reader picks the pen; five colors that cannot be told apart are one color |
+
+The marker-pen ramp is washed-out for the same reason the code palette is
+desaturated: it is a fill sitting behind ink-black body text, not decoration.
+The colour is stored on the document as a **token name** (`data-highlight="green"`),
+never a literal — a hex baked into a saved note could not follow the theme, and
+would stay a light pastel on the near-black dark canvas. An uncoloured `mark`
+falls back to sage, the system's ordinary "picked out" tint.
 
 Charts / data: a **grayscale ramp** (`#1f1f1f → #737373 → #a3a3a3 → #d4d4d4`) with
 one deep-sage step (`#c7cbb0`). No rainbow categorical colors.
@@ -89,7 +108,9 @@ one deep-sage step (`#c7cbb0`). No rainbow categorical colors.
 - Don't add borders to content cards (fill distinguishes them). Don't add shadows or
   gradients.
 - Don't introduce categorical/brand colors for badges or charts — grayscale + the
-  single sage accent only. (`--destructive` red is the sole exception, delete-only.)
+  single sage accent only. The only hues that exist are the four rows in
+  "Color outside the ramp" above, and none of them are reachable from a badge,
+  a chart, or a chrome surface.
 - Don't use serif or mono for UI (mono = code only).
 - Don't hard-code hexes in components — go through the semantic tokens.
 

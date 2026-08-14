@@ -7,6 +7,13 @@ import { vi, type Mock } from "vitest";
 
 import type { TodoEntity, TodoRepository } from "@/backend/todo-service";
 import { TodoService } from "@/backend/todo-service";
+import type { LabelEntity, LabelRepository } from "@/backend/label-service";
+import { LabelService } from "@/backend/label-service";
+import type {
+  ProjectEntity,
+  ProjectRepository,
+} from "@/backend/project-service";
+import { ProjectService } from "@/backend/project-service";
 import { ContainerContext } from "@/di-container/hook";
 import { Dependencies } from "@/di-container";
 
@@ -32,16 +39,32 @@ export function mockTodoRepository(
     listAll: vi.fn<TodoRepository["listAll"]>().mockResolvedValue([]),
     create: vi.fn<TodoRepository["create"]>().mockResolvedValue(undefined),
     delete: vi.fn<TodoRepository["delete"]>().mockResolvedValue(undefined),
-    updateDone: vi.fn<TodoRepository["updateDone"]>().mockResolvedValue(undefined),
+    updateDone: vi
+      .fn<TodoRepository["updateDone"]>()
+      .mockResolvedValue(undefined),
     updateTitle: vi
       .fn<TodoRepository["updateTitle"]>()
+      .mockResolvedValue(undefined),
+    updateProject: vi
+      .fn<TodoRepository["updateProject"]>()
+      .mockResolvedValue(undefined),
+    updateDueDate: vi
+      .fn<TodoRepository["updateDueDate"]>()
       .mockResolvedValue(undefined),
     updateDescription: vi
       .fn<TodoRepository["updateDescription"]>()
       .mockResolvedValue(undefined),
+    updateLabels: vi
+      .fn<TodoRepository["updateLabels"]>()
+      .mockResolvedValue(undefined),
+    removeLabelEverywhere: vi
+      .fn<TodoRepository["removeLabelEverywhere"]>()
+      .mockResolvedValue(undefined),
     count: vi.fn<TodoRepository["count"]>().mockResolvedValue(0),
     getById: vi.fn<TodoRepository["getById"]>().mockResolvedValue(undefined),
-    addSubtask: vi.fn<TodoRepository["addSubtask"]>().mockResolvedValue(undefined),
+    addSubtask: vi
+      .fn<TodoRepository["addSubtask"]>()
+      .mockResolvedValue(undefined),
     updateSubtaskDone: vi
       .fn<TodoRepository["updateSubtaskDone"]>()
       .mockResolvedValue(undefined),
@@ -65,18 +88,23 @@ export function inMemoryTodoRepository(
   const rows: TodoEntity[] = initial.map((row) => ({
     ...row,
     subtasks: row.subtasks.map((subtask) => ({ ...subtask })),
+    labelIds: [...row.labelIds],
   }));
   const find = (id: string) => rows.find((row) => row.id === id);
 
   return mockTodoRepository({
     listAll: vi.fn<TodoRepository["listAll"]>(async () =>
-      rows.map((row) => ({ ...row, subtasks: [...row.subtasks] }))
+      rows.map((row) => ({
+        ...row,
+        subtasks: [...row.subtasks],
+        labelIds: [...row.labelIds],
+      }))
     ),
     getById: vi.fn<TodoRepository["getById"]>(async (id) => {
       const row = find(id);
       return row === undefined
         ? undefined
-        : { ...row, subtasks: [...row.subtasks] };
+        : { ...row, subtasks: [...row.subtasks], labelIds: [...row.labelIds] };
     }),
     count: vi.fn<TodoRepository["count"]>(async () => rows.length),
     create: vi.fn<TodoRepository["create"]>(async (todo) => {
@@ -88,8 +116,25 @@ export function inMemoryTodoRepository(
     }),
     updateDone: vi.fn<TodoRepository["updateDone"]>(async ({ id, done }) => {
       const row = find(id);
-      if (row) row.done = done;
+      if (!row) return;
+
+      row.done = done;
+      // Stamped and cleared exactly as the real adapter does, so a spec reading
+      // the completion date back is not being told a story by the fake.
+      row.doneAt = done ? new Date() : undefined;
     }),
+    updateProject: vi.fn<TodoRepository["updateProject"]>(
+      async ({ id, projectId }) => {
+        const row = find(id);
+        if (row) row.projectId = projectId;
+      }
+    ),
+    updateDueDate: vi.fn<TodoRepository["updateDueDate"]>(
+      async ({ id, dueDate }) => {
+        const row = find(id);
+        if (row) row.dueDate = dueDate;
+      }
+    ),
     updateTitle: vi.fn<TodoRepository["updateTitle"]>(async ({ id, title }) => {
       const row = find(id);
       if (row) row.title = title;
@@ -98,6 +143,19 @@ export function inMemoryTodoRepository(
       async ({ id, description }) => {
         const row = find(id);
         if (row) row.description = description;
+      }
+    ),
+    updateLabels: vi.fn<TodoRepository["updateLabels"]>(
+      async ({ id, labelIds }) => {
+        const row = find(id);
+        if (row) row.labelIds = [...labelIds];
+      }
+    ),
+    removeLabelEverywhere: vi.fn<TodoRepository["removeLabelEverywhere"]>(
+      async (labelId) => {
+        for (const row of rows) {
+          row.labelIds = row.labelIds.filter((it) => it !== labelId);
+        }
       }
     ),
     addSubtask: vi.fn<TodoRepository["addSubtask"]>(async ({ id, subtask }) => {
@@ -125,16 +183,120 @@ export function inMemoryTodoRepository(
   });
 }
 
+/** The ProjectRepository port, each method a typed `vi.fn()`. */
+export type MockProjectRepository = {
+  [K in keyof ProjectRepository]: Mock<ProjectRepository[K]>;
+};
+
+export function mockProjectRepository(
+  overrides: Partial<MockProjectRepository> = {}
+): MockProjectRepository {
+  return {
+    listAll: vi.fn<ProjectRepository["listAll"]>().mockResolvedValue([]),
+    create: vi.fn<ProjectRepository["create"]>().mockResolvedValue(undefined),
+    findByName: vi
+      .fn<ProjectRepository["findByName"]>()
+      .mockResolvedValue(undefined),
+    ...overrides,
+  };
+}
+
 /**
- * Builds the same container shape the app uses, but backed by a mock repository
+ * A `mockProjectRepository` whose reads reflect its own writes, so a spec can
+ * create a project inline and then find it in the list.
+ */
+export function inMemoryProjectRepository(
+  initial: ProjectEntity[] = []
+): MockProjectRepository {
+  const rows: ProjectEntity[] = initial.map((row) => ({ ...row }));
+
+  return mockProjectRepository({
+    listAll: vi.fn<ProjectRepository["listAll"]>(async () =>
+      [...rows].sort((a, b) => a.name.localeCompare(b.name))
+    ),
+    create: vi.fn<ProjectRepository["create"]>(async (project) => {
+      rows.push({ ...project });
+    }),
+    findByName: vi.fn<ProjectRepository["findByName"]>(async (name) => {
+      const wanted = name.trim().toLocaleLowerCase();
+      return rows.find((row) => row.name.toLocaleLowerCase() === wanted);
+    }),
+  });
+}
+
+/** The LabelRepository port, each method a typed `vi.fn()`. */
+export type MockLabelRepository = {
+  [K in keyof LabelRepository]: Mock<LabelRepository[K]>;
+};
+
+export function mockLabelRepository(
+  overrides: Partial<MockLabelRepository> = {}
+): MockLabelRepository {
+  return {
+    listAll: vi.fn<LabelRepository["listAll"]>().mockResolvedValue([]),
+    create: vi.fn<LabelRepository["create"]>().mockResolvedValue(undefined),
+    rename: vi.fn<LabelRepository["rename"]>().mockResolvedValue(undefined),
+    delete: vi.fn<LabelRepository["delete"]>().mockResolvedValue(undefined),
+    findByName: vi
+      .fn<LabelRepository["findByName"]>()
+      .mockResolvedValue(undefined),
+    ...overrides,
+  };
+}
+
+/**
+ * A `mockLabelRepository` whose reads reflect its own writes, so a spec can
+ * create a label and then find it in the list.
+ */
+export function inMemoryLabelRepository(
+  initial: LabelEntity[] = []
+): MockLabelRepository {
+  const rows: LabelEntity[] = initial.map((row) => ({ ...row }));
+
+  return mockLabelRepository({
+    listAll: vi.fn<LabelRepository["listAll"]>(async () =>
+      [...rows].sort((a, b) => a.name.localeCompare(b.name))
+    ),
+    create: vi.fn<LabelRepository["create"]>(async (label) => {
+      rows.push({ ...label });
+    }),
+    rename: vi.fn<LabelRepository["rename"]>(async ({ id, name }) => {
+      const row = rows.find((it) => it.id === id);
+      if (row) row.name = name;
+    }),
+    delete: vi.fn<LabelRepository["delete"]>(async (id) => {
+      const index = rows.findIndex((row) => row.id === id);
+      if (index >= 0) rows.splice(index, 1);
+    }),
+    findByName: vi.fn<LabelRepository["findByName"]>(async (name) => {
+      const wanted = name.trim().toLocaleLowerCase();
+      return rows.find((row) => row.name.toLocaleLowerCase() === wanted);
+    }),
+  });
+}
+
+/**
+ * Builds the same container shape the app uses, but backed by mock repositories
  * — no IndexedDB is opened, so this is synchronous unlike `createDIContainer()`.
  */
-export function createTestContainer(repository: TodoRepository = mockTodoRepository()) {
+export function createTestContainer(
+  repository: TodoRepository = mockTodoRepository(),
+  projectRepository: ProjectRepository = mockProjectRepository(),
+  labelRepository: LabelRepository = mockLabelRepository()
+) {
   const container = new Container({ defaultScope: "Singleton" });
 
   container
     .bind<TodoService>(Dependencies.TodoService)
     .toConstantValue(new TodoService({ repository }));
+
+  container
+    .bind<ProjectService>(Dependencies.ProjectService)
+    .toConstantValue(new ProjectService({ repository: projectRepository }));
+
+  container
+    .bind<LabelService>(Dependencies.LabelService)
+    .toConstantValue(new LabelService({ repository: labelRepository }));
 
   return container;
 }
@@ -166,7 +328,10 @@ export function renderWithContainer(
     diContainer = createTestContainer(),
     route,
     queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
     }),
     ...renderOptions
   } = options;
@@ -181,7 +346,9 @@ export function renderWithContainer(
   function Wrapper({ children }: PropsWithChildren) {
     const tree = (
       <ContainerContext.Provider value={diContainer}>
-        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        <QueryClientProvider client={queryClient}>
+          {children}
+        </QueryClientProvider>
       </ContainerContext.Provider>
     );
 

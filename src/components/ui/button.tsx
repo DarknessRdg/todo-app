@@ -18,7 +18,7 @@ const buttonVariants = cva(
   
   focus-visible:border-ring 
   focus-visible:ring-ring
-  focus-visible:ring-[3px] 
+  focus-visible:ring-1 
   
   aria-invalid:ring-destructive/20
   aria-invalid:border-destructive

@@ -1,5 +1,7 @@
 import { faker } from "@faker-js/faker";
 
+import type { LabelEntity } from "@/backend/label-service";
+import type { ProjectEntity } from "@/backend/project-service";
 import type {
   CreateTodoEntity,
   SubtaskEntity,
@@ -25,9 +27,14 @@ export function makeTodo(overrides: Partial<TodoEntity> = {}): TodoEntity {
     title: faker.lorem.sentence({ min: 2, max: 6 }),
     done: faker.datatype.boolean(),
     createdAt: faker.date.recent({ days: 30 }),
+    // Left unset rather than randomised: a spec that cares when a todo was
+    // completed passes the date it wants to assert on.
+    doneAt: undefined,
     // Empty rather than random: a spec that cares about subtasks passes them,
     // and one that does not should not have to reason about surprise rows.
     subtasks: [],
+    // Same for labels: a spec that cares which ones a todo carries passes them.
+    labelIds: [],
     ...overrides,
   };
 }
@@ -48,6 +55,24 @@ export function makeCreateTodo(
 ): CreateTodoEntity {
   return {
     title: faker.lorem.sentence({ min: 2, max: 6 }),
+    ...overrides,
+  };
+}
+
+export function makeProject(
+  overrides: Partial<ProjectEntity> = {}
+): ProjectEntity {
+  return {
+    id: faker.string.uuid(),
+    name: faker.commerce.department(),
+    ...overrides,
+  };
+}
+
+export function makeLabel(overrides: Partial<LabelEntity> = {}): LabelEntity {
+  return {
+    id: faker.string.uuid(),
+    name: faker.word.noun(),
     ...overrides,
   };
 }

@@ -1,6 +1,10 @@
 import { Route, Routes } from "react-router";
 import { Inbox } from "./pages/inbox/inbox";
+import { TodayPage } from "./pages/today/today-page";
+import { LabelsPage } from "./pages/labels/labels-page";
 import { TodoPage } from "./pages/todo/todo-page";
+import { ProjectPage } from "./pages/project/project-page";
+import { SettingsPage } from "./pages/settings/settings-page";
 import { ComingSoon } from "./pages/coming-soon/coming-soon";
 import { NotFound } from "./pages/not-found/not-found";
 import { AppLayout } from "./layout/layout";
@@ -13,8 +17,10 @@ import type { Container } from "inversify";
 
 const queryClient = new QueryClient();
 
-/** Every sidebar view except the inbox, which is the index route already. */
-const unbuiltViews = views.filter((view) => view.path !== "/");
+/** The sidebar views that have a real page; the rest get the placeholder. */
+const builtViews = ["/", "/today", "/labels"];
+
+const unbuiltViews = views.filter((view) => !builtViews.includes(view.path));
 
 export function AppRoutes() {
   const [diContainer, setDiContainer] = useState<Container | null>(null);
@@ -46,6 +52,8 @@ export function AppRouteTable() {
     <Routes>
       <Route element={<AppLayout />}>
         <Route index element={<Inbox />} />
+        <Route path="today" element={<TodayPage />} />
+        <Route path="labels" element={<LabelsPage />} />
         {/*
           The sidebar links to every view by url, so each one needs a route
           to land on. These are placeholders until the views are built.
@@ -53,7 +61,13 @@ export function AppRouteTable() {
         {unbuiltViews.map((view) => (
           <Route key={view.id} path={view.path} element={<ComingSoon />} />
         ))}
+        {/* Not one of `views`: settings is reached from the sidebar footer,
+            not from the list of things to look at. Its groups are urls of
+            their own, so a group can be linked to and returned to. */}
+        <Route path="settings" element={<SettingsPage />} />
+        <Route path="settings/:section" element={<SettingsPage />} />
         <Route path="todo/:id" element={<TodoPage />} />
+        <Route path="project/:id" element={<ProjectPage />} />
         {/*
           Last, and inside the layout: an address that matches nothing still
           gets the sidebar, so the reader can navigate out rather than hitting

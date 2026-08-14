@@ -8,31 +8,63 @@ import { useTodoUpdate } from "@/pages/inbox/use-todo-update";
 import { DeleteButton } from "@/pages/inbox/delete-button";
 import type { TodoEntity } from "@/backend/todo-service";
 import { Progress } from "@/components/ui/progress.tsx";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   DueBadge,
   LabelChips,
   PriorityBadge,
-  ProjectBadge,
   SubtaskIndicator,
   metaFor,
 } from "@/pages/inbox/todo-meta.tsx";
 import { useNavigate } from "react-router";
 import { useEffect, useRef, useState } from "react";
+import { ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { flagKey } from "@/lib/persisted-flag";
+import { useStickyToggle } from "@/hooks/use-sticky-toggle";
 import { ConfettiBurst } from "@/components/confetti-burst";
+import { TodoProjectBadge } from "@/pages/inbox/todo-project-badge";
+import { useLabels } from "@/pages/inbox/use-labels";
+import type { TodoFilter } from "@/lib/todo-filter";
+import { useSetting } from "@/hooks/use-setting";
 
-export function TodoList() {
-  const { todoList, doneList, count, isLoading } = useTodoList();
+export function TodoList({
+  projectId,
+  dueOn,
+  filter,
+  scope: scopeOverride,
+  empty,
+}: {
+  projectId?: string;
+  /** Narrows the list to one calendar day — see `useTodoList`. */
+  dueOn?: Date;
+  /** The reader's own narrowing — see `@/lib/todo-filter`. */
+  filter?: TodoFilter;
+  /** Where this list's collapsed sections are remembered. */
+  scope?: string;
+  /** What stands in for an empty list, when "Inbox zero" is the wrong words. */
+  empty?: React.ReactNode;
+} = {}) {
+  const { todoList, doneList, count, isLoading } = useTodoList({
+    projectId,
+    dueOn,
+    filter,
+  });
 
-  if (isLoading) {
-    return (
-      <div className="text-muted-foreground flex items-center gap-2 py-10 text-sm">
-        <Spinner /> Loading…
-      </div>
-    );
-  }
+  // Each page keeps its own: collapsing Done in the inbox says nothing about
+  // whether it should be collapsed in a project.
+  const scope = scopeOverride ?? projectId ?? "inbox";
 
-  if (count === 0) return <EmptyList />;
+  const [hideDone] = useSetting("hideDone");
+  const openCount = todoList?.length ?? 0;
+
+  if (isLoading) return <TodoListSkeleton />;
+
+  // With the done section hidden, finished todos are not "some of the list" —
+  // they are none of it, and a page holding only those has nothing to show.
+  // Counting them towards `count` here would leave an empty "To do" heading
+  // standing in for the empty state.
+  if (hideDone ? openCount === 0 : count === 0) return empty ?? <EmptyList />;
 
   const doneCount = doneList?.length ?? 0;
   const percentage = count > 0 ? (doneCount / count) * 100 : 0;
@@ -42,15 +74,19 @@ export function TodoList() {
       <Section
         testId="home.todo.section.open"
         countTestId="home.todo.section.open.count"
+        storageKey={flagKey("section", scope, "open")}
         label="To do"
-        count={todoList?.length ?? 0}>
+        count={openCount}>
         <TodoListContainer todoList={todoList} />
       </Section>
 
-      {doneCount > 0 && (
+      {/* The setting takes the section away rather than collapsing it: a
+          heading that is only ever shut is clutter in the shape of one. */}
+      {!hideDone && doneCount > 0 && (
         <Section
           testId="home.todo.section.done"
           countTestId="home.todo.section.done.count"
+          storageKey={flagKey("section", scope, "done")}
           label="Done"
           count={doneCount}
           trailing={
@@ -67,6 +103,38 @@ export function TodoList() {
   );
 }
 
+/** Row-shaped stand-ins, so the list does not jump when the todos land. */
+function TodoListSkeleton() {
+  return (
+    <div
+      {...testProp("home.todo.list.loading")}
+      aria-busy
+      aria-label="Loading todos"
+      className="flex flex-col gap-8">
+      <section>
+        <div className="mb-3 flex items-center gap-2.5">
+          <Skeleton className="h-4 w-16" />
+          <Skeleton className="h-6 w-6 rounded-md" />
+        </div>
+
+        <div className="flex flex-col gap-2">
+          {[0, 1, 2].map((row) => (
+            <div
+              key={row}
+              className="bg-card flex items-start gap-3 rounded-2xl px-4 py-3.5">
+              <Skeleton className="mt-0.5 size-5 shrink-0 rounded-full" />
+              <div className="flex min-w-0 grow flex-col gap-2">
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-3 w-1/4" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function Section({
   label,
   count,
@@ -74,23 +142,50 @@ function Section({
   children,
   testId,
   countTestId,
+  storageKey,
 }: TestIdProps & {
   label: string;
   count: number;
   countTestId?: string;
   trailing?: React.ReactNode;
   children: React.ReactNode;
+  /** Where this section's collapsed state is remembered. */
+  storageKey: string;
 }) {
+  const [open, setOpen] = useStickyToggle(storageKey, true);
+
   return (
     <section {...testProp(testId)}>
       <div className="mb-3 flex items-center gap-2.5">
-        <Text variant="h5">{label}</Text>
+        {/*
+          The heading itself is the control, so the whole label is a target
+          rather than a chevron the size of a full stop. The count stays
+          outside it: collapsed, it is the only thing still saying how much is
+          in there.
+        */}
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          aria-label={`${open ? "Collapse" : "Expand"} ${label}`}
+          {...testProp(testId === undefined ? undefined : `${testId}.toggle`)}
+          className="group -ml-1 flex items-center gap-1.5 rounded-md px-1 py-0.5 transition-colors">
+          <ChevronRight
+            className={cn(
+              "text-muted-foreground size-4 shrink-0 transition-transform duration-200",
+              open && "rotate-90"
+            )}
+          />
+          <Text variant="h5">{label}</Text>
+        </button>
+
         <span {...testProp(countTestId)} className="count-chip">
           {count}
         </span>
         {trailing ? <div className="ml-auto">{trailing}</div> : null}
       </div>
-      {children}
+
+      {open ? children : null}
     </section>
   );
 }
@@ -116,8 +211,14 @@ function TodoListContainer({ todoList }: { todoList?: TodoEntity[] }) {
 function TodoItem({ todo }: { todo: TodoEntity }) {
   const { check } = useTodoUpdate();
   const navigate = useNavigate();
+  const { labels } = useLabels();
 
   const meta = metaFor(todo.id);
+  // Resolved by id, so a renamed label reads its new name here without the row
+  // being rewritten, and a deleted one simply stops appearing.
+  const todoLabels = todo.labelIds
+    .map((id) => labels.find((label) => label.id === id)?.name)
+    .filter((name): name is string => name !== undefined);
   const subtasks = todo.subtasks;
   const subDone = subtasks.filter((s) => s.done).length;
 
@@ -176,7 +277,9 @@ function TodoItem({ todo }: { todo: TodoEntity }) {
         {showBurst && <ConfettiBurst key={burstKey} />}
       </div>
 
-      <div className="min-w-0 grow data-[done=true]:opacity-60" data-done={done}>
+      <div
+        className="min-w-0 grow data-[done=true]:opacity-60"
+        data-done={done}>
         <div className="flex items-start gap-2">
           <TodoTitle
             testId={`home.todo.${todo.id}.title`}
@@ -192,8 +295,8 @@ function TodoItem({ todo }: { todo: TodoEntity }) {
 
         <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5">
           <PriorityBadge priority={meta.priority} />
-          <ProjectBadge project={meta.project} />
-          <LabelChips labels={meta.labels} max={2} />
+          <TodoProjectBadge projectId={todo.projectId} />
+          <LabelChips labels={todoLabels} max={2} />
           {todo.dueDate ? <DueBadge date={todo.dueDate} /> : null}
           {subtasks.length > 0 ? (
             <SubtaskIndicator

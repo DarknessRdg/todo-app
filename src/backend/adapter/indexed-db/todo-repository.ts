@@ -1,4 +1,5 @@
 import { Tables, type AppIDB } from "@/backend/adapter/indexed-db/indexed-db";
+import type { RichTextDoc } from "@/lib/rich-text";
 import type {
   SubtaskEntity,
   TodoEntity,
@@ -36,7 +37,9 @@ export class TodoRepositoryIndexedDB implements TodoRepository {
     await this.mutateTodo(id, (todo) => ({
       ...todo,
       done,
-      dueDate: new Date(),
+      // Records the completion without touching `dueDate` — that is the date
+      // the user picked, and stamping it here silently rewrote their choice.
+      doneAt: done ? new Date() : undefined,
     }));
   };
 
@@ -44,14 +47,75 @@ export class TodoRepositoryIndexedDB implements TodoRepository {
     await this.mutateTodo(id, (todo) => ({ ...todo, title }));
   };
 
+  updateDueDate = async ({
+    id,
+    dueDate,
+  }: {
+    id: string;
+    dueDate: Date | undefined;
+  }) => {
+    await this.mutateTodo(id, (todo) => ({ ...todo, dueDate }));
+  };
+
+  updateProject = async ({
+    id,
+    projectId,
+  }: {
+    id: string;
+    projectId: string | undefined;
+  }) => {
+    await this.mutateTodo(id, (todo) => ({ ...todo, projectId }));
+  };
+
   updateDescription = async ({
     id,
     description,
+    descriptionDoc,
   }: {
     id: string;
     description: string;
+    descriptionDoc: RichTextDoc | undefined;
   }) => {
-    await this.mutateTodo(id, (todo) => ({ ...todo, description }));
+    // Both fields are set on every write, including to `undefined` — the
+    // parsed copy is only ever valid for the markdown it was saved with, so it
+    // must never survive a change to it.
+    await this.mutateTodo(id, (todo) => ({
+      ...todo,
+      description,
+      descriptionDoc,
+    }));
+  };
+
+  updateLabels = async ({
+    id,
+    labelIds,
+  }: {
+    id: string;
+    labelIds: string[];
+  }) => {
+    await this.mutateTodo(id, (todo) => ({ ...todo, labelIds }));
+  };
+
+  /**
+   * Read-modify-write over every todo rather than an index lookup: the store
+   * holds one workspace's todos, and a label is on a handful of them. An index
+   * on an array field would be the answer at a scale this app does not have.
+   */
+  removeLabelEverywhere = async (labelId: string) => {
+    const transaction = this.db.transaction(Tables.Todo, "readwrite");
+    const store = transaction.objectStore(Tables.Todo);
+
+    for (const todo of await store.getAll()) {
+      const labelIds = todo.labelIds ?? [];
+      if (!labelIds.includes(labelId)) continue;
+
+      await store.put({
+        ...todo,
+        labelIds: labelIds.filter((id) => id !== labelId),
+      });
+    }
+
+    await transaction.done;
   };
 
   addSubtask = async ({
