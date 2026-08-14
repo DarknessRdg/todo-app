@@ -6,12 +6,6 @@ on:
   pull_request:
     branches: [main]
 
-# A new push to a PR makes the in-flight run obsolete; don't burn minutes on it.
-# main is exempt so every commit on the default branch keeps a real result.
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
-
 jobs:
   test:
     name: Type-check and test
@@ -41,8 +35,8 @@ jobs:
     # Pushes to main only: a pull request must never publish, and this is the
     # step that makes "merged" and "live" the same event.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    # The gate. A deploy is the one place a red suite must not reach, so this
-    # waits for the same type-check and specs every other change answers to.
+    # The gate, and the order: nothing here starts until `test` has finished
+    # and passed. A deploy is the one place a red suite must not reach.
     needs: test
     runs-on: ubuntu-latest
 
@@ -50,13 +44,6 @@ jobs:
     # the stricter repository settings, and nothing here needs more than this.
     permissions:
       contents: write
-
-    # Two deploys racing would publish whichever finished last rather than
-    # whichever is newer, so they queue. Not cancelled in flight: a half-run
-    # deploy is worse than a redundant one.
-    concurrency:
-      group: github-pages
-      cancel-in-progress: false
 
     steps:
       - uses: actions/checkout@v4
