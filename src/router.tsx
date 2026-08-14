@@ -62,8 +62,10 @@ export function AppRouteTable() {
           <Route key={view.id} path={view.path} element={<ComingSoon />} />
         ))}
         {/* Not one of `views`: settings is reached from the sidebar footer,
-            not from the list of things to look at. */}
+            not from the list of things to look at. Its groups are urls of
+            their own, so a group can be linked to and returned to. */}
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="settings/:section" element={<SettingsPage />} />
         <Route path="todo/:id" element={<TodoPage />} />
         <Route path="project/:id" element={<ProjectPage />} />
         {/*

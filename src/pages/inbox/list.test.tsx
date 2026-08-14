@@ -1,6 +1,6 @@
 import { screen, within } from "@testing-library/react";
 import { setupUser, waitFor } from "@/test/user";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import type { TodoEntity } from "@/backend/todo-service";
 import { Inbox } from "@/pages/inbox/inbox";
@@ -11,6 +11,11 @@ import {
   renderWithContainer,
 } from "@/test/container";
 import { makeSubtask, makeTodo } from "@/test/todo-factory";
+import { writeSetting } from "@/lib/settings";
+
+// Settings live in localStorage, so one spec's choice would otherwise be the
+// next spec's starting point.
+afterEach(() => localStorage.clear());
 
 const openSection = "home.todo.section.open";
 const doneSection = "home.todo.section.done";
@@ -27,8 +32,7 @@ const deleteDialog = (todo: TodoEntity) => `home.todo.${todo.id}.delete.dialog`;
 const deleteConfirm = (todo: TodoEntity) =>
   `home.todo.${todo.id}.delete.confirm`;
 const deleteCancel = (todo: TodoEntity) => `home.todo.${todo.id}.delete.cancel`;
-const subtaskCount = (todo: TodoEntity) =>
-  `home.todo.${todo.id}.subtask.count`;
+const subtaskCount = (todo: TodoEntity) => `home.todo.${todo.id}.subtask.count`;
 
 function renderInbox(todos: TodoEntity[]) {
   const repository = inMemoryTodoRepository(todos);
@@ -483,6 +487,43 @@ describe("todo list", () => {
 
       await screen.findByTestId(openToggle);
       expect(screen.queryByTestId(rowTitle(mine))).not.toBeInTheDocument();
+    });
+  });
+
+  /**
+   * Finished work is folded away by default, not thrown away — but some people
+   * want it gone entirely, and a section that only ever stays shut is clutter
+   * in the shape of a heading.
+   */
+  describe("when done todos are set to be hidden", () => {
+    it("Then the done section is not on the page at all", async () => {
+      writeSetting("hideDone", true);
+      renderInbox([makeTodo({ done: false }), makeTodo({ done: true })]);
+
+      expect(await screen.findByTestId(openSection)).toBeInTheDocument();
+      expect(screen.queryByTestId(doneSection)).not.toBeInTheDocument();
+    });
+
+    it("Then the todos still to do are all still there", async () => {
+      const open = makeTodo({ done: false });
+      writeSetting("hideDone", true);
+      renderInbox([open, makeTodo({ done: true })]);
+
+      expect(await screen.findByTestId(rowTitle(open))).toBeInTheDocument();
+    });
+
+    it("Then a list of nothing but done todos reads as empty, not as an empty section", async () => {
+      writeSetting("hideDone", true);
+      renderInbox([makeTodo({ done: true }), makeTodo({ done: true })]);
+
+      expect(await screen.findByTestId(emptyState)).toBeInTheDocument();
+      expect(screen.queryByTestId(openSection)).not.toBeInTheDocument();
+    });
+
+    it("Then turning it back off brings the section back", async () => {
+      renderInbox([makeTodo({ done: false }), makeTodo({ done: true })]);
+
+      expect(await screen.findByTestId(doneSection)).toBeInTheDocument();
     });
   });
 });

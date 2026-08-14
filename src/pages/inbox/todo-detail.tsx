@@ -35,6 +35,7 @@ import { TodoProjectBadge } from "@/pages/inbox/todo-project-badge";
 import { useTodoProjectName } from "@/pages/inbox/use-todo-project";
 import { Timing } from "@/lib/timing";
 import { richTextContent, type RichTextDoc } from "@/lib/rich-text";
+import { useSetting } from "@/hooks/use-setting";
 import { Calendar } from "@/components/ui/calendar";
 import { LabelPicker } from "@/components/label-picker";
 import {
@@ -672,7 +673,12 @@ function TitleEditor({ todo }: { todo: TodoEntity }) {
  * would leave the next todo mysteriously refusing to open.
  */
 function Description({ todo }: { todo: TodoEntity }) {
-  const [readOnly, setReadOnly] = useState(false);
+  // Where the toggle starts is a setting; where it goes from there is this
+  // visit's business. Read once as the initial value rather than tracked, so
+  // changing the preference never yanks a description out from under someone
+  // who has already chosen for the todo in front of them.
+  const [defaultView] = useSetting("defaultTodoView");
+  const [readOnly, setReadOnly] = useState(defaultView === "read");
   // Owned here rather than in the editor below, because the section header is
   // where the outcome of a save is reported — and it has to be the very same
   // mutation that performed it, not a second one asked how it went.

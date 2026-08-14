@@ -26,6 +26,7 @@ import { ConfettiBurst } from "@/components/confetti-burst";
 import { TodoProjectBadge } from "@/pages/inbox/todo-project-badge";
 import { useLabels } from "@/pages/inbox/use-labels";
 import type { TodoFilter } from "@/lib/todo-filter";
+import { useSetting } from "@/hooks/use-setting";
 
 export function TodoList({
   projectId,
@@ -54,9 +55,16 @@ export function TodoList({
   // whether it should be collapsed in a project.
   const scope = scopeOverride ?? projectId ?? "inbox";
 
+  const [hideDone] = useSetting("hideDone");
+  const openCount = todoList?.length ?? 0;
+
   if (isLoading) return <TodoListSkeleton />;
 
-  if (count === 0) return empty ?? <EmptyList />;
+  // With the done section hidden, finished todos are not "some of the list" —
+  // they are none of it, and a page holding only those has nothing to show.
+  // Counting them towards `count` here would leave an empty "To do" heading
+  // standing in for the empty state.
+  if (hideDone ? openCount === 0 : count === 0) return empty ?? <EmptyList />;
 
   const doneCount = doneList?.length ?? 0;
   const percentage = count > 0 ? (doneCount / count) * 100 : 0;
@@ -68,11 +76,13 @@ export function TodoList({
         countTestId="home.todo.section.open.count"
         storageKey={flagKey("section", scope, "open")}
         label="To do"
-        count={todoList?.length ?? 0}>
+        count={openCount}>
         <TodoListContainer todoList={todoList} />
       </Section>
 
-      {doneCount > 0 && (
+      {/* The setting takes the section away rather than collapsing it: a
+          heading that is only ever shut is clutter in the shape of one. */}
+      {!hideDone && doneCount > 0 && (
         <Section
           testId="home.todo.section.done"
           countTestId="home.todo.section.done.count"
