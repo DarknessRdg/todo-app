@@ -158,7 +158,10 @@ describe("TodoRepositoryIndexedDB", () => {
       const todo = makeTodo({ projectId: undefined });
       const repository = await repositoryWith([todo]);
 
-      await repository.updateProject({ id: todo.id, projectId: "project-work" });
+      await repository.updateProject({
+        id: todo.id,
+        projectId: "project-work",
+      });
 
       const stored = await repository.getById(todo.id);
       expect(stored?.projectId).toBe("project-work");
@@ -207,6 +210,48 @@ describe("TodoRepositoryIndexedDB", () => {
       ).rejects.toBeDefined();
 
       expect(await repository.count()).toBe(0);
+    });
+  });
+
+  describe("when I save a description", () => {
+    const doc = { type: "doc", content: [{ type: "paragraph" }] };
+
+    it("Then both the markdown and the parsed copy are stored", async () => {
+      const todo = makeTodo({ description: "the old notes" });
+      const repository = await repositoryWith([todo]);
+
+      await repository.updateDescription({
+        id: todo.id,
+        description: "the new notes",
+        descriptionDoc: doc,
+      });
+
+      const stored = await repository.getById(todo.id);
+      expect(stored?.description).toBe("the new notes");
+      expect(stored?.descriptionDoc).toEqual(doc);
+    });
+
+    /**
+     * The parsed copy is only ever valid for the markdown it was saved with, so
+     * a write that brings none has to take the old one away — left behind, it
+     * would be what the description is drawn from, showing text the todo no
+     * longer says.
+     */
+    it("Then saving without one clears the copy already there", async () => {
+      const todo = makeTodo({
+        description: "the old notes",
+        descriptionDoc: doc,
+      });
+      const repository = await repositoryWith([todo]);
+
+      await repository.updateDescription({
+        id: todo.id,
+        description: "the new notes",
+        descriptionDoc: undefined,
+      });
+
+      const stored = await repository.getById(todo.id);
+      expect(stored?.descriptionDoc).toBeUndefined();
     });
   });
 

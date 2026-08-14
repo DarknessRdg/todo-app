@@ -32,6 +32,7 @@ export default defineConfig({
     env: {
       VITE_COMPLETION_RESORT_MS: "0",
       VITE_CONFETTI_VISIBLE_MS: "0",
+      VITE_SAVED_VISIBLE_MS: "0",
     },
   },
 });

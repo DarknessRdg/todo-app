@@ -1,6 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 import { act, fireEvent, screen } from "@testing-library/react";
-import { setupUser, waitFor } from "@/test/user";
+import { setupUser, waitFor, type User } from "@/test/user";
 import { describe, expect, it } from "vitest";
 
 import type { TodoEntity } from "@/backend/todo-service";
@@ -11,6 +11,9 @@ import {
   renderWithContainer,
 } from "@/test/container";
 import { makeTodo } from "@/test/todo-factory";
+
+const descriptionRead = "todo.detail.description.read";
+const descriptionEditor = "todo.detail.description.editor";
 
 /**
  * Renders the inbox with one todo and its detail modal already open. The todo
@@ -165,6 +168,71 @@ describe("todo detail modal", { timeout: 3000 }, () => {
     await user.type(url, "https://x.dev");
 
     expect(url).toHaveValue("https://x.dev");
+  });
+
+  describe("when I press escape while editing the description", () => {
+    /** Opens the modal with the description already in its editor. */
+    async function editDescription(user: User) {
+      const rendered = renderInboxWithModalOpen({
+        description: "the old notes",
+      });
+
+      await user.click(await screen.findByTestId(descriptionRead));
+      // Clicked into rather than relying on the editor's own autofocus, which
+      // jsdom does not honour — the caret has to really be in the text or the
+      // keys under test land on the dialog instead.
+      await user.click(await screen.findByTestId(descriptionEditor));
+
+      return rendered;
+    }
+
+    it("Then the modal stays open", async () => {
+      const user = setupUser();
+      const { modal } = await editDescription(user);
+
+      await user.keyboard("{Escape}");
+
+      // Flushed rather than polled: `waitFor` on something still being there is
+      // satisfied by the first tick, before a closing dialog would have gone.
+      await act(async () => {});
+      expect(screen.getByTestId(modal)).toBeInTheDocument();
+    });
+
+    it("Then what I wrote is saved", async () => {
+      const user = setupUser();
+      const { repository, todo } = await editDescription(user);
+
+      await user.keyboard(" and a new line{Escape}");
+
+      await waitFor(() =>
+        expect(repository.updateDescription).toHaveBeenCalledWith({
+          id: todo.id,
+          description: expect.stringContaining("and a new line"),
+          descriptionDoc: expect.objectContaining({ type: "doc" }),
+        })
+      );
+    });
+
+    it("Then the editor gives way to the read view", async () => {
+      const user = setupUser();
+      await editDescription(user);
+
+      await user.keyboard("{Escape}");
+
+      expect(await screen.findByTestId(descriptionRead)).toBeInTheDocument();
+      expect(screen.queryByTestId(descriptionEditor)).not.toBeInTheDocument();
+    });
+  });
+
+  it("when I press escape with the description at rest, Then the modal closes", async () => {
+    const user = setupUser();
+    const { modal, currentLocation } = renderInboxWithModalOpen();
+
+    await screen.findByTestId(modal);
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => expect(currentLocation()).toBe("/"));
+    expect(screen.queryByTestId(modal)).not.toBeInTheDocument();
   });
 
   describe("when the modal opens", () => {

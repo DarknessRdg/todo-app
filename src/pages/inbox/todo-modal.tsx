@@ -10,6 +10,7 @@ import { TodoDetail, type TodoDetailView } from "@/pages/inbox/todo-detail.tsx";
 import { Button } from "@/components/ui/button";
 import { TooltipText } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { isEditingRichText } from "@/lib/rich-text";
 import { Maximize2 } from "lucide-react";
 import type { PropsWithChildren } from "react";
 
@@ -118,6 +119,15 @@ function ModalShell({
         // click is dispatched — the click then hit-tests onto the row underneath
         // and re-navigates to ?todo=<id>, so the modal blinks back open. Keep the
         // backdrop up for the whole gesture and close on its click instead.
+        // Escape belongs to the innermost thing that can answer it. With the
+        // description open for editing that is the editor, which saves and
+        // closes itself — taking the key here as well would shut the todo out
+        // from under an edit, on the keystroke meant to finish it. Radix reads
+        // `defaultPrevented` as "handled elsewhere", and the editor's own
+        // listener still runs afterwards, so preventing here costs it nothing.
+        onEscapeKeyDown={(event) => {
+          if (isEditingRichText(event.target)) event.preventDefault();
+        }}
         onPointerDownOutside={(event) => event.preventDefault()}
         onInteractOutside={(event) => event.preventDefault()}
         overlayProps={{ onClick: onClose }}

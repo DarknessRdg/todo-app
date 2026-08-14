@@ -1,6 +1,6 @@
 import { fireEvent, screen } from "@testing-library/react";
 import { setupUser, waitFor } from "@/test/user";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { TodoEntity } from "@/backend/todo-service";
 import { TodoDetail } from "@/pages/inbox/todo-detail";
@@ -31,6 +31,9 @@ const dueToday = "todo.detail.duedate.today";
 const projectOption = (id: string) => `todo.detail.project.option.${id}`;
 const readView = "todo.detail.description.read";
 const editor = "todo.detail.description.editor";
+const readOnlyToggle = "todo.detail.description.readonly.toggle";
+const saving = "todo.detail.description.saving";
+const saved = "todo.detail.description.saved";
 const subtaskCount = "todo.detail.subtask.count";
 const addInput = "todo.detail.subtask.add.input";
 const addButton = "todo.detail.subtask.add.button";
@@ -426,6 +429,9 @@ describe("todo detail", () => {
         expect(repository.updateDescription).toHaveBeenCalledWith({
           id: todo.id,
           description: "the new notes",
+          // Saved beside the markdown so showing this description again does
+          // not mean parsing it again.
+          descriptionDoc: expect.objectContaining({ type: "doc" }),
         })
       );
     });
@@ -443,6 +449,76 @@ describe("todo detail", () => {
         expect(screen.getByTestId(readView)).toBeInTheDocument()
       );
       expect(repository.updateDescription).not.toHaveBeenCalled();
+    });
+
+    it("Then it says on screen that the writing was saved", async () => {
+      const user = setupUser();
+      // The notice takes itself away, and the suite runs that delay at zero —
+      // so it has to be held open to be seen at all. Dialled through the
+      // environment, which is what `Timing` reads on every access.
+      vi.stubEnv("VITE_SAVED_VISIBLE_MS", "5000");
+      renderDetail(makeTodo({ description: "the old notes" }));
+
+      await user.click(await screen.findByTestId(readView));
+      const field = await screen.findByTestId(editor);
+
+      await user.type(field, " and more");
+      fireEvent.blur(field);
+
+      expect(await screen.findByTestId(saved)).toBeInTheDocument();
+    });
+
+    it("Then the notice takes itself away again", async () => {
+      const user = setupUser();
+      // Short rather than zero: the notice has to be seen arriving before its
+      // leaving means anything — `waitFor` on an absence is satisfied by the
+      // first tick, and would pass just as well if it had never appeared.
+      vi.stubEnv("VITE_SAVED_VISIBLE_MS", "300");
+      renderDetail(makeTodo({ description: "the old notes" }));
+
+      await user.click(await screen.findByTestId(readView));
+      const field = await screen.findByTestId(editor);
+
+      await user.type(field, " and more");
+      fireEvent.blur(field);
+      await screen.findByTestId(saved);
+
+      await waitFor(() =>
+        expect(screen.queryByTestId(saved)).not.toBeInTheDocument()
+      );
+    });
+
+    it("Then it says it is saving until the write lands", async () => {
+      const user = setupUser();
+      const { repository } = renderDetail(
+        makeTodo({ description: "the old notes" })
+      );
+
+      // A write that never settles, so the in-flight state can be caught at
+      // all — against the in-memory repository it is over within the tick.
+      repository.updateDescription.mockReturnValue(new Promise(() => {}));
+
+      await user.click(await screen.findByTestId(readView));
+      const field = await screen.findByTestId(editor);
+
+      await user.type(field, " and more");
+      fireEvent.blur(field);
+
+      expect(await screen.findByTestId(saving)).toBeInTheDocument();
+      expect(screen.queryByTestId(saved)).not.toBeInTheDocument();
+    });
+
+    it("Then an unchanged description claims no save, having made none", async () => {
+      const user = setupUser();
+      renderDetail(makeTodo({ description: "the old notes" }));
+
+      await user.click(await screen.findByTestId(readView));
+      fireEvent.blur(await screen.findByTestId(editor));
+
+      await waitFor(() =>
+        expect(screen.getByTestId(readView)).toBeInTheDocument()
+      );
+      expect(screen.queryByTestId(saved)).not.toBeInTheDocument();
     });
   });
 
@@ -471,6 +547,61 @@ describe("todo detail", () => {
 
       expect(repository.updateDescription).not.toHaveBeenCalled();
     });
+  });
+
+  /**
+   * A description is stored twice: as markdown, which is the record, and as the
+   * editor's own parsed copy, which is what makes showing it cheap. Which of
+   * the two was used is only observable through what ends up on screen, so
+   * these two specs deliberately put different text in each.
+   */
+  describe("when a todo carries a parsed copy of its description", () => {
+    it("Then that is what is shown, rather than the markdown being parsed again", async () => {
+      renderDetail(
+        makeTodo({
+          description: "the markdown",
+          descriptionDoc: {
+            type: "doc",
+            content: [
+              {
+                type: "paragraph",
+                content: [{ type: "text", text: "the parsed copy" }],
+              },
+            ],
+          },
+        })
+      );
+
+      expect(await screen.findByTestId(readView)).toHaveTextContent(
+        "the parsed copy"
+      );
+    });
+  });
+
+  it("when a todo has only markdown, Then it is shown all the same", async () => {
+    renderDetail(
+      makeTodo({ description: "the markdown", descriptionDoc: undefined })
+    );
+
+    expect(await screen.findByTestId(readView)).toHaveTextContent(
+      "the markdown"
+    );
+  });
+
+  /**
+   * What read mode *does* is `InlineEdit`'s, and is specified there — cheaply,
+   * without the editor. This is the wiring: that the toggle beside the eyebrow
+   * is the thing holding the description's end of it.
+   */
+  it("when I put the description into read mode, Then clicking it no longer opens the editor", async () => {
+    const user = setupUser();
+    renderDetail(makeTodo({ description: "the old notes" }));
+
+    await user.click(await screen.findByTestId(readOnlyToggle));
+    await user.click(screen.getByTestId(readView));
+
+    expect(screen.queryByTestId(editor)).not.toBeInTheDocument();
+    expect(screen.getByTestId(readView)).toBeInTheDocument();
   });
 
   describe("when I add a subtask", () => {

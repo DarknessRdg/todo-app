@@ -16,9 +16,12 @@ import {
   shortId,
 } from "@/pages/inbox/todo-meta.tsx";
 import {
+  BookOpen,
   CalendarIcon,
+  Check,
   CircleDot,
   FolderIcon,
+  PencilLine,
   Plus,
   SignalHigh,
   Tag,
@@ -31,6 +34,7 @@ import { ProjectSelect } from "@/components/project-select";
 import { TodoProjectBadge } from "@/pages/inbox/todo-project-badge";
 import { useTodoProjectName } from "@/pages/inbox/use-todo-project";
 import { Timing } from "@/lib/timing";
+import { richTextContent, type RichTextDoc } from "@/lib/rich-text";
 import { Calendar } from "@/components/ui/calendar";
 import { LabelPicker } from "@/components/label-picker";
 import {
@@ -44,6 +48,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Text, textVariants } from "@/components/ui/text";
+import { Toggle } from "@/components/ui/toggle";
+import { TooltipText } from "@/components/ui/tooltip";
 import { dialogOf } from "@/lib/dialog-container";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router";
@@ -104,10 +110,9 @@ export function TodoDetailBody({ todo }: { todo: TodoEntity }) {
   return (
     <div className="grid flex-1 items-stretch gap-8 lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_18rem]">
       <main className="flex min-w-0 flex-col gap-8">
-        <section className="flex flex-col gap-2.5">
-          <Text variant="eyebrow">Description</Text>
-          <DescriptionEditor todo={todo} />
-        </section>
+        {/* Keyed so read mode is dropped when the pane moves to another todo:
+            it is a way to read *this* one, not a setting. */}
+        <Description key={todo.id} todo={todo} />
 
         <Subtasks todo={todo} />
       </main>
@@ -655,14 +660,170 @@ function TitleEditor({ todo }: { todo: TodoEntity }) {
   );
 }
 
-function DescriptionEditor({ todo }: { todo: TodoEntity }) {
+/**
+ * The description, and the switch that decides whether it is a field or a
+ * document.
+ *
+ * Click-to-edit costs the one thing reading needs: a click that would select a
+ * word instead turns the text into an editor, so a description cannot be
+ * skimmed with the cursor, quoted, or copied out of. Read mode gives that back
+ * for as long as it is on, and is per todo per visit rather than remembered —
+ * editing is what the detail is for, and a preference that quietly persisted
+ * would leave the next todo mysteriously refusing to open.
+ */
+function Description({ todo }: { todo: TodoEntity }) {
+  const [readOnly, setReadOnly] = useState(false);
+  // Owned here rather than in the editor below, because the section header is
+  // where the outcome of a save is reported — and it has to be the very same
+  // mutation that performed it, not a second one asked how it went.
   const { updateDescription } = useTodoUpdate();
 
   return (
+    <section className="flex flex-col gap-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <Text variant="eyebrow">Description</Text>
+
+        {/* Status and mode together on the right: both answer "what is this
+            description doing", and split apart they read as unrelated. */}
+        <div className="flex items-center gap-2">
+          <SaveState mutation={updateDescription} />
+
+          {/*
+          The button says which mode the description is *in*, not which one the
+          click leads to — an icon alone leaves the reader guessing which of the
+          two it means, and that guess is the whole point of the control. The
+          tooltip carries the action, so both readings are answered.
+
+          Three signals move together so the state survives however it is read:
+          the word, the icon, and the sage fill that marks selected everywhere
+          else in the app. Colour alone would say nothing to a reader who cannot
+          separate it from the canvas.
+
+          The `on` hover is restated in the classes because the primitive's own
+          hover paints mist over that sage — the state would otherwise drop out
+          from under the cursor that is about to click it.
+        */}
+          <TooltipText
+            testId="todo.detail.description.readonly.tooltip"
+            text={readOnly ? "Switch back to editing" : "Switch to reading"}
+            asChild>
+            <Toggle
+              testId="todo.detail.description.readonly.toggle"
+              size="sm"
+              pressed={readOnly}
+              onPressedChange={setReadOnly}
+              // No `aria-label`: it would replace the visible word as the
+              // accessible name, leaving what is read aloud and what is on screen
+              // saying different things. Radix supplies the pressed state.
+              className="text-muted-foreground data-[state=on]:text-foreground data-[state=on]:hover:bg-accent data-[state=on]:hover:text-foreground -mr-1.5 h-7 gap-1.5 rounded-full px-2.5 text-xs font-medium [&_svg]:size-3.5">
+              {readOnly ? <BookOpen /> : <PencilLine />}
+              {readOnly ? "Reading" : "Editing"}
+            </Toggle>
+          </TooltipText>
+        </div>
+      </div>
+
+      <DescriptionEditor
+        todo={todo}
+        readOnly={readOnly}
+        updateDescription={updateDescription}
+      />
+    </section>
+  );
+}
+
+/**
+ * Whether the description is being written, and whether the last write landed.
+ *
+ * The in-flight half is read straight off the mutation — the answer is already
+ * there, and it cannot drift from what actually happened. The confirmation is
+ * held for a beat and then goes, which is the one thing the mutation cannot say
+ * on its own: `isSuccess` stays true forever, and a permanent tick becomes part
+ * of the furniture rather than news.
+ *
+ * A failure says nothing here — the mutation raises a toast for that, and a
+ * quiet marker in a header is the wrong place to report something that needs
+ * acting on.
+ */
+function SaveState({
+  mutation,
+}: {
+  mutation: ReturnType<typeof useTodoUpdate>["updateDescription"];
+}) {
+  const { isPending, isSuccess, submittedAt } = mutation;
+  const [confirming, setConfirming] = useState(false);
+
+  // Keyed on `submittedAt` rather than on success alone: it changes with every
+  // write, so a second save re-arms the notice instead of the first one's timer
+  // deciding how long the second is seen for.
+  useEffect(() => {
+    if (!isSuccess) return;
+
+    setConfirming(true);
+    const timer = setTimeout(() => setConfirming(false), Timing.savedVisibleMs);
+
+    return () => clearTimeout(timer);
+  }, [isSuccess, submittedAt]);
+
+  if (isPending) {
+    return (
+      <span
+        {...testProp("todo.detail.description.saving")}
+        role="status"
+        className="text-muted-foreground text-xs">
+        Saving…
+      </span>
+    );
+  }
+
+  if (!confirming) return null;
+
+  return (
+    <span
+      {...testProp("todo.detail.description.saved")}
+      // Announced rather than only drawn: the tick and the colour are the whole
+      // message, and neither reaches a screen reader.
+      role="status"
+      // The fade is CSS and the unmount is the timer above, both running off
+      // `savedVisibleMs` — so the notice cannot finish fading and then sit
+      // there invisible, or vanish mid-fade.
+      style={{ animationDuration: `${Timing.savedVisibleMs}ms` }}
+      className="text-success animate-saved-notice flex items-center gap-1 text-xs font-medium">
+      <Check className="size-3.5" />
+      Saved
+    </span>
+  );
+}
+
+function DescriptionEditor({
+  todo,
+  readOnly,
+  updateDescription,
+}: {
+  todo: TodoEntity;
+  readOnly: boolean;
+  updateDescription: ReturnType<typeof useTodoUpdate>["updateDescription"];
+}) {
+  /**
+   * The parsed document behind the markdown `InlineEdit` is tracking.
+   *
+   * `InlineEdit` deals in strings — which is right, it is the same machinery
+   * the title uses — so the doc rides alongside rather than being threaded
+   * through it. The editor reports both together, so the one landing here is
+   * always the one the committed markdown came from.
+   */
+  const doc = useRef<RichTextDoc | undefined>(undefined);
+
+  return (
     <InlineEdit
+      readOnly={readOnly}
       value={todo.description ?? ""}
       onCommit={(description) =>
-        updateDescription.mutate({ id: todo.id, description })
+        updateDescription.mutate({
+          id: todo.id,
+          description,
+          descriptionDoc: doc.current,
+        })
       }>
       <InlineEdit.Read
         testId="todo.detail.description.read"
@@ -671,12 +832,18 @@ function DescriptionEditor({ todo }: { todo: TodoEntity }) {
         className="p-2">
         {todo.description?.trim() ? (
           <RichTextEditor
-            content={todo.description}
+            // The parsed copy when the todo has one, the markdown when it does
+            // not — which is what makes an old row still readable.
+            content={richTextContent(todo.description, todo.descriptionDoc)}
             editable={false}
             chrome={false}
           />
         ) : (
-          <Text variant="muted">Add a description…</Text>
+          // Nothing to read, and in read mode nothing to add either — the
+          // invitation would name an action the click cannot perform.
+          <Text variant="muted">
+            {readOnly ? "No description" : "Add a description…"}
+          </Text>
         )}
       </InlineEdit.Read>
 
@@ -689,11 +856,23 @@ function DescriptionEditor({ todo }: { todo: TodoEntity }) {
         {({ commit }) => (
           <RichTextEditor
             testId="todo.detail.description.editor"
-            content={todo.description}
+            content={richTextContent(todo.description, todo.descriptionDoc)}
             placeholder="Add a description…"
             editable
             autoFocus
-            onBlur={commit}
+            onBlur={(value) => {
+              doc.current = value.doc;
+              commit(value.markdown);
+            }}
+            // Escape is the keyboard's way out, and it keeps the writing:
+            // the same commit clicking away performs. Deliberately not the
+            // `cancel` that Escape means in a single-line field — a
+            // description is long enough that discarding it silently would
+            // be a loss, where a title can be retyped in seconds.
+            onEscape={(value) => {
+              doc.current = value.doc;
+              commit(value.markdown);
+            }}
           />
         )}
       </InlineEdit.Edit>

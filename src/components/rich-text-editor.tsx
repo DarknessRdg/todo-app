@@ -96,6 +96,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { testProp, type TestIdProps } from "@/lib/test-id";
+import type { RichTextDoc, RichTextValue } from "@/lib/rich-text";
 
 /**
  * `common` is lowlight's curated grammar set (~35 languages) rather than `all`
@@ -562,11 +563,15 @@ const HeadingKeepingAlignment = Heading.extend({
 
 type RichTextEditorProps = {
   /**
-   * The document content, stored/exchanged as Markdown. Markdown is a
-   * portable, human-readable format so persisted values are not locked into
-   * Tiptap's internal ProseMirror JSON representation.
+   * The document to load, in either spelling.
+   *
+   * Markdown is the portable one and stays the record of truth, so a stored
+   * value is never locked into ProseMirror's JSON. A `RichTextDoc` is that same
+   * document already parsed: handing one over skips the markdown parse, which
+   * is most of what mounting a description costs. Callers with both should pass
+   * the doc — see `richTextContent`.
    */
-  content?: string;
+  content?: string | RichTextDoc;
   editable?: boolean;
   autoFocus?: boolean;
   placeholder?: string;
@@ -574,8 +579,19 @@ type RichTextEditorProps = {
   /** When true, wraps the editor in a bordered box with the formatting toolbar.
    * When false, renders just the (read-only) content — for click-to-edit views. */
   chrome?: boolean;
-  /** Called with the current document as a Markdown string when focus leaves. */
-  onBlur?: (markdown: string) => void;
+  /**
+   * Called when focus leaves, with the document in both spellings so the caller
+   * can store the portable one and the fast one together. Handing back a single
+   * value rather than two arguments is deliberate: saving the markdown and
+   * forgetting the doc would leave a stale cache behind.
+   */
+  onBlur?: (value: RichTextValue) => void;
+  /**
+   * Called with the same value when Escape is pressed in the text — the
+   * keyboard's way out of the editor, which keeps what was written rather than
+   * discarding it. Left unset, Escape passes through untouched.
+   */
+  onEscape?: (value: RichTextValue) => void;
 } & TestIdProps;
 
 export function RichTextEditor({
@@ -586,6 +602,7 @@ export function RichTextEditor({
   className,
   chrome = true,
   onBlur,
+  onEscape,
   testId,
 }: RichTextEditorProps) {
   // The `:` autocomplete: the plugin owns when it opens, React owns how it is
@@ -684,15 +701,46 @@ export function RichTextEditor({
     // opens. Only a blur that lands outside counts.
     onBlur: ({ editor, event }) => {
       if (movedIntoEditorChrome(event)) return;
-      onBlur?.(getMarkdown(editor));
+      onBlur?.(valueOf(editor));
     },
+  });
+
+  /**
+   * Escape hands the document back and leaves the editor.
+   *
+   * Bound as a plain listener on the editable — the same route ctrl+K takes —
+   * rather than through ProseMirror's keymap, because a dialog above answers
+   * Escape from a *document-level capture* listener. That runs before anything
+   * here whatever the mount order, so the dialog cannot be beaten to the key;
+   * it is instead told to stand down (see `isEditingRichText`), and this fires
+   * afterwards on the way down to the target.
+   *
+   * No dependency array, matching the ctrl+K handler below: the listener closes
+   * over props that change, and re-binding each render is cheaper than the
+   * stale callback the alternative buys.
+   */
+  useEffect(() => {
+    if (!editor || onEscape === undefined) return;
+
+    const dom = editor.view.dom;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      // A layer inside the editor — the shortcode list — answers Escape by
+      // closing itself, and stops the key here so the editor stays open. See
+      // `EmojiSuggestions`.
+      onEscape(valueOf(editor));
+    };
+
+    dom.addEventListener("keydown", onKeyDown);
+    return () => dom.removeEventListener("keydown", onKeyDown);
   });
 
   // Sync when the content prop changes from the outside (e.g. after a refetch),
   // but never while the user is typing to avoid clobbering the cursor.
   useEffect(() => {
     if (!editor || editor.isFocused) return;
-    if (content === getMarkdown(editor)) return;
+    if (holdsContent(editor, content)) return;
     editor.commands.setContent(content);
   }, [content, editor]);
 
@@ -769,7 +817,16 @@ function EmojiSuggestions({
         // Radix marks the event handled from a document-level listener, and
         // ProseMirror drops any key that already carries `defaultPrevented`, so
         // the editor genuinely never sees it while this list is on screen.
-        onEscapeKeyDown={onDismiss}
+        //
+        // `stopPropagation` covers the editor's *own* Escape listener, which is
+        // a plain DOM handler on the editable and so is not bound by that. This
+        // runs in the capture phase on the way down, and the list is the
+        // innermost thing on screen: dismissing it must not also close the
+        // editor it was offering into.
+        onEscapeKeyDown={(event) => {
+          event.stopPropagation();
+          onDismiss();
+        }}
         align="start"
         side="bottom"
         sideOffset={6}
@@ -809,6 +866,28 @@ type MarkdownStorage = { markdown: { getMarkdown: () => string } };
 
 function getMarkdown(editor: Editor): string {
   return (editor.storage as unknown as MarkdownStorage).markdown.getMarkdown();
+}
+
+/** The document the editor is holding, in both spellings. */
+function valueOf(editor: Editor): RichTextValue {
+  return {
+    doc: editor.getJSON() as RichTextDoc,
+    markdown: getMarkdown(editor),
+  };
+}
+
+/**
+ * Whether the editor already holds what it is being given, so a re-render does
+ * not reset the document under the user.
+ *
+ * Each spelling is compared in its own terms: markdown as text, a doc against
+ * the editor's own JSON. Serialising to compare is cheap next to the
+ * `setContent` it avoids, which tears the document down and rebuilds it.
+ */
+function holdsContent(editor: Editor, content: string | RichTextDoc): boolean {
+  return typeof content === "string"
+    ? content === getMarkdown(editor)
+    : JSON.stringify(content) === JSON.stringify(editor.getJSON());
 }
 
 function Toolbar({ editor }: { editor: Editor }) {

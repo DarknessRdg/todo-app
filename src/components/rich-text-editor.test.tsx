@@ -3,6 +3,7 @@ import { setupUser, waitFor, type User } from "@/test/user";
 import { describe, expect, it, vi } from "vitest";
 
 import { RichTextEditor } from "@/components/rich-text-editor";
+import type { RichTextValue } from "@/lib/rich-text";
 
 const editor = "editor.content";
 const codeBlockButton = "editor.toolbar.codeblock.button";
@@ -16,14 +17,29 @@ const toolbar = "editor.toolbar";
 function renderEditor(
   props: Partial<Parameters<typeof RichTextEditor>[0]> = {}
 ) {
-  /** The markdown the editor hands back when focus leaves it. */
+  /**
+   * The markdown the editor hands back when focus leaves it.
+   *
+   * The editor reports both spellings of the document at once; these specs are
+   * about the markdown round trip, so the helper unwraps it and they assert on
+   * the string as they always have. `onSave` is the whole value, for the specs
+   * that are about the doc stored beside it.
+   */
   const onBlur = vi.fn<(markdown: string) => void>();
+  const onSave = vi.fn<(value: RichTextValue) => void>();
 
   const { rerender } = render(
-    <RichTextEditor testId={editor} onBlur={onBlur} {...props} />
+    <RichTextEditor
+      testId={editor}
+      onBlur={(value) => {
+        onSave(value);
+        onBlur(value.markdown);
+      }}
+      {...props}
+    />
   );
 
-  return { onBlur, rerender };
+  return { onBlur, onSave, rerender };
 }
 
 const blurEditor = () => fireEvent.blur(screen.getByTestId(editor));
@@ -1093,6 +1109,80 @@ describe("rich text editor", () => {
           expect.stringContaining("```ts\nfirst()\nsecond()\n```")
         )
       );
+    });
+  });
+
+  /**
+   * The parsed doc is stored beside the markdown so a description does not have
+   * to be re-parsed every time it is shown — the markdown stays the record, the
+   * doc is the copy that loads fast.
+   */
+  describe("when I leave the editor", () => {
+    it("Then the document is handed back parsed as well as as markdown", async () => {
+      const user = setupUser();
+      const { onSave } = renderEditor();
+
+      await user.click(screen.getByTestId(editor));
+      await user.keyboard("the notes");
+      blurEditor();
+
+      await waitFor(() => expect(onSave).toHaveBeenCalled());
+      const value = onSave.mock.lastCall?.[0];
+      expect(value?.markdown).toContain("the notes");
+      expect(value?.doc).toMatchObject({ type: "doc" });
+    });
+
+    it("Then that doc is enough to show the same document again, with no markdown", async () => {
+      const user = setupUser();
+      const { onSave } = renderEditor();
+
+      await user.click(screen.getByTestId(editor));
+      await user.keyboard("the notes");
+      blurEditor();
+      await waitFor(() => expect(onSave).toHaveBeenCalled());
+
+      cleanup();
+      renderEditor({ content: onSave.mock.lastCall?.[0].doc });
+
+      expect(await screen.findByTestId(editor)).toHaveTextContent("the notes");
+    });
+  });
+
+  describe("when I press escape in the text", () => {
+    it("Then what I wrote is handed back, the same as leaving the editor would", async () => {
+      const user = setupUser();
+      const onEscape = vi.fn<(value: RichTextValue) => void>();
+      renderEditor({ onEscape });
+
+      await user.click(screen.getByTestId(editor));
+      await user.keyboard("some notes{Escape}");
+
+      await waitFor(() => expect(onEscape).toHaveBeenCalled());
+      expect(onEscape.mock.lastCall?.[0].markdown).toContain("some notes");
+    });
+
+    /**
+     * Escape belongs to the innermost thing that can answer it, and while the
+     * shortcode list is up that is the list. Answering both would close the
+     * editor out from under someone who only meant to dismiss a menu.
+     */
+    it("Then the emoji list takes it first, leaving the editor alone", async () => {
+      const user = setupUser();
+      const onEscape = vi.fn<(value: RichTextValue) => void>();
+      renderEditor({ onEscape });
+
+      await user.click(screen.getByTestId(editor));
+      await user.keyboard(":tada");
+      await screen.findByTestId("editor.emoji.suggestions.tada.button");
+
+      await user.keyboard("{Escape}");
+
+      await waitFor(() =>
+        expect(
+          screen.queryByTestId("editor.emoji.suggestions")
+        ).not.toBeInTheDocument()
+      );
+      expect(onEscape).not.toHaveBeenCalled();
     });
   });
 

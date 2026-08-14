@@ -1,3 +1,4 @@
+import type { RichTextDoc } from "@/lib/rich-text";
 import { uuidV7 } from "@/lib/uuid";
 import { zodAsValidator } from "@/lib/validator";
 import type { IValidator } from "@/validators/validators";
@@ -12,7 +13,23 @@ const subtaskZodScheme = z.object({
 const createTodoZodScheme = z.object({
   title: z.string().nonempty({ error: "title-required" }),
   dueDate: z.date().optional(),
+  /**
+   * The description, as Markdown. This is the record of truth: portable,
+   * readable, and what the app falls back to whenever the parsed copy beside it
+   * is missing.
+   */
   description: z.string().optional(),
+  /**
+   * The same description, pre-parsed by the editor, so showing it does not mean
+   * parsing the markdown again — most of what a description costs to display.
+   *
+   * A cache, not a second source of truth. Written only together with
+   * `description`, so the two cannot drift apart; absent on rows that predate
+   * it and on anything restored from a markdown backup, which simply parse the
+   * markdown until their next save. Kept opaque — the shape belongs to the
+   * editor, and the domain stays free of it.
+   */
+  descriptionDoc: z.record(z.string(), z.unknown()).optional(),
   /** Which project it belongs to. Unset means the inbox — no project yet. */
   projectId: z.string().optional(),
 });
@@ -53,7 +70,11 @@ export interface TodoRepository {
     id: string;
     dueDate: Date | undefined;
   }): Promise<void>;
-  updateDescription(params: { id: string; description: string }): Promise<void>;
+  updateDescription(params: {
+    id: string;
+    description: string;
+    descriptionDoc: RichTextDoc | undefined;
+  }): Promise<void>;
   updateLabels(params: { id: string; labelIds: string[] }): Promise<void>;
   /** Takes one label off every todo carrying it — what deleting it means. */
   removeLabelEverywhere(labelId: string): Promise<void>;
@@ -137,7 +158,19 @@ export class TodoService {
     return this.repository.updateProject(params);
   };
 
-  updateDescription = async (params: { id: string; description: string }) => {
+  /**
+   * Saves a description in both spellings at once.
+   *
+   * Both always, never one: writing the markdown while leaving an older parsed
+   * copy in place would leave the fast path showing text the todo no longer
+   * says. A caller with no doc to offer passes `undefined`, which clears the
+   * stored one rather than stranding it.
+   */
+  updateDescription = async (params: {
+    id: string;
+    description: string;
+    descriptionDoc: RichTextDoc | undefined;
+  }) => {
     return this.repository.updateDescription(params);
   };
 

@@ -1,4 +1,5 @@
 import { Tables, type AppIDB } from "@/backend/adapter/indexed-db/indexed-db";
+import type { RichTextDoc } from "@/lib/rich-text";
 import type {
   SubtaskEntity,
   TodoEntity,
@@ -69,11 +70,20 @@ export class TodoRepositoryIndexedDB implements TodoRepository {
   updateDescription = async ({
     id,
     description,
+    descriptionDoc,
   }: {
     id: string;
     description: string;
+    descriptionDoc: RichTextDoc | undefined;
   }) => {
-    await this.mutateTodo(id, (todo) => ({ ...todo, description }));
+    // Both fields are set on every write, including to `undefined` — the
+    // parsed copy is only ever valid for the markdown it was saved with, so it
+    // must never survive a change to it.
+    await this.mutateTodo(id, (todo) => ({
+      ...todo,
+      description,
+      descriptionDoc,
+    }));
   };
 
   updateLabels = async ({

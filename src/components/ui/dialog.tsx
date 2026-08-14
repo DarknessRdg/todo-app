@@ -59,17 +59,23 @@ function DialogContent({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> &
   TestIdProps & {
-  showCloseButton?: boolean;
-  /** Escape hatch for the backdrop — e.g. owning the dismiss click yourself. */
-  overlayProps?: React.ComponentProps<typeof DialogOverlay>;
-}) {
+    showCloseButton?: boolean;
+    /** Escape hatch for the backdrop — e.g. owning the dismiss click yourself. */
+    overlayProps?: React.ComponentProps<typeof DialogOverlay>;
+  }) {
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay {...overlayProps} />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg",
+          // `focus:outline-none` because Radix focuses this container itself
+          // (it carries `tabIndex={-1}`) whenever the element that had focus
+          // disappears — closing the description editor with Escape, say. The
+          // browser then paints its default ring around the whole panel, which
+          // says nothing the open dialog does not already say. Re-apply this if
+          // this vendored file is regenerated.
+          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 focus:outline-none sm:max-w-lg",
           className
         )}
         {...props}
