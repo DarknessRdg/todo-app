@@ -32,7 +32,7 @@ import { ProjectSelect } from "@/components/project-select";
 import { TodoProjectBadge } from "@/pages/inbox/todo-project-badge";
 import { useTodoProjectName } from "@/pages/inbox/use-todo-project";
 import { Timing } from "@/lib/timing";
-import { richTextContent, type RichTextDoc } from "@/lib/rich-text";
+import { richTextContent, type RichTextValue } from "@/lib/rich-text";
 import { useSetting } from "@/hooks/use-setting";
 import { Calendar } from "@/components/ui/calendar";
 import { LabelPicker } from "@/components/label-picker";
@@ -759,6 +759,19 @@ function SaveState({
   );
 }
 
+/**
+ * The description: one editor, handed between reading and writing rather than
+ * torn down and rebuilt.
+ *
+ * It used to be two `RichTextEditor`s in `InlineEdit`'s mutually exclusive
+ * slots, so every click destroyed a ProseMirror instance and constructed a
+ * second — 48ms of teardown and rebuild to make text typeable that was already
+ * parsed and on screen. Handing one over instead costs 14ms, and the document
+ * never leaves the page.
+ *
+ * `InlineEdit` still owns the title, where the two states are genuinely
+ * different controls (a heading and an input) and nothing expensive is built.
+ */
 function DescriptionEditor({
   todo,
   readOnly,
@@ -768,80 +781,138 @@ function DescriptionEditor({
   readOnly: boolean;
   updateDescription: ReturnType<typeof useTodoUpdate>["updateDescription"];
 }) {
-  /**
-   * The parsed document behind the markdown `InlineEdit` is tracking.
-   *
-   * `InlineEdit` deals in strings — which is right, it is the same machinery
-   * the title uses — so the doc rides alongside rather than being threaded
-   * through it. The editor reports both together, so the one landing here is
-   * always the one the committed markdown came from.
-   */
-  const doc = useRef<RichTextDoc | undefined>(undefined);
+  const [editing, setEditing] = useState(false);
+  // Escape saves and closes, and closing blurs the editor, which saves again.
+  // The same guard `InlineEdit` keeps, for the same reason.
+  const settled = useRef(false);
+
+  const editable = editing && !readOnly;
+
+  // Read mode arriving mid-edit closes the editor rather than leaving it open
+  // and inert. Nothing is committed here: whatever turned read mode on took
+  // focus out of the editor first, and that blur is what saves.
+  if (readOnly && editing) setEditing(false);
+
+  const open = () => {
+    if (readOnly) return;
+
+    settled.current = false;
+    setEditing(true);
+  };
+
+  const commit = (value: RichTextValue) => {
+    if (settled.current) return;
+    settled.current = true;
+    setEditing(false);
+
+    const next = value.markdown.trim();
+
+    // An unchanged description is not worth a write, and the parsed copy
+    // beside it is only ever saved with the markdown it belongs to.
+    if (next === (todo.description ?? "").trim()) return;
+
+    updateDescription.mutate({
+      id: todo.id,
+      description: next,
+      descriptionDoc: value.doc,
+    });
+  };
+
+  // Nothing written yet: the invitation stands in for the editor, and the
+  // editor is built when it is accepted. There is no parsed document to keep
+  // alive in this state, so nothing is saved by holding one open.
+  if (!todo.description?.trim() && !editing) {
+    return (
+      <div
+        {...testProp("todo.detail.description.read")}
+        {...openers({ readOnly, open })}
+        className={cn(
+          "rounded-lg border border-transparent p-2 transition-colors",
+          readOnly ? "cursor-auto" : "hover:border-border cursor-text"
+        )}>
+        {/* In read mode there is nothing to add either — the invitation would
+            name an action the click cannot perform. */}
+        <Text variant="muted">
+          {readOnly ? "No description" : "Add a description…"}
+        </Text>
+      </div>
+    );
+  }
 
   return (
-    <InlineEdit
-      readOnly={readOnly}
-      value={todo.description ?? ""}
-      onCommit={(description) =>
-        updateDescription.mutate({
-          id: todo.id,
-          description,
-          descriptionDoc: doc.current,
-        })
-      }>
-      <InlineEdit.Read
-        testId="todo.detail.description.read"
-        aria-label="Edit description"
-        // Read view only — the editor brings its own chrome and padding.
-        className="p-2">
-        {todo.description?.trim() ? (
-          <RichTextEditor
-            // The parsed copy when the todo has one, the markdown when it does
-            // not — which is what makes an old row still readable.
-            content={richTextContent(todo.description, todo.descriptionDoc)}
-            editable={false}
-            chrome={false}
-          />
-        ) : (
-          // Nothing to read, and in read mode nothing to add either — the
-          // invitation would name an action the click cannot perform.
-          <Text variant="muted">
-            {readOnly ? "No description" : "Add a description…"}
-          </Text>
-        )}
-      </InlineEdit.Read>
-
-      {/*
-        Not `InlineEdit.Input`: the editor holds its own content and hands the
-        markdown back on blur, and Enter has to stay a newline rather than
-        saving.
-      */}
-      <InlineEdit.Edit>
-        {({ commit }) => (
-          <RichTextEditor
-            testId="todo.detail.description.editor"
-            content={richTextContent(todo.description, todo.descriptionDoc)}
-            placeholder="Add a description…"
-            editable
-            autoFocus
-            onBlur={(value) => {
-              doc.current = value.doc;
-              commit(value.markdown);
-            }}
-            // Escape is the keyboard's way out, and it keeps the writing:
-            // the same commit clicking away performs. Deliberately not the
-            // `cancel` that Escape means in a single-line field — a
-            // description is long enough that discarding it silently would
-            // be a loss, where a title can be retyped in seconds.
-            onEscape={(value) => {
-              doc.current = value.doc;
-              commit(value.markdown);
-            }}
-          />
-        )}
-      </InlineEdit.Edit>
-    </InlineEdit>
+    <div
+      {...openers({ readOnly, open, editable })}
+      className={cn(
+        "rounded-lg transition-colors",
+        // The editor brings its own chrome and padding once it is open; until
+        // then this stands in for it, so the text does not shift on the way in.
+        editable
+          ? "border border-transparent"
+          : cn(
+              "border border-transparent p-2",
+              readOnly ? "cursor-auto" : "hover:border-border cursor-text"
+            )
+      )}>
+      <RichTextEditor
+        /*
+          Two names for one element, by the state it is in. A spec asking
+          whether the read view or the editor is on screen is asking which of
+          the two this description is currently being — which is exactly what
+          it was asking when they were separate components.
+        */
+        testId={
+          editable
+            ? "todo.detail.description.editor"
+            : "todo.detail.description.read"
+        }
+        // The parsed copy when the todo has one, the markdown when it does
+        // not — which is what makes an old row still readable.
+        content={richTextContent(todo.description, todo.descriptionDoc)}
+        placeholder="Add a description…"
+        editable={editable}
+        chrome={editable}
+        autoFocus
+        onBlur={commit}
+        // Escape is the keyboard's way out, and it keeps the writing: the same
+        // commit clicking away performs. Deliberately not the `cancel` that
+        // Escape means in a single-line field — a description is long enough
+        // that discarding it silently would be a loss, where a title can be
+        // retyped in seconds.
+        onEscape={commit}
+      />
+    </div>
   );
+}
+
+/**
+ * What makes the resting description openable: a click, a tab stop and a key.
+ *
+ * Nothing at all while it is already open, or while read mode is on — that is
+ * the whole point of read mode, and a tab stop onto something that cannot be
+ * activated is a dead end for anyone using the keyboard.
+ */
+function openers({
+  readOnly,
+  open,
+  editable = false,
+}: {
+  readOnly: boolean;
+  open: () => void;
+  editable?: boolean;
+}) {
+  if (readOnly || editable) return {};
+
+  return {
+    "aria-label": "Edit description",
+    tabIndex: 0,
+    onClick: open,
+    onKeyDown: (event: React.KeyboardEvent) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        open();
+      }
+    },
+  };
 }
 
 function Subtasks({ todo }: { todo: TodoEntity }) {

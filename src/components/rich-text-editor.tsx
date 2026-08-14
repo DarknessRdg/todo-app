@@ -621,6 +621,20 @@ export function RichTextEditor({
   suggestionRef.current = suggestion;
   highlightedRef.current = highlighted;
 
+  /**
+   * What the editable element wears. Recomputed every render and re-applied
+   * below, because `useEditor` builds the editor once: everything passed here
+   * is a snapshot of the first render unless something says otherwise.
+   */
+  const editorAttributes = {
+    class: cn(
+      chrome ? "min-h-24 p-2" : "",
+      "outline-none md:text-sm",
+      className
+    ),
+    ...testProp(testId),
+  };
+
   const editor = useEditor({
     extensions: [
       // StarterKit ships a plain code block; swap it for the lowlight one so
@@ -684,17 +698,12 @@ export function RichTextEditor({
     ],
     content,
     editable,
-    autofocus: autoFocus ? "end" : false,
-    editorProps: {
-      attributes: {
-        class: cn(
-          chrome ? "min-h-24 p-2" : "",
-          "outline-none md:text-sm",
-          className
-        ),
-        ...testProp(testId),
-      },
-    },
+    // Only when it is born editable. A mounted editor is handed over by the
+    // effect below, which focuses it then — autofocusing a read-only editor
+    // on page load would take the caret for a document nobody asked to write
+    // in.
+    autofocus: autoFocus && editable ? "end" : false,
+    editorProps: { attributes: editorAttributes },
     // Focus moving into the editor's own chrome (the toolbar, the link popover)
     // is not the user leaving the editor — reporting a blur there tears down
     // click-to-edit views mid-interaction, closing the editor as the popover
@@ -704,6 +713,35 @@ export function RichTextEditor({
       onBlur?.(valueOf(editor));
     },
   });
+
+  /**
+   * Keeps a mounted editor in step with its props.
+   *
+   * `useEditor` reads its options once, at creation, and never looks at them
+   * again — so before this, flipping `editable` on a mounted editor changed
+   * nothing but the toolbar, leaving a full set of controls above a surface
+   * that could not be typed into. That is what lets one editor be handed
+   * between reading and writing instead of a second one being built: the
+   * document stays parsed and on screen, and only its editability changes.
+   *
+   * `autoFocus` is honoured on the handover rather than at mount, so the caret
+   * lands in the text at the moment it becomes writable.
+   */
+  useEffect(() => {
+    if (!editor) return;
+
+    const wasEditable = editor.isEditable;
+
+    if (wasEditable !== editable) editor.setEditable(editable);
+    editor.setOptions({ editorProps: { attributes: editorAttributes } });
+
+    if (autoFocus && editable && !wasEditable) {
+      editor.commands.focus("end");
+    }
+    // `editorAttributes` is a fresh object every render; the values inside it
+    // are what matter, so the effect keys on those instead.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, editable, autoFocus, editorAttributes.class, testId]);
 
   /**
    * Escape hands the document back and leaves the editor.
@@ -757,20 +795,17 @@ export function RichTextEditor({
     />
   );
 
-  if (!chrome) {
-    return (
-      <>
-        <EditorContent editor={editor} />
-        {emojiList}
-      </>
-    );
-  }
-
+  // One root either way. Returning a fragment when there is no chrome would
+  // put `EditorContent` under a different parent as `chrome` flips, which
+  // unmounts it — and rebuilding the view is the whole thing being avoided.
   return (
     <div
       data-editor-chrome=""
-      className="focus-within:ring-ring rounded-lg border focus-within:ring-1">
-      {editable && editor && <Toolbar editor={editor} />}
+      className={cn(
+        "rounded-lg",
+        chrome && "focus-within:ring-ring border focus-within:ring-1"
+      )}>
+      {chrome && editable && editor && <Toolbar editor={editor} />}
       <EditorContent editor={editor} />
       {emojiList}
     </div>

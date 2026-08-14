@@ -1117,6 +1117,56 @@ describe("rich text editor", () => {
    * to be re-parsed every time it is shown — the markdown stays the record, the
    * doc is the copy that loads fast.
    */
+  /**
+   * Handing one mounted editor between reading and writing, rather than
+   * building a second one: the document is already parsed and on screen, and
+   * rebuilding it to make it typeable is most of what opening a description
+   * costs.
+   */
+  describe("when a mounted editor is handed over for editing", () => {
+    it("Then the text can be typed into, not just the toolbar shown", async () => {
+      const user = setupUser();
+      const onBlur = vi.fn<(value: RichTextValue) => void>();
+
+      const { rerender } = render(
+        <RichTextEditor testId={editor} editable={false} onBlur={onBlur} />
+      );
+      rerender(<RichTextEditor testId={editor} editable onBlur={onBlur} />);
+
+      await user.click(screen.getByTestId(editor));
+      await user.keyboard("typed after the handover");
+      blurEditor();
+
+      await waitFor(() => expect(onBlur).toHaveBeenCalled());
+      expect(onBlur.mock.lastCall?.[0].markdown).toContain(
+        "typed after the handover"
+      );
+    });
+
+    it("Then handing it back stops it taking text again", async () => {
+      const user = setupUser();
+      const onBlur = vi.fn<(value: RichTextValue) => void>();
+
+      const { rerender } = render(
+        <RichTextEditor testId={editor} editable onBlur={onBlur} />
+      );
+      await user.click(screen.getByTestId(editor));
+      await user.keyboard("while it was open");
+
+      rerender(
+        <RichTextEditor testId={editor} editable={false} onBlur={onBlur} />
+      );
+      await user.click(screen.getByTestId(editor));
+      await user.keyboard("after it was closed");
+      blurEditor();
+
+      await waitFor(() => expect(onBlur).toHaveBeenCalled());
+      expect(onBlur.mock.lastCall?.[0].markdown).not.toContain(
+        "after it was closed"
+      );
+    });
+  });
+
   describe("when I leave the editor", () => {
     it("Then the document is handed back parsed as well as as markdown", async () => {
       const user = setupUser();
