@@ -1,4 +1,5 @@
 /// <reference types="vitest/config" />
+import { execSync } from "child_process";
 import fs from "fs";
 import path from "path";
 import tailwindcss from "@tailwindcss/vite";
@@ -40,9 +41,38 @@ function githubPagesSpaFallback(): Plugin {
   };
 }
 
+/**
+ * The commit the bundle was built from, which is the app's version.
+ *
+ * `package.json` is never bumped — a client-only app that ships on every green
+ * push to main has no release number to bump — so the short sha is the only
+ * thing that tells two builds apart. Failing softly matters: a checkout without
+ * git history (a tarball, some CI runners) must still build, it just cannot say
+ * which commit it is, and `src/lib/version.ts` falls back for it.
+ */
+function buildVersion(): string {
+  try {
+    return execSync("git rev-parse --short HEAD", {
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+      .toString()
+      .trim();
+  } catch {
+    return "";
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ command }) => ({
   base: command === "build" ? ProjectPageBase : "/",
+  // Stamped rather than read at runtime: there is no server to ask, and the
+  // sha has to survive into the static bundle. Only the build carries one —
+  // the dev server reports itself as a dev build.
+  define: {
+    "import.meta.env.VITE_APP_VERSION": JSON.stringify(
+      command === "build" ? buildVersion() : ""
+    ),
+  },
   plugins: [react(), tailwindcss(), githubPagesSpaFallback()],
   resolve: {
     alias: {

@@ -2,6 +2,7 @@ import { screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { AppRouteTable } from "@/router";
+import { AppVersion } from "@/lib/version";
 import { readSetting, writeSetting } from "@/lib/settings";
 import { renderWithContainer } from "@/test/container";
 import { setupUser, waitFor } from "@/test/user";
@@ -13,6 +14,9 @@ const darkTheme = "settings.appearance.theme.dark";
 const hideDone = "settings.lists.hidedone.toggle";
 const viewRead = "settings.todos.defaultview.read";
 const viewWrite = "settings.todos.defaultview.write";
+const version = "settings.about.version";
+const author = "settings.about.author.link";
+const issues = "settings.about.issues.link";
 
 /**
  * Rendered through the real route table rather than the component: the section
@@ -55,7 +59,7 @@ describe("settings page", () => {
     it("Then each group is an anchor carrying its own url", async () => {
       renderSettings();
 
-      for (const id of ["appearance", "lists", "todos"]) {
+      for (const id of ["appearance", "lists", "todos", "about"]) {
         const link = await screen.findByTestId(tab(id));
         expect(link.tagName).toBe("A");
         expect(link).toHaveAttribute("href", `/settings/${id}`);
@@ -99,6 +103,44 @@ describe("settings page", () => {
 
     await screen.findByTestId(panel("appearance"));
     await waitFor(() => expect(currentLocation()).toBe("/settings"));
+  });
+
+  it("when I open the about group, Then it names the build the app is running", async () => {
+    renderSettings("/settings/about");
+
+    expect(await screen.findByTestId(version)).toHaveTextContent(AppVersion);
+  });
+
+  describe("when I open the about group", () => {
+    it("Then the author's profile is a link out to it", async () => {
+      renderSettings("/settings/about");
+
+      const link = await screen.findByTestId(author);
+
+      expect(link).toHaveAttribute("href", "https://github.com/DarknessRdg");
+    });
+
+    it("Then the project's issues are a link out to them", async () => {
+      renderSettings("/settings/about");
+
+      expect(await screen.findByTestId(issues)).toHaveAttribute(
+        "href",
+        "https://github.com/DarknessRdg/todo-app/issues"
+      );
+    });
+
+    it("Then that link opens away from the app rather than replacing it", async () => {
+      renderSettings("/settings/about");
+
+      expect(await screen.findByTestId(author)).toHaveAttribute(
+        "target",
+        "_blank"
+      );
+      expect(await screen.findByTestId(issues)).toHaveAttribute(
+        "target",
+        "_blank"
+      );
+    });
   });
 
   describe("when I pick a theme", () => {

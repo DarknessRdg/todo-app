@@ -1,4 +1,13 @@
-import { ListChecks, Palette, SquarePen, type LucideIcon } from "lucide-react";
+import {
+  ArrowUpRight,
+  CircleDot,
+  Github,
+  Info,
+  ListChecks,
+  Palette,
+  SquarePen,
+  type LucideIcon,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { Link, Navigate, useParams } from "react-router";
 
@@ -7,6 +16,7 @@ import { Text } from "@/components/ui/text";
 import { useSetting } from "@/hooks/use-setting";
 import { useTheme } from "@/hooks/use-theme";
 import { testProp } from "@/lib/test-id";
+import { AppVersion } from "@/lib/version";
 import { cn } from "@/lib/utils";
 
 /**
@@ -19,7 +29,7 @@ import { cn } from "@/lib/utils";
  * makes a page unlinkable.
  */
 
-type SectionId = "appearance" | "lists" | "todos";
+type SectionId = "appearance" | "lists" | "todos" | "about";
 
 type Section = {
   id: SectionId;
@@ -47,6 +57,12 @@ const sections: Section[] = [
     title: "Todos",
     summary: "How a todo opens when you go into it.",
     icon: SquarePen,
+  },
+  {
+    id: "about",
+    title: "About",
+    summary: "Who made this, and which build of it you are running.",
+    icon: Info,
   },
 ];
 
@@ -147,6 +163,8 @@ function Panel({ section }: { section: SectionId }) {
       return <ListsSettings />;
     case "todos":
       return <TodoSettings />;
+    case "about":
+      return <AboutSettings />;
   }
 }
 
@@ -366,6 +384,119 @@ function ChoiceCard({
         {description}
       </Text>
     </button>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* About                                                                        */
+/* -------------------------------------------------------------------------- */
+
+/** Who wrote the app, and where to find them. */
+const AuthorName = "Luan Rodrigues";
+const AuthorHandle = "DarknessRdg";
+const AuthorProfile = `https://github.com/${AuthorHandle}`;
+/** Where a bug goes. The repository's own tracker, not an email nobody reads. */
+const IssuesUrl = `${AuthorProfile}/todo-app/issues`;
+
+/**
+ * Who made the app and which build is on screen. Nothing here is a setting — it is the one thing a
+ * bug report needs and the app otherwise never says out loud, so it lives in
+ * its own group rather than as a footnote nailed under the sidebar.
+ */
+function AboutSettings() {
+  return (
+    <div className="flex flex-col gap-4">
+      <SettingCard>
+        <SettingHeading
+          title="Made by"
+          description="A side project by one developer. Bugs and ideas are welcome on GitHub."
+        />
+
+        <ExternalLink
+          testId="settings.about.author.link"
+          href={AuthorProfile}
+          icon={Github}
+          title={AuthorName}
+          subtitle={`github.com/${AuthorHandle}`}
+        />
+      </SettingCard>
+
+      <SettingCard>
+        <SettingHeading
+          title="Found a bug?"
+          description="Open an issue on the repository — what you did, and what happened instead. The version below is worth pasting in."
+        />
+
+        <ExternalLink
+          testId="settings.about.issues.link"
+          href={IssuesUrl}
+          icon={CircleDot}
+          title="Issues"
+          subtitle="github.com/DarknessRdg/todo-app/issues"
+        />
+      </SettingCard>
+
+      <SettingCard>
+        <SettingHeading
+          title="Version"
+          description="The commit this build came from. Worth quoting when something looks wrong."
+        />
+
+        <Text
+          testId="settings.about.version"
+          as="span"
+          className="font-mono text-sm tabular-nums">
+          {AppVersion}
+        </Text>
+      </SettingCard>
+    </div>
+  );
+}
+
+/**
+ * A row that leaves the app.
+ *
+ * A real anchor to another origin, so it is `target="_blank"` and carries
+ * `rel` — going to GitHub is the point, and dropping the app to get there is
+ * not. The arrow says so before it is clicked.
+ */
+function ExternalLink({
+  testId,
+  href,
+  icon: Icon,
+  title,
+  subtitle,
+}: {
+  testId: string;
+  href: string;
+  icon: LucideIcon;
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer noopener"
+      {...testProp(testId)}
+      className="hover:bg-accent flex max-w-88 items-center gap-3 rounded-xl p-2 transition-colors">
+      <span
+        aria-hidden
+        className="bg-primary text-primary-foreground flex size-9 shrink-0 items-center justify-center rounded-full">
+        <Icon className="size-4.5" />
+      </span>
+
+      <span className="flex min-w-0 flex-col">
+        <Text as="span" className="text-sm font-medium">
+          {title}
+        </Text>
+        <Text variant="muted" as="span" className="truncate text-xs">
+          {subtitle}
+        </Text>
+      </span>
+
+      <ArrowUpRight className="text-muted-foreground ml-auto size-4 shrink-0" />
+    </a>
   );
 }
 
