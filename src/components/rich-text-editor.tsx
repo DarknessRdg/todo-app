@@ -24,7 +24,7 @@ import { Paragraph } from "@tiptap/extension-paragraph";
 import { Heading } from "@tiptap/extension-heading";
 import { Extension, getHTMLFromFragment } from "@tiptap/core";
 import { Fragment, type Node as ProseMirrorNode } from "@tiptap/pm/model";
-import { PluginKey } from "@tiptap/pm/state";
+import { Plugin, PluginKey } from "@tiptap/pm/state";
 import Suggestion, { type SuggestionProps } from "@tiptap/suggestion";
 import { loadEmojis, searchEmojis, type Emoji } from "@/lib/emoji";
 import type { MarkdownSerializerState } from "prosemirror-markdown";
@@ -140,7 +140,61 @@ const CodeBlockWithLanguage = CodeBlockLowlight.extend({
   addNodeView() {
     return ReactNodeViewRenderer(CodeBlockView);
   },
+
+  /**
+   * Copying out of a text editor puts three flavours on the clipboard at once:
+   * the plain text, a syntax-coloured `text/html` rendering of it, and VS
+   * Code's `vscode-editor-data` naming the language. The code block ships a
+   * handler for that last one, which turns any such paste into a fenced block
+   * — right for a `.ts` file, wrong for a `.md` one, where it buries the
+   * markdown the editor exists to render.
+   *
+   * So the markdown modes are pulled out first and parsed as markdown; every
+   * other language falls through to the stock handler and still lands in a
+   * code block.
+   */
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        key: new PluginKey("codeBlockMarkdownPasteHandler"),
+        props: {
+          handlePaste: (_view, event) => {
+            const clipboard = event.clipboardData;
+            if (clipboard === null) return false;
+            // Inside a code block a paste is literal text, markdown included.
+            if (this.editor.isActive(this.type.name)) return false;
+
+            const text = clipboard.getData("text/plain");
+            if (!text || !isMarkdownClipboard(clipboard)) return false;
+
+            // The html flavour is a colourised rendering of the same text, so
+            // it is dropped: the plain text is the markdown, and parsing it is
+            // the whole point.
+            return this.editor.commands.insertContent(
+              parseMarkdown(this.editor, text)
+            );
+          },
+        },
+      }),
+      ...(this.parent?.() ?? []),
+    ];
+  },
 });
+
+/** The VS Code editor modes whose content *is* markdown rather than code. */
+const MarkdownModes = new Set(["markdown", "md", "mdx"]);
+
+/** Whether a clipboard payload was copied out of a markdown file. */
+function isMarkdownClipboard(clipboard: DataTransfer): boolean {
+  const vscode = clipboard.getData("vscode-editor-data");
+  if (!vscode) return false;
+
+  try {
+    return MarkdownModes.has(JSON.parse(vscode)?.mode);
+  } catch {
+    return false;
+  }
+}
 
 function CodeBlockView({
   node,
@@ -693,7 +747,12 @@ export function RichTextEditor({
           return false;
         },
       }),
-      Markdown,
+      // `transformPastedText` is what makes a plain-text paste — a markdown file
+      // out of a terminal, a raw GitHub view, another note — arrive as rich
+      // text instead of as its own source. A paste that carries real `text/html`
+      // (a web page) is untouched: ProseMirror prefers the html flavour and
+      // never reaches the text parser.
+      Markdown.configure({ transformPastedText: true }),
       Placeholder.configure({ placeholder }),
     ],
     content,
@@ -897,10 +956,24 @@ function movedIntoEditorChrome(event: FocusEvent) {
 
 // tiptap-markdown augments the editor storage at runtime but ships no types
 // for it, so we read the serializer through a narrow typed view.
-type MarkdownStorage = { markdown: { getMarkdown: () => string } };
+type MarkdownStorage = {
+  markdown: {
+    getMarkdown: () => string;
+    parser: {
+      parse: (markdown: string, options?: { inline?: boolean }) => string;
+    };
+  };
+};
 
 function getMarkdown(editor: Editor): string {
   return (editor.storage as unknown as MarkdownStorage).markdown.getMarkdown();
+}
+
+/** Markdown source rendered to the html tiptap parses documents from. */
+function parseMarkdown(editor: Editor, markdown: string): string {
+  return (editor.storage as unknown as MarkdownStorage).markdown.parser.parse(
+    markdown
+  );
 }
 
 /** The document the editor is holding, in both spellings. */
