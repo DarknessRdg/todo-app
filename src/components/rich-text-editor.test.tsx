@@ -44,6 +44,37 @@ function renderEditor(
 
 const blurEditor = () => fireEvent.blur(screen.getByTestId(editor));
 
+/**
+ * Fires a paste the way a real clipboard arrives.
+ *
+ * A copy out of a code editor carries three flavours at once: the plain text,
+ * a syntax-coloured `text/html` rendering of it, and VS Code's own
+ * `vscode-editor-data` naming the language it was copied from. Which of them
+ * the editor trusts is the whole point of these specs, so the fake carries all
+ * three.
+ */
+function paste({
+  text,
+  html = "",
+  mode,
+}: {
+  text: string;
+  html?: string;
+  mode?: string;
+}) {
+  fireEvent.paste(screen.getByTestId(editor), {
+    clipboardData: {
+      getData: (type: string) => {
+        if (type === "text/plain") return text;
+        if (type === "text/html") return html;
+        if (type === "vscode-editor-data" && mode !== undefined)
+          return JSON.stringify({ mode });
+        return "";
+      },
+    },
+  });
+}
+
 /** Selects the whole document, so a spec can act on "the selected text". */
 const selectAll = (user: User) => user.keyboard("{Control>}a{/Control}");
 
@@ -1250,6 +1281,59 @@ describe("rich text editor", () => {
       await waitFor(() =>
         expect(onBlur).toHaveBeenCalledWith(
           expect.stringContaining("[the docs](https://example.com/docs)")
+        )
+      );
+    });
+  });
+
+  describe("when I paste markdown copied out of a code editor", () => {
+    it("Then it is parsed as rich text instead of becoming a code block", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor();
+
+      await user.click(screen.getByTestId(editor));
+      paste({
+        text: "# Roadmap\n\nShip the **thing**.",
+        html: '<div style="color: #1f1f1f"><span># Roadmap</span></div>',
+        mode: "markdown",
+      });
+      blurEditor();
+
+      await waitFor(() =>
+        expect(onBlur).toHaveBeenCalledWith("# Roadmap\n\nShip the **thing**.")
+      );
+    });
+  });
+
+  describe("when I paste code copied out of a code editor", () => {
+    it("Then it still becomes a fenced code block in that language", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor();
+
+      await user.click(screen.getByTestId(editor));
+      paste({ text: "const answer = 42", mode: "typescript" });
+      blurEditor();
+
+      await waitFor(() =>
+        expect(onBlur).toHaveBeenCalledWith(
+          expect.stringContaining("```typescript\nconst answer = 42\n```")
+        )
+      );
+    });
+  });
+
+  describe("when I paste markdown as plain text", () => {
+    it("Then its syntax is parsed rather than kept literal", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor();
+
+      await user.click(screen.getByTestId(editor));
+      paste({ text: "## Notes\n\n- first\n- second" });
+      blurEditor();
+
+      await waitFor(() =>
+        expect(onBlur).toHaveBeenCalledWith(
+          expect.stringContaining("## Notes\n\n- first\n- second")
         )
       );
     });
