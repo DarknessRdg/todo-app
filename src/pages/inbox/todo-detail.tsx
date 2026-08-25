@@ -63,29 +63,41 @@ import { Skeleton } from "@/components/ui/skeleton";
 /* Header                                                                      */
 /* -------------------------------------------------------------------------- */
 
-export function TodoDetailHeader({
+/**
+ * Where this todo is and what can be done to the whole of it: the trail, and
+ * the container's own buttons.
+ *
+ * Split out from the heading below because the modal pins this and scrolls
+ * everything else — a trail that scrolls away takes the close button with it.
+ */
+export function TodoDetailTopBar({
   todo,
   actions,
 }: {
   todo: TodoEntity;
   actions?: ReactNode;
 }) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <div className="text-muted-foreground flex items-center gap-2 text-xs font-medium">
+        <span className="text-foreground/70">Inbox</span>
+        <span className="opacity-40">/</span>
+        <TodoBreadcrumbProject projectId={todo.projectId} />
+        <span>{shortId(todo.id)}</span>
+      </div>
+      {actions ? (
+        <div className="flex shrink-0 items-center gap-1">{actions}</div>
+      ) : null}
+    </div>
+  );
+}
+
+/** The todo itself: its checkbox, its name, and what it is at a glance. */
+export function TodoDetailHeading({ todo }: { todo: TodoEntity }) {
   const meta = metaFor(todo.id);
 
   return (
-    <header className="flex flex-col gap-4">
-      <div className="flex items-start justify-between gap-4">
-        <div className="text-muted-foreground flex items-center gap-2 text-xs font-medium">
-          <span className="text-foreground/70">Inbox</span>
-          <span className="opacity-40">/</span>
-          <TodoBreadcrumbProject projectId={todo.projectId} />
-          <span>{shortId(todo.id)}</span>
-        </div>
-        {actions ? (
-          <div className="flex shrink-0 items-center gap-1">{actions}</div>
-        ) : null}
-      </div>
-
+    <div className="flex flex-col gap-4">
       <div className="flex items-start gap-3">
         <span className="mt-1.5 shrink-0">
           <TodoCompletion todo={todo} />
@@ -99,6 +111,22 @@ export function TodoDetailHeader({
         {todo.dueDate ? <DueBadge date={todo.dueDate} /> : null}
         <TodoProjectBadge projectId={todo.projectId} />
       </div>
+    </div>
+  );
+}
+
+/** Both halves together, for the page, where the whole document scrolls as one. */
+export function TodoDetailHeader({
+  todo,
+  actions,
+}: {
+  todo: TodoEntity;
+  actions?: ReactNode;
+}) {
+  return (
+    <header className="flex flex-col gap-4">
+      <TodoDetailTopBar todo={todo} actions={actions} />
+      <TodoDetailHeading todo={todo} />
     </header>
   );
 }
@@ -107,10 +135,44 @@ export function TodoDetailHeader({
 /* Body: two-column — main content + properties panel                          */
 /* -------------------------------------------------------------------------- */
 
-export function TodoDetailBody({ todo }: { todo: TodoEntity }) {
+export function TodoDetailBody({
+  todo,
+  heading,
+  panes = false,
+}: {
+  todo: TodoEntity;
+  /** Rendered at the top of the reading column, for frames that scroll it. */
+  heading?: ReactNode;
+  /**
+   * Two panes that scroll independently, rather than one document that scrolls
+   * as a whole.
+   *
+   * Only from `lg` up, where the two columns are actually side by side. Stacked
+   * on a narrow screen they are one column of two boxes, and giving each its own
+   * scrollbar there would mean scrolling a 200px window inside a page that
+   * cannot scroll — so below that breakpoint the pane container scrolls instead
+   * and the layout is the page's again.
+   */
+  panes?: boolean;
+}) {
   return (
-    <div className="grid flex-1 items-stretch gap-8 lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_18rem]">
-      <main className="flex min-w-0 flex-col gap-8">
+    <div
+      className={cn(
+        "grid gap-8 lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_18rem]",
+        panes
+          ? // `minmax(0,1fr)` on the row, not just `1fr`: a grid row's default
+            // minimum is its content, so without it the row grows to fit the
+            // description and the panes never reach a height they can scroll at.
+            "min-h-0 flex-1 overflow-y-auto lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden"
+          : "flex-1 items-stretch"
+      )}>
+      <main
+        className={cn(
+          "flex min-w-0 flex-col gap-8",
+          panes && "lg:min-h-0 lg:overflow-y-auto lg:pr-6 lg:pb-2"
+        )}>
+        {heading}
+
         {/* Keyed so nothing follows the pane to another todo: the save notice
             belongs to the description it was written in, and read mode is a
             way to read *this* one rather than a setting. */}
@@ -119,7 +181,7 @@ export function TodoDetailBody({ todo }: { todo: TodoEntity }) {
         <Subtasks todo={todo} />
       </main>
 
-      <PropertiesPanel todo={todo} />
+      <PropertiesPanel todo={todo} panes={panes} />
     </div>
   );
 }
@@ -139,8 +201,22 @@ export type TodoDetailView =
   | { status: "missing"; content: ReactNode }
   | { status: "ready"; content: ReactNode; todo: TodoEntity };
 
+/**
+ * How the container wants the detail laid out.
+ *
+ * `flow` is a document: one column of content that scrolls with whatever holds
+ * it, which is the page. `panes` is a bounded frame: the trail stays put, and
+ * the reading column and the properties scroll under it on their own — which is
+ * what a dialog with a fixed height needs, and what a page does not have the
+ * height to do.
+ *
+ * The pieces are the same either way; only their arrangement differs.
+ */
+export type TodoDetailFrame = "flow" | "panes";
+
 type TodoDetailProps = {
   headerActions?: ReactNode;
+  frame?: TodoDetailFrame;
 } & (
   | { todo: TodoEntity; id?: never; children?: never }
   | {
@@ -168,12 +244,20 @@ type TodoDetailProps = {
  * their wrapper. A fix to the detail (the description editor's link popover,
  * say) therefore cannot land in one and miss the other.
  */
-export function TodoDetail({ headerActions, ...props }: TodoDetailProps) {
+export function TodoDetail({
+  headerActions,
+  frame = "flow",
+  ...props
+}: TodoDetailProps) {
   // Two components rather than a conditional hook: the id form has to read the
   // query, the model form must not.
   if (props.todo !== undefined) {
     return (
-      <TodoDetailContent todo={props.todo} headerActions={headerActions} />
+      <TodoDetailContent
+        todo={props.todo}
+        headerActions={headerActions}
+        frame={frame}
+      />
     );
   }
 
@@ -181,6 +265,7 @@ export function TodoDetail({ headerActions, ...props }: TodoDetailProps) {
     <ResolvedTodoDetail
       id={props.id}
       headerActions={headerActions}
+      frame={frame}
       onLeave={props.onLeave}>
       {props.children}
     </ResolvedTodoDetail>
@@ -190,10 +275,25 @@ export function TodoDetail({ headerActions, ...props }: TodoDetailProps) {
 function TodoDetailContent({
   todo,
   headerActions,
+  frame = "flow",
 }: {
   todo: TodoEntity;
   headerActions?: ReactNode;
+  frame?: TodoDetailFrame;
 }) {
+  if (frame === "panes") {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col gap-5">
+        <TodoDetailTopBar todo={todo} actions={headerActions} />
+        <TodoDetailBody
+          todo={todo}
+          panes
+          heading={<TodoDetailHeading todo={todo} />}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-full flex-col gap-8">
       <TodoDetailHeader todo={todo} actions={headerActions} />
@@ -208,11 +308,13 @@ const bareContainer = (view: TodoDetailView) => view.content;
 function ResolvedTodoDetail({
   id,
   headerActions,
+  frame,
   onLeave,
   children = bareContainer,
 }: {
   id: string;
   headerActions?: ReactNode;
+  frame?: TodoDetailFrame;
   onLeave?: () => void;
   children?: (view: TodoDetailView) => ReactNode;
 }) {
@@ -253,7 +355,13 @@ function ResolvedTodoDetail({
   return children({
     status: "ready",
     todo,
-    content: <TodoDetailContent todo={todo} headerActions={headerActions} />,
+    content: (
+      <TodoDetailContent
+        todo={todo}
+        headerActions={headerActions}
+        frame={frame}
+      />
+    ),
   });
 }
 
@@ -344,11 +452,26 @@ function DetailMissing({ onLeave }: { onLeave: () => void }) {
 /* Properties panel                                                            */
 /* -------------------------------------------------------------------------- */
 
-function PropertiesPanel({ todo }: { todo: TodoEntity }) {
+function PropertiesPanel({
+  todo,
+  panes = false,
+}: {
+  todo: TodoEntity;
+  panes?: boolean;
+}) {
   const meta = metaFor(todo.id);
 
   return (
-    <aside className="lg:border-border flex flex-col gap-1 lg:border-l lg:pl-8">
+    <aside
+      className={cn(
+        "lg:border-border flex min-w-0 flex-col gap-1 lg:border-l lg:pl-8",
+        // `overflow-x-hidden` explicitly: a box that scrolls on one axis is
+        // never `visible` on the other, so `overflow-y-auto` on its own turns
+        // the sideways overflow into a second scrollbar rather than letting it
+        // spill. The rows below shrink instead of pushing, so there is nothing
+        // out there to reach — only a bar that should not exist.
+        panes && "lg:min-h-0 lg:overflow-x-hidden lg:overflow-y-auto lg:pb-2"
+      )}>
       <Text variant="eyebrow" className="mb-3">
         Properties
       </Text>
@@ -440,12 +563,16 @@ function PropertyRow({
   children: ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 py-1.5">
-      <span className="text-muted-foreground flex items-center gap-2 text-sm">
+    <div className="flex min-w-0 items-center justify-between gap-3 py-1.5">
+      {/* The label holds its width and the value gives way: "Project" is the
+          same three inches whatever it names, and a flex item's floor is its
+          content unless it is told otherwise — which is what made a long
+          project name widen the whole column. */}
+      <span className="text-muted-foreground flex shrink-0 items-center gap-2 text-sm">
         {icon}
         {label}
       </span>
-      <div className="flex items-center">{children}</div>
+      <div className="flex min-w-0 items-center justify-end">{children}</div>
     </div>
   );
 }
@@ -832,27 +959,21 @@ function DescriptionEditor({
   updateDescription: ReturnType<typeof useTodoUpdate>["updateDescription"];
 }) {
   const [editing, setEditing] = useState(false);
-  // Escape saves and closes, and closing blurs the editor, which saves again.
-  // The same guard `InlineEdit` keeps, for the same reason.
-  const settled = useRef(false);
 
   const editable = editing && !readOnly;
 
   // Read mode arriving mid-edit closes the editor rather than leaving it open
-  // and inert. Nothing is committed here: whatever turned read mode on took
-  // focus out of the editor first, and that blur is what saves.
+  // and inert. Nothing is committed here: reading is not saving, and the todo
+  // keeps whatever was last saved to it.
   if (readOnly && editing) setEditing(false);
 
   const open = () => {
     if (readOnly) return;
 
-    settled.current = false;
     setEditing(true);
   };
 
   const commit = (value: RichTextValue) => {
-    if (settled.current) return;
-    settled.current = true;
     setEditing(false);
 
     const next = value.markdown.trim();
@@ -922,13 +1043,18 @@ function DescriptionEditor({
         editable={editable}
         chrome={editable}
         autoFocus
-        onBlur={commit}
-        // Escape is the keyboard's way out, and it keeps the writing: the same
-        // commit clicking away performs. Deliberately not the `cancel` that
-        // Escape means in a single-line field — a description is long enough
-        // that discarding it silently would be a loss, where a title can be
-        // retyped in seconds.
-        onEscape={commit}
+        /*
+          A description is saved because the Save button was pressed, and never
+          because focus wandered. Blur used to commit, which meant every trip to
+          another property wrote a half-finished paragraph to the database and
+          dropped the editor out from under the cursor.
+
+          So there is no `onBlur` here: clicking away leaves the editor open,
+          holding the writing, until one of these two is chosen. Escape is the
+          keyboard's Cancel — the editor puts the saved text back itself.
+        */
+        onSave={commit}
+        onCancel={() => setEditing(false)}
       />
     </div>
   );

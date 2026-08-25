@@ -36,6 +36,11 @@ export function TodoModalContent({
     <TodoDetail
       id={id}
       onLeave={onClose}
+      // The dialog has a fixed height, so it can hold the trail still and let
+      // the reading column and the properties scroll under it separately —
+      // rather than scrolling the whole detail and taking the close button off
+      // screen with it.
+      frame="panes"
       headerActions={
         <TooltipText
           text="Open full screen"
@@ -146,7 +151,14 @@ function ModalShell({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto px-8 py-7">{children}</div>
+        {/*
+          Not a scroller any more: the panes inside are. It still owns the
+          padding, so every state — the detail, the skeleton, a failed read —
+          sits the same distance from the dialog's edges.
+        */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-8 py-7 lg:overflow-hidden">
+          {children}
+        </div>
       </DialogContent>
     </Dialog>
   );

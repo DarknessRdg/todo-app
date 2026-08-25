@@ -27,6 +27,11 @@ const tableInsert = "editor.toolbar.table.insert.button";
 const tableRowAfter = "editor.toolbar.table.row.after.button";
 const tableColumnAfter = "editor.toolbar.table.column.after.button";
 const tableDelete = "editor.toolbar.table.delete.button";
+const saveButton = "editor.save.button";
+const cancelButton = "editor.cancel.button";
+const discardDialog = "editor.discard.dialog";
+const discardConfirm = "editor.discard.confirm";
+const keepWriting = "editor.discard.keep";
 
 function renderEditor(
   props: Partial<Parameters<typeof RichTextEditor>[0]> = {}
@@ -1718,6 +1723,191 @@ describe("rich text editor", () => {
       await waitFor(() =>
         expect(screen.queryByTestId(image)).not.toBeInTheDocument()
       );
+    });
+  });
+
+
+  /**
+   * The editor's own way out, for callers that want a save the user asks for
+   * rather than one that happens when focus wanders. Both are opt-in: the bar
+   * exists only for a caller that handed over something for it to do.
+   */
+  describe("when the editor is given a save and a cancel", () => {
+    it("Then saving hands back the document in both spellings", async () => {
+      const user = setupUser();
+      const onSaved = vi.fn<(value: RichTextValue) => void>();
+      renderEditor({ content: "the old notes", onSave: onSaved });
+
+      await user.click(screen.getByTestId(editor));
+      await user.keyboard(" and more");
+      await user.click(screen.getByTestId(saveButton));
+
+      await waitFor(() => expect(onSaved).toHaveBeenCalled());
+      const value = onSaved.mock.lastCall?.[0];
+      expect(value?.markdown).toContain("and more");
+      expect(value?.doc).toMatchObject({ type: "doc" });
+    });
+
+    it("Then cancelling an untouched document leaves without asking", async () => {
+      const user = setupUser();
+      const onSaved = vi.fn<(value: RichTextValue) => void>();
+      const onCancel = vi.fn();
+      renderEditor({
+        content: "the old notes",
+        onSave: onSaved,
+        onCancel,
+      });
+
+      await user.click(screen.getByTestId(editor));
+      await user.click(screen.getByTestId(cancelButton));
+
+      await waitFor(() => expect(onCancel).toHaveBeenCalled());
+      expect(screen.queryByTestId(discardDialog)).not.toBeInTheDocument();
+      expect(onSaved).not.toHaveBeenCalled();
+    });
+
+    it("Then escape cancels too, rather than handing the writing back", async () => {
+      const user = setupUser();
+      const onEscape = vi.fn<(value: RichTextValue) => void>();
+      const onCancel = vi.fn();
+      renderEditor({ content: "the old notes", onCancel, onEscape });
+
+      await user.click(screen.getByTestId(editor));
+      await user.keyboard("{Escape}");
+
+      await waitFor(() => expect(onCancel).toHaveBeenCalled());
+      expect(onEscape).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * Writing that was never saved is gone for good once the editor closes, so
+   * throwing it away is destruction and is confirmed like any other — but only
+   * when there is something to lose. A dialog in front of a cancel that changes
+   * nothing is a question with one answer.
+   */
+  describe("when I cancel after changing the text", () => {
+    async function changeAndCancel(user: User) {
+      const onCancel = vi.fn();
+      renderEditor({ content: "the old notes", onCancel });
+
+      await user.click(screen.getByTestId(editor));
+      await user.keyboard(" and more");
+      await user.click(screen.getByTestId(cancelButton));
+
+      return { onCancel };
+    }
+
+    it("Then it asks before the writing is thrown away", async () => {
+      const user = setupUser();
+      const { onCancel } = await changeAndCancel(user);
+
+      expect(await screen.findByTestId(discardDialog)).toBeInTheDocument();
+      expect(onCancel).not.toHaveBeenCalled();
+      expect(screen.getByTestId(editor)).toHaveTextContent("and more");
+    });
+
+    it("Then discarding puts the text back and closes the editor", async () => {
+      const user = setupUser();
+      const { onCancel } = await changeAndCancel(user);
+
+      await user.click(await screen.findByTestId(discardConfirm));
+
+      await waitFor(() => expect(onCancel).toHaveBeenCalled());
+      expect(screen.getByTestId(editor)).not.toHaveTextContent("and more");
+      expect(screen.getByTestId(editor)).toHaveTextContent("the old notes");
+    });
+
+    it("Then keeping it leaves the editor open, holding what I wrote", async () => {
+      const user = setupUser();
+      const { onCancel } = await changeAndCancel(user);
+
+      await user.click(await screen.findByTestId(keepWriting));
+
+      await waitFor(() =>
+        expect(screen.queryByTestId(discardDialog)).not.toBeInTheDocument()
+      );
+      expect(onCancel).not.toHaveBeenCalled();
+      expect(screen.getByTestId(editor)).toHaveTextContent("and more");
+    });
+
+    it("Then escape asks the same question rather than throwing it away", async () => {
+      const user = setupUser();
+      const onCancel = vi.fn();
+      renderEditor({ content: "the old notes", onCancel });
+
+      await user.click(screen.getByTestId(editor));
+      await user.keyboard(" and more{Escape}");
+
+      expect(await screen.findByTestId(discardDialog)).toBeInTheDocument();
+      expect(onCancel).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * What counts as "changed" is what the *editor* holds now against what it
+   * held when the sitting began — never the markdown it was handed. Markdown
+   * does not survive a parse and a re-serialise byte for byte, so comparing
+   * against the prop asked the question of every description written with a
+   * heading or a list, untouched or not.
+   */
+  describe("when I cancel a document I never typed into", () => {
+    it("Then formatted markdown closes without asking", async () => {
+      const user = setupUser();
+      const onCancel = vi.fn();
+      renderEditor({
+        content: "# Heading\n\nSome **bold** notes\n\n- one\n- two",
+        onCancel,
+      });
+
+      await user.click(screen.getByTestId(editor));
+      await user.click(screen.getByTestId(cancelButton));
+
+      await waitFor(() => expect(onCancel).toHaveBeenCalled());
+      expect(screen.queryByTestId(discardDialog)).not.toBeInTheDocument();
+    });
+
+    it("Then a document it was handed already parsed closes without asking", async () => {
+      const user = setupUser();
+      const onSaved = vi.fn<(value: RichTextValue) => void>();
+      renderEditor({ content: "the old notes", onSave: onSaved });
+      await user.click(screen.getByTestId(editor));
+      await user.click(screen.getByTestId(saveButton));
+      await waitFor(() => expect(onSaved).toHaveBeenCalled());
+      const doc = onSaved.mock.lastCall?.[0].doc;
+      cleanup();
+
+      const onCancel = vi.fn();
+      renderEditor({ content: doc, onCancel });
+      await user.click(screen.getByTestId(editor));
+      await user.click(screen.getByTestId(cancelButton));
+
+      await waitFor(() => expect(onCancel).toHaveBeenCalled());
+      expect(screen.queryByTestId(discardDialog)).not.toBeInTheDocument();
+    });
+
+    it("Then typing and undoing it back to where it started asks nothing either", async () => {
+      const user = setupUser();
+      const onCancel = vi.fn();
+      renderEditor({ content: "the old notes", onCancel });
+
+      await user.click(screen.getByTestId(editor));
+      await user.keyboard(" and more");
+      await user.keyboard("{Control>}z{/Control}");
+      await user.click(screen.getByTestId(cancelButton));
+
+      await waitFor(() => expect(onCancel).toHaveBeenCalled());
+      expect(screen.queryByTestId(discardDialog)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the editor is given neither a save nor a cancel", () => {
+    it("Then there is no footer offering either", async () => {
+      renderEditor({ content: "the old notes" });
+
+      expect(await screen.findByTestId(editor)).toBeInTheDocument();
+      expect(screen.queryByTestId(saveButton)).not.toBeInTheDocument();
+      expect(screen.queryByTestId(cancelButton)).not.toBeInTheDocument();
     });
   });
 

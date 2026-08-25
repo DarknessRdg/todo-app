@@ -92,6 +92,16 @@ import {
   type ComponentProps,
   type ReactNode,
 } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -1073,8 +1083,30 @@ type RichTextEditorProps = {
    * Called with the same value when Escape is pressed in the text — the
    * keyboard's way out of the editor, which keeps what was written rather than
    * discarding it. Left unset, Escape passes through untouched.
+   *
+   * `onCancel` takes precedence: an editor that can be cancelled answers Escape
+   * with the cancel, because two ways out that do opposite things to the same
+   * key is how writing gets lost.
    */
   onEscape?: (value: RichTextValue) => void;
+  /**
+   * Saving on purpose. Given one, the chrome grows a footer with a Save button,
+   * and this is called with the document at the moment it is pressed.
+   *
+   * A caller that wants this generally does *not* want `onBlur` as well:
+   * together they are the autosave the footer exists to replace.
+   */
+  onSave?: (value: RichTextValue) => void;
+  /**
+   * Leaving without saving. Given one, the footer grows a Cancel button and
+   * Escape answers to it. The editor puts its own text back to the `content` it
+   * was handed before calling this, so the caller only has to close it.
+   *
+   * Writing that was never saved has nowhere else to exist, so a cancel that
+   * would lose some asks first — see `cancel` below. This is called once the
+   * answer is yes, or straight away when there was nothing to lose.
+   */
+  onCancel?: () => void;
 } & TestIdProps;
 
 export function RichTextEditor({
@@ -1086,6 +1118,8 @@ export function RichTextEditor({
   chrome = true,
   onBlur,
   onEscape,
+  onSave,
+  onCancel,
   testId,
 }: RichTextEditorProps) {
   // The `:` autocomplete: the plugin owns when it opens, React owns how it is
@@ -1095,6 +1129,19 @@ export function RichTextEditor({
     null
   );
   const [highlighted, setHighlighted] = useState(0);
+  /** Whether the "throw the writing away?" question is on screen. */
+  const [discarding, setDiscarding] = useState(false);
+  /**
+   * The document as the editor itself held it when this sitting began.
+   *
+   * Deliberately not the `content` prop. Markdown does not survive a parse and
+   * a re-serialise byte for byte — a heading, a list, an escaped character all
+   * come back spelled slightly differently — so comparing the two says "changed"
+   * about a description nobody has touched. What the editor loaded is the only
+   * honest baseline for "did the user change anything", and it is re-taken
+   * every time the editor is handed a document.
+   */
+  const pristine = useRef<string | null>(null);
   const suggestionRef = useRef<EmojiSuggestionState | null>(null);
   const highlightedRef = useRef(0);
   // Escape dismisses the list without ending the shortcode, so the plugin stays
@@ -1200,6 +1247,7 @@ export function RichTextEditor({
     // in.
     autofocus: autoFocus && editable ? "end" : false,
     editorProps: { attributes: editorAttributes },
+    onCreate: ({ editor }) => remember(editor),
     // Focus moving into the editor's own chrome (the toolbar, the link popover)
     // is not the user leaving the editor — reporting a blur there tears down
     // click-to-edit views mid-interaction, closing the editor as the popover
@@ -1231,6 +1279,10 @@ export function RichTextEditor({
     if (wasEditable !== editable) editor.setEditable(editable);
     editor.setOptions({ editorProps: { attributes: editorAttributes } });
 
+    // A fresh sitting starts here, whatever was on screen while it was being
+    // read — so cancelling straight after opening asks nothing.
+    if (editable && !wasEditable) remember(editor);
+
     if (autoFocus && editable && !wasEditable) {
       editor.commands.focus("end");
     }
@@ -1238,6 +1290,46 @@ export function RichTextEditor({
     // are what matter, so the effect keys on those instead.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, editable, autoFocus, editorAttributes.class, testId]);
+
+  /**
+   * Undo the whole sitting: the text goes back to the document this editor was
+   * handed, and the caller is told to close it.
+   *
+   * The restore happens here rather than in the caller because only the editor
+   * can perform it — the `content` prop has not changed, so the sync effect
+   * below sees nothing to do and would leave the abandoned writing on screen,
+   * read-only and looking saved.
+   */
+  /** Take this document as the one nothing has been written on top of yet. */
+  const remember = (editor: Editor) => {
+    pristine.current = JSON.stringify(editor.getJSON());
+  };
+
+  const changed = (editor: Editor) =>
+    pristine.current !== JSON.stringify(editor.getJSON());
+
+  const cancel = () => {
+    if (!editor) return;
+
+    // Nothing written since it opened: there is nothing to lose, and a dialog
+    // asking whether to lose it is a question with one answer.
+    if (!changed(editor)) {
+      onCancel?.();
+      return;
+    }
+
+    setDiscarding(true);
+  };
+
+  /** The answer being yes. */
+  const discard = () => {
+    if (!editor) return;
+
+    setDiscarding(false);
+    editor.commands.setContent(content);
+    remember(editor);
+    onCancel?.();
+  };
 
   /**
    * Escape hands the document back and leaves the editor.
@@ -1254,7 +1346,8 @@ export function RichTextEditor({
    * stale callback the alternative buys.
    */
   useEffect(() => {
-    if (!editor || onEscape === undefined) return;
+    if (!editor) return;
+    if (onEscape === undefined && onCancel === undefined) return;
 
     const dom = editor.view.dom;
 
@@ -1263,7 +1356,11 @@ export function RichTextEditor({
       // A layer inside the editor — the shortcode list — answers Escape by
       // closing itself, and stops the key here so the editor stays open. See
       // `EmojiSuggestions`.
-      onEscape(valueOf(editor));
+      if (onCancel !== undefined) {
+        cancel();
+        return;
+      }
+      onEscape?.(valueOf(editor));
     };
 
     dom.addEventListener("keydown", onKeyDown);
@@ -1276,6 +1373,7 @@ export function RichTextEditor({
     if (!editor || editor.isFocused) return;
     if (holdsContent(editor, content)) return;
     editor.commands.setContent(content);
+    remember(editor);
   }, [content, editor]);
 
   const emojiList = editor && (
@@ -1295,14 +1393,29 @@ export function RichTextEditor({
   // put `EditorContent` under a different parent as `chrome` flips, which
   // unmounts it — and rebuilding the view is the whole thing being avoided.
   return (
-    <div
-      data-editor-chrome=""
-      className={cn(
-        "rounded-lg",
-        chrome && "focus-within:ring-ring border focus-within:ring-1"
-      )}>
-      {chrome && editable && editor && <Toolbar editor={editor} />}
-      <EditorContent editor={editor} />
+    <div data-editor-chrome="" className="flex flex-col">
+      <div
+        className={cn(
+          "rounded-lg",
+          chrome && "focus-within:ring-ring border focus-within:ring-1"
+        )}>
+        {chrome && editable && editor && <Toolbar editor={editor} />}
+        <EditorContent editor={editor} />
+      </div>
+      {/* Outside the box, and pinned to the bottom of whatever is scrolling —
+          see `EditorActions`. */}
+      {editable && editor && (onSave || onCancel) && (
+        <EditorActions
+          editor={editor}
+          onSave={onSave}
+          onCancel={onCancel && cancel}
+        />
+      )}
+      <DiscardConfirm
+        open={discarding}
+        onOpenChange={setDiscarding}
+        onDiscard={discard}
+      />
       {emojiList}
     </div>
   );
@@ -1461,7 +1574,18 @@ function Toolbar({ editor }: { editor: Editor }) {
   return (
     <div
       {...testProp("editor.toolbar")}
-      className="flex flex-wrap items-center gap-0.5 border-b px-1.5 py-1">
+      /*
+        Pinned to the top of whatever is scrolling the page — the modal's body,
+        or the window on the detail route. A long description scrolls the
+        formatting controls off screen exactly when they are being used, and
+        reaching them meant scrolling back to the top of a document to change
+        one word near the bottom.
+
+        It needs an opaque fill of its own to be scrolled *under*, and the
+        corner rounded to match the box it is pinned inside — a square fill
+        would paint over the border's radius.
+      */
+      className="bg-background sticky top-0 z-10 flex flex-wrap items-center gap-0.5 rounded-t-lg border-b px-1.5 py-1">
       <ToolbarButton
         testId="editor.toolbar.undo.button"
         label="Undo"
@@ -2488,6 +2612,103 @@ type ToolbarButtonProps = Omit<
   onClick?: () => void;
   children: ReactNode;
 };
+
+/**
+ * The question in front of a cancel that would lose writing.
+ *
+ * Not portalled into the editor's chrome, unlike the popovers: this is a modal
+ * over the whole page, and it is asked *because* the editor is about to close.
+ * Keeping focus in the editor is the one thing it must not do.
+ */
+function DiscardConfirm({
+  open,
+  onOpenChange,
+  onDiscard,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onDiscard: () => void;
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent testId="editor.discard.dialog">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Throw away what you wrote?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This description has changes that were never saved. Leaving now
+            drops them, and they cannot be brought back.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel testId="editor.discard.keep">
+            Keep writing
+          </AlertDialogCancel>
+          <AlertDialogAction
+            testId="editor.discard.confirm"
+            variant="destructive"
+            onClick={onDiscard}>
+            Discard
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+/**
+ * The footer: the two ways out of an editor that saves on purpose.
+ *
+ * It floats rather than sitting in the box. Inside the border it belonged to
+ * the text — the bottom row of a long document, only reachable by scrolling to
+ * the end of the writing to agree to keep it. Pinned below the box instead, it
+ * follows the scroll and stays where it was last seen.
+ *
+ * Right-aligned and its own small surface, so it reads as being *over* the
+ * document rather than part of it, and covers as little of the text as two
+ * buttons can.
+ *
+ * Both hold the caret where it is (`onMouseDown` preventDefault) rather than
+ * taking focus. That keeps the selection for anything the caller does next, and
+ * means pressing either cannot be mistaken for the user leaving the editor.
+ */
+function EditorActions({
+  editor,
+  onSave,
+  onCancel,
+}: {
+  editor: Editor;
+  onSave?: (value: RichTextValue) => void;
+  onCancel?: () => void;
+}) {
+  return (
+    <div
+      {...testProp("editor.actions")}
+      className="bg-background/85 border-border sticky bottom-2 z-20 mt-2 ml-auto flex items-center gap-1 rounded-full border p-1 shadow-sm backdrop-blur-sm">
+      {onCancel && (
+        <Button
+          testId="editor.cancel.button"
+          type="button"
+          variant="ghost"
+          size="sm"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={onCancel}>
+          Cancel
+        </Button>
+      )}
+      {onSave && (
+        <Button
+          testId="editor.save.button"
+          type="button"
+          size="sm"
+          className="rounded-full"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => onSave(valueOf(editor))}>
+          Save
+        </Button>
+      )}
+    </div>
+  );
+}
 
 function ToolbarButton({
   label,
