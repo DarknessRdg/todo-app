@@ -198,18 +198,23 @@ describe("todo detail modal", { timeout: 3000 }, () => {
       expect(screen.getByTestId(modal)).toBeInTheDocument();
     });
 
-    it("Then what I wrote is saved", async () => {
+    /**
+     * Escape is the keyboard's Cancel now that the editor has one — it puts the
+     * saved text back and closes, rather than committing on the way out. The
+     * modal itself still stands down for the key (see the spec above), which is
+     * what stops the same press closing the dialog.
+     */
+    it("Then what I wrote is discarded rather than saved", async () => {
       const user = setupUser();
-      const { repository, todo } = await editDescription(user);
+      const { repository } = await editDescription(user);
 
       await user.keyboard(" and a new line{Escape}");
+      await user.click(await screen.findByTestId("editor.discard.confirm"));
 
-      await waitFor(() =>
-        expect(repository.updateDescription).toHaveBeenCalledWith({
-          id: todo.id,
-          description: expect.stringContaining("and a new line"),
-          descriptionDoc: expect.objectContaining({ type: "doc" }),
-        })
+      await screen.findByTestId(descriptionRead);
+      expect(repository.updateDescription).not.toHaveBeenCalled();
+      expect(screen.getByTestId(descriptionRead)).not.toHaveTextContent(
+        "and a new line"
       );
     });
 

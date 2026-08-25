@@ -45,6 +45,11 @@ const check = (id: string) => `todo.detail.subtask.${id}.check`;
 const deleteButton = (id: string) => `todo.detail.subtask.${id}.delete.button`;
 const linkButton = "editor.toolbar.link.button";
 const linkUrlInput = "editor.toolbar.link.url.input";
+const saveButton = "editor.save.button";
+const cancelButton = "editor.cancel.button";
+const discardConfirm = "editor.discard.confirm";
+const discardDialog = "editor.discard.dialog";
+const keepWriting = "editor.discard.keep";
 
 /**
  * `TodoDetail` takes its todo as a prop, so on its own it can never show the
@@ -415,7 +420,7 @@ describe("todo detail", () => {
     });
   });
 
-  describe("when I edit the description and leave the field", () => {
+  describe("when I edit the description and save it", () => {
     it("Then the new text is persisted", async () => {
       const user = setupUser();
       const todo = makeTodo({ description: "the old notes" });
@@ -426,7 +431,7 @@ describe("todo detail", () => {
 
       await user.clear(field);
       await user.type(field, "the new notes");
-      fireEvent.blur(field);
+      await user.click(screen.getByTestId(saveButton));
 
       await waitFor(() =>
         expect(repository.updateDescription).toHaveBeenCalledWith({
@@ -439,6 +444,19 @@ describe("todo detail", () => {
       );
     });
 
+    it("Then it goes back to reading", async () => {
+      const user = setupUser();
+      renderDetail(makeTodo({ description: "the old notes" }));
+
+      await user.click(await screen.findByTestId(readView));
+      const field = await screen.findByTestId(editor);
+
+      await user.type(field, " and more");
+      await user.click(screen.getByTestId(saveButton));
+
+      expect(await screen.findByTestId(readView)).toBeInTheDocument();
+    });
+
     it("Then an unchanged description is not written back", async () => {
       const user = setupUser();
       const { repository } = renderDetail(
@@ -446,7 +464,8 @@ describe("todo detail", () => {
       );
 
       await user.click(await screen.findByTestId(readView));
-      fireEvent.blur(await screen.findByTestId(editor));
+      await screen.findByTestId(editor);
+      await user.click(screen.getByTestId(saveButton));
 
       await waitFor(() =>
         expect(screen.getByTestId(readView)).toBeInTheDocument()
@@ -466,7 +485,7 @@ describe("todo detail", () => {
       const field = await screen.findByTestId(editor);
 
       await user.type(field, " and more");
-      fireEvent.blur(field);
+      await user.click(screen.getByTestId(saveButton));
 
       expect(await screen.findByTestId(saved)).toBeInTheDocument();
     });
@@ -483,7 +502,7 @@ describe("todo detail", () => {
       const field = await screen.findByTestId(editor);
 
       await user.type(field, " and more");
-      fireEvent.blur(field);
+      await user.click(screen.getByTestId(saveButton));
       await screen.findByTestId(saved);
 
       await waitFor(() =>
@@ -505,7 +524,7 @@ describe("todo detail", () => {
       const field = await screen.findByTestId(editor);
 
       await user.type(field, " and more");
-      fireEvent.blur(field);
+      await user.click(screen.getByTestId(saveButton));
 
       expect(await screen.findByTestId(saving)).toBeInTheDocument();
       expect(screen.queryByTestId(saved)).not.toBeInTheDocument();
@@ -516,12 +535,180 @@ describe("todo detail", () => {
       renderDetail(makeTodo({ description: "the old notes" }));
 
       await user.click(await screen.findByTestId(readView));
-      fireEvent.blur(await screen.findByTestId(editor));
+      await screen.findByTestId(editor);
+      await user.click(screen.getByTestId(saveButton));
 
       await waitFor(() =>
         expect(screen.getByTestId(readView)).toBeInTheDocument()
       );
       expect(screen.queryByTestId(saved)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when I cancel out of the description", () => {
+    it("Then nothing is written back", async () => {
+      const user = setupUser();
+      const { repository } = renderDetail(
+        makeTodo({ description: "the old notes" })
+      );
+
+      await user.click(await screen.findByTestId(readView));
+      const field = await screen.findByTestId(editor);
+
+      await user.type(field, " and more");
+      await user.click(screen.getByTestId(cancelButton));
+      await user.click(await screen.findByTestId(discardConfirm));
+
+      await waitFor(() =>
+        expect(screen.getByTestId(readView)).toBeInTheDocument()
+      );
+      expect(repository.updateDescription).not.toHaveBeenCalled();
+    });
+
+    it("Then it goes back to reading the text it had before", async () => {
+      const user = setupUser();
+      renderDetail(makeTodo({ description: "the old notes" }));
+
+      await user.click(await screen.findByTestId(readView));
+      const field = await screen.findByTestId(editor);
+
+      await user.type(field, " and more");
+      await user.click(screen.getByTestId(cancelButton));
+      await user.click(await screen.findByTestId(discardConfirm));
+
+      const read = await screen.findByTestId(readView);
+      expect(read).toHaveTextContent("the old notes");
+      expect(read).not.toHaveTextContent("and more");
+    });
+
+    it("Then keeping the writing leaves the editor open with it", async () => {
+      const user = setupUser();
+      renderDetail(makeTodo({ description: "the old notes" }));
+
+      await user.click(await screen.findByTestId(readView));
+      const field = await screen.findByTestId(editor);
+
+      await user.type(field, " and more");
+      await user.click(screen.getByTestId(cancelButton));
+      await user.click(await screen.findByTestId(keepWriting));
+
+      await waitFor(() =>
+        expect(screen.getByTestId(editor)).toHaveTextContent("and more")
+      );
+      expect(screen.queryByTestId(readView)).not.toBeInTheDocument();
+    });
+  });
+
+  /**
+   * The real shape of the bug this guards: a description stored as markdown is
+   * parsed on the way in, and what comes back out is spelled differently enough
+   * that comparing the two called every untouched todo "changed".
+   */
+  describe("when I open a description and cancel without touching it", () => {
+    it("Then it closes without asking, having nothing to throw away", async () => {
+      const user = setupUser();
+      renderDetail(
+        makeTodo({ description: "# Notes\n\n- one\n- two\n\n**bold**" })
+      );
+
+      await user.click(await screen.findByTestId(readView));
+      await screen.findByTestId(editor);
+      await user.click(screen.getByTestId(cancelButton));
+
+      expect(await screen.findByTestId(readView)).toBeInTheDocument();
+      expect(screen.queryByTestId(discardDialog)).not.toBeInTheDocument();
+    });
+
+    it("Then escape closes it just as quietly", async () => {
+      const user = setupUser();
+      renderDetail(
+        makeTodo({ description: "# Notes\n\n- one\n- two\n\n**bold**" })
+      );
+
+      await user.click(await screen.findByTestId(readView));
+      await user.click(await screen.findByTestId(editor));
+      await user.keyboard("{Escape}");
+
+      expect(await screen.findByTestId(readView)).toBeInTheDocument();
+      expect(screen.queryByTestId(discardDialog)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when I press escape while editing the description", () => {
+    it("Then nothing is written back, the same as cancelling", async () => {
+      const user = setupUser();
+      const { repository } = renderDetail(
+        makeTodo({ description: "the old notes" })
+      );
+
+      await user.click(await screen.findByTestId(readView));
+      const field = await screen.findByTestId(editor);
+
+      await user.type(field, " and more");
+      await user.keyboard("{Escape}");
+      await user.click(await screen.findByTestId(discardConfirm));
+
+      await waitFor(() =>
+        expect(screen.getByTestId(readView)).toBeInTheDocument()
+      );
+      expect(repository.updateDescription).not.toHaveBeenCalled();
+    });
+
+    it("Then the text it had before is what is left on screen", async () => {
+      const user = setupUser();
+      renderDetail(makeTodo({ description: "the old notes" }));
+
+      await user.click(await screen.findByTestId(readView));
+      const field = await screen.findByTestId(editor);
+
+      await user.type(field, " and more");
+      await user.keyboard("{Escape}");
+      await user.click(await screen.findByTestId(discardConfirm));
+
+      const read = await screen.findByTestId(readView);
+      expect(read).not.toHaveTextContent("and more");
+    });
+  });
+
+  /**
+   * The point of the two buttons: a save happens because it was asked for.
+   * Focus wandering off — to a toolbar, to another property, to nothing at all
+   * — is not that, and closing the editor there would throw away writing the
+   * user never said they were done with.
+   */
+  describe("when I click away from the description editor", () => {
+    it("Then it stays open, holding what I wrote", async () => {
+      const user = setupUser();
+      renderDetail(makeTodo({ description: "the old notes" }));
+
+      await user.click(await screen.findByTestId(readView));
+      const field = await screen.findByTestId(editor);
+
+      await user.type(field, " and more");
+      fireEvent.blur(field);
+
+      await waitFor(() =>
+        expect(screen.getByTestId(editor)).toHaveTextContent("and more")
+      );
+      expect(screen.queryByTestId(readView)).not.toBeInTheDocument();
+    });
+
+    it("Then nothing is written back", async () => {
+      const user = setupUser();
+      const { repository } = renderDetail(
+        makeTodo({ description: "the old notes" })
+      );
+
+      await user.click(await screen.findByTestId(readView));
+      const field = await screen.findByTestId(editor);
+
+      await user.type(field, " and more");
+      fireEvent.blur(field);
+
+      await waitFor(() =>
+        expect(screen.getByTestId(editor)).toHaveTextContent("and more")
+      );
+      expect(repository.updateDescription).not.toHaveBeenCalled();
     });
   });
 

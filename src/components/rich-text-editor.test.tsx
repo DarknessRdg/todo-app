@@ -22,11 +22,21 @@ const image = "editor.image.0";
 const imageSmaller = "editor.image.0.smaller.button";
 const imageBigger = "editor.image.0.bigger.button";
 const imageAlignCenter = "editor.image.0.align.center.button";
+const imageControls = "editor.image.0.controls";
 const tableMenu = "editor.toolbar.table.menu";
-const tableInsert = "editor.toolbar.table.insert.button";
-const tableRowAfter = "editor.toolbar.table.row.after.button";
-const tableColumnAfter = "editor.toolbar.table.column.after.button";
-const tableDelete = "editor.toolbar.table.delete.button";
+/** A cell in the toolbar's size grid: the table it would build, header included. */
+const tableSize = (rows: number, cols: number) =>
+  `editor.toolbar.table.size.${rows}x${cols}`;
+const tableControls = "editor.table.0.controls";
+const tableRowAfter = "editor.table.0.row.after.button";
+const tableColumnAfter = "editor.table.0.column.after.button";
+const tableRowDelete = "editor.table.0.row.delete.button";
+const tableDelete = "editor.table.0.delete.button";
+const saveButton = "editor.save.button";
+const cancelButton = "editor.cancel.button";
+const discardDialog = "editor.discard.dialog";
+const discardConfirm = "editor.discard.confirm";
+const keepWriting = "editor.discard.keep";
 
 function renderEditor(
   props: Partial<Parameters<typeof RichTextEditor>[0]> = {}
@@ -108,17 +118,14 @@ function makeImageFile(bytes = 8): File {
  */
 async function insideTable() {
   // The dropdown runs a typeahead of its own while it is open, which eats the
-  // keystrokes a spec sends next — so the menu being gone is half of "the
-  // caret is in the table", and the button reporting itself pressed is the
-  // other half.
+  // keystrokes a spec sends next — so the grid being gone is half of "the caret
+  // is in the table", and the table's own controls appearing is the other half:
+  // they are on screen only for the table being worked in.
   await waitFor(() =>
-    expect(screen.queryByTestId(tableInsert)).not.toBeInTheDocument()
+    expect(screen.queryByTestId(tableSize(3, 3))).not.toBeInTheDocument()
   );
   await waitFor(() =>
-    expect(screen.getByTestId(tableMenu)).toHaveAttribute(
-      "aria-pressed",
-      "true"
-    )
+    expect(screen.getByTestId(tableControls)).toBeInTheDocument()
   );
   // Closing the menu hands focus back to its trigger before the editor takes
   // it again; typing in between goes to the button.
@@ -1456,6 +1463,11 @@ describe("rich text editor", () => {
     });
   });
 
+  /**
+   * The toolbar offers a shape rather than a fixed table: an 8×8 grid, where
+   * the top row is the header a pipe table cannot do without. Picking 3 × 4
+   * therefore means a header and two rows under it.
+   */
   describe("when I insert a table from the toolbar", () => {
     it("Then it is saved as a markdown table", async () => {
       const user = setupUser();
@@ -1463,12 +1475,31 @@ describe("rich text editor", () => {
 
       await user.click(screen.getByTestId(editor));
       await user.click(screen.getByTestId(tableMenu));
-      await user.click(await screen.findByTestId(tableInsert));
+      await user.click(await screen.findByTestId(tableSize(3, 3)));
       blurEditor();
 
       await waitFor(() =>
         expect(onBlur).toHaveBeenCalledWith(
           expect.stringContaining("|  |  |  |\n| --- | --- | --- |")
+        )
+      );
+    });
+
+    it("Then the size I picked is the size I get, the header being its first row", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor();
+
+      await user.click(screen.getByTestId(editor));
+      await user.click(screen.getByTestId(tableMenu));
+      await user.click(await screen.findByTestId(tableSize(2, 4)));
+      blurEditor();
+
+      // Two rows: the header, and one to write in.
+      await waitFor(() =>
+        expect(onBlur).toHaveBeenCalledWith(
+          expect.stringContaining(
+            "|  |  |  |  |\n| --- | --- | --- | --- |\n|  |  |  |  |"
+          )
         )
       );
     });
@@ -1479,7 +1510,7 @@ describe("rich text editor", () => {
 
       await user.click(screen.getByTestId(editor));
       await user.click(screen.getByTestId(tableMenu));
-      await user.click(await screen.findByTestId(tableInsert));
+      await user.click(await screen.findByTestId(tableSize(3, 3)));
       await insideTable();
       await user.keyboard("Name");
       blurEditor();
@@ -1517,30 +1548,43 @@ describe("rich text editor", () => {
     });
   });
 
+  /**
+   * Rows and columns are added and removed from the table itself now, not from
+   * the toolbar — the same floating controls an image carries, and for the same
+   * reason: the thing being changed is the thing you are pointing at.
+   */
   describe("when I work on the table I inserted", () => {
     /**
-     * Inserts a table and names its first cell.
+     * Inserts a table and leaves the caret in its first cell.
      *
-     * Built through the menu rather than loaded as content because that is
+     * Built through the toolbar rather than loaded as content because that is
      * what leaves the caret inside the table — which is the state every one of
-     * these actions needs, and the state the menu itself switches on.
+     * these actions needs, and the state the controls themselves appear for.
      */
     async function insertTable(user: User) {
       const rendered = renderEditor();
 
       await user.click(screen.getByTestId(editor));
       await user.click(screen.getByTestId(tableMenu));
-      await user.click(await screen.findByTestId(tableInsert));
+      await user.click(await screen.findByTestId(tableSize(3, 3)));
+      await insideTable();
 
       return rendered;
     }
+
+    it("Then its controls are on the table rather than in the toolbar", async () => {
+      const user = setupUser();
+      await insertTable(user);
+
+      expect(screen.getByTestId(tableControls)).toBeInTheDocument();
+      expect(screen.getByTestId(tableRowAfter)).toBeInTheDocument();
+    });
 
     it("Then adding a row writes another empty one", async () => {
       const user = setupUser();
       const { onBlur } = await insertTable(user);
 
-      await user.click(screen.getByTestId(tableMenu));
-      await user.click(await screen.findByTestId(tableRowAfter));
+      await user.click(screen.getByTestId(tableRowAfter));
       blurEditor();
 
       await waitFor(() =>
@@ -1556,8 +1600,7 @@ describe("rich text editor", () => {
       const user = setupUser();
       const { onBlur } = await insertTable(user);
 
-      await user.click(screen.getByTestId(tableMenu));
-      await user.click(await screen.findByTestId(tableColumnAfter));
+      await user.click(screen.getByTestId(tableColumnAfter));
       blurEditor();
 
       await waitFor(() =>
@@ -1567,17 +1610,56 @@ describe("rich text editor", () => {
       );
     });
 
+    /**
+     * The row that goes is the row the caret is in — which is the whole reason
+     * these controls sit on the table rather than in the toolbar. Tab walks
+     * cell by cell, so three of them from the first header cell of a 3-wide
+     * table lands in the first cell of the row below.
+     */
+    it("Then deleting a row takes the one I am in, leaving the header", async () => {
+      const user = setupUser();
+      const { onBlur } = await insertTable(user);
+
+      await user.keyboard("Head");
+      await user.keyboard("{Tab}{Tab}{Tab}");
+      await user.keyboard("Body");
+      await user.click(screen.getByTestId(tableRowDelete));
+      blurEditor();
+
+      await waitFor(() =>
+        expect(onBlur).toHaveBeenCalledWith(
+          expect.stringContaining("| Head |")
+        )
+      );
+      expect(onBlur).toHaveBeenLastCalledWith(
+        expect.not.stringContaining("Body")
+      );
+    });
+
     it("Then deleting it takes the whole table out", async () => {
       const user = setupUser();
       const { onBlur } = await insertTable(user);
 
-      await user.click(screen.getByTestId(tableMenu));
-      await user.click(await screen.findByTestId(tableDelete));
+      await user.click(screen.getByTestId(tableDelete));
       blurEditor();
 
       await waitFor(() =>
         expect(onBlur).toHaveBeenCalledWith(expect.not.stringContaining("|"))
       );
+    });
+  });
+
+  describe("when a table is only being read", () => {
+    it("Then it carries no controls to change it with", async () => {
+      renderEditor({
+        content: "| Task | Owner |\n| --- | --- |\n| Ship it | Me |",
+        editable: false,
+      });
+
+      await waitFor(() =>
+        expect(screen.getByTestId(editor)).toHaveTextContent("Ship it")
+      );
+      expect(screen.queryByTestId(tableControls)).not.toBeInTheDocument();
     });
   });
 
@@ -1612,6 +1694,34 @@ describe("rich text editor", () => {
     });
   });
 
+  /**
+   * The controls are the table's: on the thing being changed, and only while it
+   * is the thing being worked on. Clicking the picture is what selects it, so
+   * every one of these opens by doing that.
+   */
+  describe("when the caret comes to rest on an image", () => {
+    it("Then its controls are on it", async () => {
+      const user = setupUser();
+      renderEditor({ content: "![a cat](https://example.com/cat.png)" });
+
+      await user.click(screen.getByTestId(editor));
+
+      expect(await screen.findByTestId(imageControls)).toBeInTheDocument();
+    });
+
+    it("Then a picture the caret is nowhere near carries none", async () => {
+      const user = setupUser();
+      renderEditor({
+        content: "some words\n\n![a cat](https://example.com/cat.png)",
+      });
+
+      await user.click(screen.getByTestId(editor));
+      await screen.findByTestId(image);
+
+      expect(screen.queryByTestId(imageControls)).not.toBeInTheDocument();
+    });
+  });
+
   describe("when I scale an image down", () => {
     it("Then the size is saved with it", async () => {
       const user = setupUser();
@@ -1619,12 +1729,38 @@ describe("rich text editor", () => {
         content: "![a cat](https://example.com/cat.png)",
       });
 
+      await user.click(screen.getByTestId(editor));
       await user.click(await screen.findByTestId(imageSmaller));
       blurEditor();
 
       await waitFor(() =>
         expect(onBlur).toHaveBeenCalledWith(
-          expect.stringContaining('data-width="75"')
+          expect.stringContaining('data-width="95"')
+        )
+      );
+    });
+
+    /**
+     * The four fixed sizes are gone: the buttons walk a 5% rung at a time for
+     * as far as there is room, so a picture can be tuned rather than picked
+     * from a shortlist.
+     */
+    it("Then it keeps stepping down past where the old four sizes stopped", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor({
+        content: "![a cat](https://example.com/cat.png)",
+      });
+
+      await user.click(screen.getByTestId(editor));
+      const smaller = await screen.findByTestId(imageSmaller);
+      await user.click(smaller);
+      await user.click(smaller);
+      await user.click(smaller);
+      blurEditor();
+
+      await waitFor(() =>
+        expect(onBlur).toHaveBeenCalledWith(
+          expect.stringContaining('data-width="85"')
         )
       );
     });
@@ -1635,6 +1771,7 @@ describe("rich text editor", () => {
         content: "![a cat](https://example.com/cat.png)",
       });
 
+      await user.click(screen.getByTestId(editor));
       await user.click(await screen.findByTestId(imageSmaller));
       await user.click(screen.getByTestId(imageBigger));
       blurEditor();
@@ -1654,6 +1791,7 @@ describe("rich text editor", () => {
         content: "![a cat](https://example.com/cat.png)",
       });
 
+      await user.click(screen.getByTestId(editor));
       await user.click(await screen.findByTestId(imageAlignCenter));
       blurEditor();
 
@@ -1718,6 +1856,191 @@ describe("rich text editor", () => {
       await waitFor(() =>
         expect(screen.queryByTestId(image)).not.toBeInTheDocument()
       );
+    });
+  });
+
+
+  /**
+   * The editor's own way out, for callers that want a save the user asks for
+   * rather than one that happens when focus wanders. Both are opt-in: the bar
+   * exists only for a caller that handed over something for it to do.
+   */
+  describe("when the editor is given a save and a cancel", () => {
+    it("Then saving hands back the document in both spellings", async () => {
+      const user = setupUser();
+      const onSaved = vi.fn<(value: RichTextValue) => void>();
+      renderEditor({ content: "the old notes", onSave: onSaved });
+
+      await user.click(screen.getByTestId(editor));
+      await user.keyboard(" and more");
+      await user.click(screen.getByTestId(saveButton));
+
+      await waitFor(() => expect(onSaved).toHaveBeenCalled());
+      const value = onSaved.mock.lastCall?.[0];
+      expect(value?.markdown).toContain("and more");
+      expect(value?.doc).toMatchObject({ type: "doc" });
+    });
+
+    it("Then cancelling an untouched document leaves without asking", async () => {
+      const user = setupUser();
+      const onSaved = vi.fn<(value: RichTextValue) => void>();
+      const onCancel = vi.fn();
+      renderEditor({
+        content: "the old notes",
+        onSave: onSaved,
+        onCancel,
+      });
+
+      await user.click(screen.getByTestId(editor));
+      await user.click(screen.getByTestId(cancelButton));
+
+      await waitFor(() => expect(onCancel).toHaveBeenCalled());
+      expect(screen.queryByTestId(discardDialog)).not.toBeInTheDocument();
+      expect(onSaved).not.toHaveBeenCalled();
+    });
+
+    it("Then escape cancels too, rather than handing the writing back", async () => {
+      const user = setupUser();
+      const onEscape = vi.fn<(value: RichTextValue) => void>();
+      const onCancel = vi.fn();
+      renderEditor({ content: "the old notes", onCancel, onEscape });
+
+      await user.click(screen.getByTestId(editor));
+      await user.keyboard("{Escape}");
+
+      await waitFor(() => expect(onCancel).toHaveBeenCalled());
+      expect(onEscape).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * Writing that was never saved is gone for good once the editor closes, so
+   * throwing it away is destruction and is confirmed like any other — but only
+   * when there is something to lose. A dialog in front of a cancel that changes
+   * nothing is a question with one answer.
+   */
+  describe("when I cancel after changing the text", () => {
+    async function changeAndCancel(user: User) {
+      const onCancel = vi.fn();
+      renderEditor({ content: "the old notes", onCancel });
+
+      await user.click(screen.getByTestId(editor));
+      await user.keyboard(" and more");
+      await user.click(screen.getByTestId(cancelButton));
+
+      return { onCancel };
+    }
+
+    it("Then it asks before the writing is thrown away", async () => {
+      const user = setupUser();
+      const { onCancel } = await changeAndCancel(user);
+
+      expect(await screen.findByTestId(discardDialog)).toBeInTheDocument();
+      expect(onCancel).not.toHaveBeenCalled();
+      expect(screen.getByTestId(editor)).toHaveTextContent("and more");
+    });
+
+    it("Then discarding puts the text back and closes the editor", async () => {
+      const user = setupUser();
+      const { onCancel } = await changeAndCancel(user);
+
+      await user.click(await screen.findByTestId(discardConfirm));
+
+      await waitFor(() => expect(onCancel).toHaveBeenCalled());
+      expect(screen.getByTestId(editor)).not.toHaveTextContent("and more");
+      expect(screen.getByTestId(editor)).toHaveTextContent("the old notes");
+    });
+
+    it("Then keeping it leaves the editor open, holding what I wrote", async () => {
+      const user = setupUser();
+      const { onCancel } = await changeAndCancel(user);
+
+      await user.click(await screen.findByTestId(keepWriting));
+
+      await waitFor(() =>
+        expect(screen.queryByTestId(discardDialog)).not.toBeInTheDocument()
+      );
+      expect(onCancel).not.toHaveBeenCalled();
+      expect(screen.getByTestId(editor)).toHaveTextContent("and more");
+    });
+
+    it("Then escape asks the same question rather than throwing it away", async () => {
+      const user = setupUser();
+      const onCancel = vi.fn();
+      renderEditor({ content: "the old notes", onCancel });
+
+      await user.click(screen.getByTestId(editor));
+      await user.keyboard(" and more{Escape}");
+
+      expect(await screen.findByTestId(discardDialog)).toBeInTheDocument();
+      expect(onCancel).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * What counts as "changed" is what the *editor* holds now against what it
+   * held when the sitting began — never the markdown it was handed. Markdown
+   * does not survive a parse and a re-serialise byte for byte, so comparing
+   * against the prop asked the question of every description written with a
+   * heading or a list, untouched or not.
+   */
+  describe("when I cancel a document I never typed into", () => {
+    it("Then formatted markdown closes without asking", async () => {
+      const user = setupUser();
+      const onCancel = vi.fn();
+      renderEditor({
+        content: "# Heading\n\nSome **bold** notes\n\n- one\n- two",
+        onCancel,
+      });
+
+      await user.click(screen.getByTestId(editor));
+      await user.click(screen.getByTestId(cancelButton));
+
+      await waitFor(() => expect(onCancel).toHaveBeenCalled());
+      expect(screen.queryByTestId(discardDialog)).not.toBeInTheDocument();
+    });
+
+    it("Then a document it was handed already parsed closes without asking", async () => {
+      const user = setupUser();
+      const onSaved = vi.fn<(value: RichTextValue) => void>();
+      renderEditor({ content: "the old notes", onSave: onSaved });
+      await user.click(screen.getByTestId(editor));
+      await user.click(screen.getByTestId(saveButton));
+      await waitFor(() => expect(onSaved).toHaveBeenCalled());
+      const doc = onSaved.mock.lastCall?.[0].doc;
+      cleanup();
+
+      const onCancel = vi.fn();
+      renderEditor({ content: doc, onCancel });
+      await user.click(screen.getByTestId(editor));
+      await user.click(screen.getByTestId(cancelButton));
+
+      await waitFor(() => expect(onCancel).toHaveBeenCalled());
+      expect(screen.queryByTestId(discardDialog)).not.toBeInTheDocument();
+    });
+
+    it("Then typing and undoing it back to where it started asks nothing either", async () => {
+      const user = setupUser();
+      const onCancel = vi.fn();
+      renderEditor({ content: "the old notes", onCancel });
+
+      await user.click(screen.getByTestId(editor));
+      await user.keyboard(" and more");
+      await user.keyboard("{Control>}z{/Control}");
+      await user.click(screen.getByTestId(cancelButton));
+
+      await waitFor(() => expect(onCancel).toHaveBeenCalled());
+      expect(screen.queryByTestId(discardDialog)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the editor is given neither a save nor a cancel", () => {
+    it("Then there is no footer offering either", async () => {
+      renderEditor({ content: "the old notes" });
+
+      expect(await screen.findByTestId(editor)).toBeInTheDocument();
+      expect(screen.queryByTestId(saveButton)).not.toBeInTheDocument();
+      expect(screen.queryByTestId(cancelButton)).not.toBeInTheDocument();
     });
   });
 

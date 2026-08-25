@@ -63,6 +63,7 @@ import {
   Highlighter,
   Image as ImageIcon,
   Italic,
+  Columns3,
   Link as LinkIcon,
   List,
   ListCollapse,
@@ -71,12 +72,12 @@ import {
   Pilcrow,
   PanelBottomOpen,
   PanelRightOpen,
-  Plus,
-  Trash2,
   Quote,
   Redo2,
+  Rows3,
   Smile,
   Strikethrough,
+  Trash2,
   Table as TableIcon,
   TriangleAlert,
   Type as TypeIcon,
@@ -92,6 +93,16 @@ import {
   type ComponentProps,
   type ReactNode,
 } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -682,8 +693,29 @@ const HeadingKeepingAlignment = Heading.extend({
  * measurement that means the same thing on both. `FullWidth` is the default —
  * an image at full width carries no size at all, so it stays plain markdown.
  */
-const ImageWidths = [25, 50, 75, 100] as const;
+/**
+ * How a picture is sized: a percentage of the text column, walked in rungs.
+ *
+ * Rungs rather than a fixed shortlist of sizes, because the corners can now be
+ * dragged to anything in between — the buttons snap to the nearest rung and
+ * move one, so they stay useful on a width that was never picked from a list.
+ * The floor is a picture still big enough to be a picture; the ceiling is the
+ * column, past which the editor would scroll sideways.
+ */
+const ImageStep = 5;
+const MinWidth = 5;
 const FullWidth = 100;
+
+/** The corners a picture can be pulled by, and which way each one grows. */
+const imageCorners = [
+  { id: "nw", grows: -1, className: "top-0 left-0 cursor-nwse-resize" },
+  { id: "ne", grows: 1, className: "top-0 right-0 cursor-nesw-resize" },
+  { id: "sw", grows: -1, className: "bottom-0 left-0 cursor-nesw-resize" },
+  { id: "se", grows: 1, className: "right-0 bottom-0 cursor-nwse-resize" },
+] as const;
+
+const clampWidth = (width: number) =>
+  Math.min(FullWidth, Math.max(MinWidth, Math.round(width)));
 
 /** Where an image sits in the column. `left` is the default and unwritten. */
 type ImageAlign = "left" | "center" | "right";
@@ -721,7 +753,11 @@ const ImageWithLayout = Image.extend({
         default: null,
         parseHTML: (element: HTMLElement) => {
           const raw = Number(element.getAttribute("data-width"));
-          return ImageWidths.some((width) => width === raw) ? raw : null;
+          // Any percentage inside the range, not one of a fixed few: a width
+          // that came from a dragged corner is whatever the drag made it.
+          return Number.isFinite(raw) && raw >= MinWidth && raw <= FullWidth
+            ? Math.round(raw)
+            : null;
         },
         renderHTML: (attributes: { width?: number | null }) =>
           attributes.width === null || attributes.width === undefined
@@ -835,24 +871,105 @@ const ImageWithLayout = Image.extend({
 });
 
 /**
- * The image and its controls: two steps of scale and three of alignment.
+ * The image, its handles and its controls.
  *
- * The controls are on screen whenever the editor is editable, the way the code
- * block's language picker is, rather than appearing on hover — hovering is not
- * something a phone does.
+ * All of it appears on selection and not before, the way a table's controls do:
+ * a picture nobody is working on is a picture, not a picture wearing furniture.
+ * Clicking it is what selects it, which is also the tap that reveals the
+ * controls — and a tap is the one gesture a phone has.
  */
 function ImageView({ node, updateAttributes, editor, getPos }: NodeViewProps) {
   const width: number | null = node.attrs.width;
   const align: ImageAlign | null = node.attrs.align;
   const testId = `editor.image.${nodeIndex(editor, getPos, "image")}`;
+  const box = useRef<HTMLSpanElement>(null);
 
-  const at = ImageWidths.indexOf(
-    (width ?? FullWidth) as (typeof ImageWidths)[number]
-  );
-  const scale = (to: number) =>
+  /**
+   * Whether this is the picture being worked on — the same question the table
+   * asks, and the same answer: the selection is on it or beside it.
+   *
+   * Not `NodeViewProps.selected`, which is only true for a node *selection*.
+   * A picture is an inline atom, so the caret coming to rest against it is the
+   * ordinary way of arriving at one, and the controls have to be there when it
+   * does. Read through `useEditorState` because a caret moving is a
+   * transaction, and nothing else here would re-render for it.
+   */
+  const working = useEditorState({
+    editor,
+    selector: ({ editor }) => {
+      if (!editor.isEditable) return false;
+
+      const at = getPos();
+      if (at === undefined) return false;
+
+      const { from, to } = editor.state.selection;
+      return from >= at && to <= at + node.nodeSize;
+    },
+  });
+
+  // Full width is stored as nothing at all, which is what keeps an untouched
+  // picture spelled `![alt](src)` rather than as inline HTML.
+  const setWidth = (next: number) =>
     updateAttributes({
-      width: ImageWidths[to] === FullWidth ? null : ImageWidths[to],
+      width: clampWidth(next) === FullWidth ? null : clampWidth(next),
     });
+
+  /**
+   * One rung up or down from wherever the picture is now.
+   *
+   * Snapped to the rung grid on the way: a width dragged to 37% steps to 40 or
+   * 35, not to 42 — otherwise the buttons carry the drag's arbitrary offset
+   * around with them forever.
+   */
+  const step = (by: 1 | -1) => {
+    const from = width ?? FullWidth;
+    const rung =
+      by > 0
+        ? Math.floor(from / ImageStep) * ImageStep
+        : Math.ceil(from / ImageStep) * ImageStep;
+
+    setWidth(rung + by * ImageStep);
+  };
+
+  /**
+   * Dragging a corner.
+   *
+   * The pointer's travel is read against the column the picture sits in, so
+   * what is stored stays a percentage — the same picture is read on a phone and
+   * on a desktop, and only a proportion means the same thing on both.
+   *
+   * The pointer is captured, so a fast drag that outruns the cursor keeps
+   * feeding this handle rather than being lost to whatever is underneath.
+   */
+  const pull = (grows: number) => (event: React.PointerEvent<HTMLSpanElement>) => {
+    const picture = box.current;
+    const column = picture?.parentElement?.getBoundingClientRect().width ?? 0;
+    if (!picture || column === 0) return;
+
+    const startX = event.clientX;
+    const startWidth = picture.getBoundingClientRect().width;
+    const handle = event.currentTarget;
+
+    // Keeps ProseMirror from taking the gesture as a click into the document,
+    // which would drop the selection the handles are showing for.
+    event.preventDefault();
+    handle.setPointerCapture(event.pointerId);
+
+    const move = (moved: PointerEvent) =>
+      setWidth(
+        ((startWidth + (moved.clientX - startX) * grows) / column) * 100
+      );
+
+    const done = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", done);
+      handle.removeEventListener("pointercancel", done);
+    };
+
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", done);
+    handle.addEventListener("pointercancel", done);
+  };
 
   return (
     <NodeViewWrapper
@@ -875,47 +992,81 @@ function ImageView({ node, updateAttributes, editor, getPos }: NodeViewProps) {
         picture fill it makes the two the same thing again.
       */}
       <span
+        ref={box}
         data-width={width === null ? undefined : String(width)}
-        className="relative inline-block align-top">
+        // Inline rather than a class per size: the width is now any percentage
+        // a drag can land on, and a stylesheet cannot hold a rule for each.
+        style={width === null ? undefined : { width: `${width}%` }}
+        className={cn(
+          "relative inline-block align-top",
+          // The ring says which picture the controls belong to — and with the
+          // controls sitting above rather than on it, something has to.
+          working &&
+            "ring-ring ring-offset-background rounded-lg ring-2 ring-offset-2",
+          // Room for the controls, made only while they are up — the same
+          // bargain the table strikes.
+          working && "mt-11"
+        )}>
         <img src={node.attrs.src ?? ""} alt={node.attrs.alt ?? ""} />
 
-        {editor.isEditable && (
+        {working && (
           // Outside the document as far as ProseMirror is concerned: without
           // this the controls' own markup is treated as editable content.
-          <span
-            contentEditable={false}
-            className="bg-card absolute top-2 right-2 z-10 flex items-center gap-0.5 rounded-full p-0.5 shadow-sm">
-            <ToolbarButton
-              testId={`${testId}.smaller.button`}
-              label="Smaller"
-              disabled={at <= 0}
-              onClick={() => scale(at - 1)}>
-              <ZoomOut />
-            </ToolbarButton>
-            <ToolbarButton
-              testId={`${testId}.bigger.button`}
-              label="Bigger"
-              disabled={at >= ImageWidths.length - 1}
-              onClick={() => scale(at + 1)}>
-              <ZoomIn />
-            </ToolbarButton>
-
-            <Divider />
-
-            {imageAlignments.map((option) => (
-              <ToolbarButton
-                key={option.id}
-                testId={`${testId}.align.${option.id}.button`}
-                label={option.label}
-                active={(align ?? "left") === option.id}
-                onClick={() =>
-                  updateAttributes({
-                    align: option.id === "left" ? null : option.id,
-                  })
-                }>
-                {option.icon}
-              </ToolbarButton>
+          <span contentEditable={false}>
+            {imageCorners.map((corner) => (
+              <span
+                key={corner.id}
+                {...testProp(`${testId}.resize.${corner.id}`)}
+                onPointerDown={pull(corner.grows)}
+                // Pulled by the corner, so it sits *on* the corner rather than
+                // beside it.
+                className={cn(
+                  "border-background bg-primary absolute z-10 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2",
+                  corner.className,
+                  corner.id === "ne" && "translate-x-1/2",
+                  corner.id === "se" && "translate-x-1/2 translate-y-1/2",
+                  corner.id === "sw" && "translate-y-1/2"
+                )}
+              />
             ))}
+
+            <span
+              {...testProp(`${testId}.controls`)}
+              // Above the picture rather than over it: a pill in the corner
+              // covers the one thing being looked at.
+              className="bg-card absolute right-0 bottom-full z-10 mb-1.5 flex items-center gap-0.5 rounded-full p-0.5 shadow-sm">
+              <ToolbarButton
+                testId={`${testId}.smaller.button`}
+                label="Smaller"
+                disabled={(width ?? FullWidth) <= MinWidth}
+                onClick={() => step(-1)}>
+                <ZoomOut />
+              </ToolbarButton>
+              <ToolbarButton
+                testId={`${testId}.bigger.button`}
+                label="Bigger"
+                disabled={width === null}
+                onClick={() => step(1)}>
+                <ZoomIn />
+              </ToolbarButton>
+
+              <Divider />
+
+              {imageAlignments.map((option) => (
+                <ToolbarButton
+                  key={option.id}
+                  testId={`${testId}.align.${option.id}.button`}
+                  label={option.label}
+                  active={(align ?? "left") === option.id}
+                  onClick={() =>
+                    updateAttributes({
+                      align: option.id === "left" ? null : option.id,
+                    })
+                  }>
+                  {option.icon}
+                </ToolbarButton>
+              ))}
+            </span>
           </span>
         )}
       </span>
@@ -928,11 +1079,16 @@ function ImageView({ node, updateAttributes, editor, getPos }: NodeViewProps) {
 /* -------------------------------------------------------------------------- */
 
 /**
- * How many columns a table gets when it is inserted, and whether the top row
- * is a header. A header, always: a markdown pipe table has no way to write a
- * table without one, so a headerless table would be lost on the first save.
+ * The largest table the toolbar's grid offers, and the shape it starts on.
+ *
+ * A header, always: a markdown pipe table has no way to write a table without
+ * one, so a headerless table would be lost on the first save. It is the first
+ * of the rows picked rather than an extra on top — the grid draws it that way,
+ * so 3 × 4 is a header and two rows under it, which is what the picture said it
+ * would be.
  */
-const NewTable = { rows: 3, cols: 3, withHeaderRow: true } as const;
+const TableGrid = { rows: 8, cols: 8 } as const;
+const NewTable = { rows: 3, cols: 3 } as const;
 
 /**
  * Whether a table can be written as a GFM pipe table, which is a narrower
@@ -1042,7 +1198,141 @@ const TableWritingPipes = Table.extend({
       },
     };
   },
+
+  addNodeView() {
+    // `contentDOMElementTag` matters more than it looks. The React renderer
+    // injects an element of its own to hold the rows, and it is a `div` unless
+    // told otherwise — a `div` between `<table>` and `<tr>`, which is not a
+    // table row group, so the rows stop being rows: the columns collapse to
+    // their min-width and the table no longer fills its line.
+    return ReactNodeViewRenderer(TableView, { contentDOMElementTag: "tbody" });
+  },
 });
+
+/**
+ * A table and the controls for the one being worked in.
+ *
+ * The controls float on the table itself, the way an image's scale and
+ * alignment do — the row being added is the row the caret is in, and a menu in
+ * the toolbar could only ever describe that in words.
+ *
+ * They appear only while the selection is inside *this* table, which is both
+ * what makes them unambiguous and what keeps a document of several tables from
+ * wearing several sets of buttons. That is also the tap that reveals them,
+ * which matters: the same editor is read on a phone, where there is nothing to
+ * hover with.
+ *
+ * Deleting a row, a column or the table is not the destructive action the
+ * design system makes you confirm — that rule is about entities that go for
+ * good. This is a document being written, and every one of these is one undo
+ * away.
+ */
+function TableView({ editor, getPos }: NodeViewProps) {
+  const testId = `editor.table.${nodeIndex(editor, getPos, "table")}`;
+
+  // Read through `useEditorState` rather than off the editor directly: a
+  // selection moving from one cell to another is a transaction, and nothing
+  // else here would re-render for it.
+  const working = useEditorState({
+    editor,
+    selector: ({ editor }) => {
+      if (!editor.isEditable) return false;
+
+      const at = getPos();
+      if (at === undefined) return false;
+
+      const node = editor.state.doc.nodeAt(at);
+      if (!node) return false;
+
+      const { from, to } = editor.state.selection;
+      return from >= at && to <= at + node.nodeSize;
+    },
+  });
+
+  const run = (action: (chain: ReturnType<Editor["chain"]>) => void) => () => {
+    const chain = editor.chain().focus();
+    action(chain);
+    chain.run();
+  };
+
+  return (
+    <NodeViewWrapper
+      {...testProp(testId)}
+      className={cn(
+        "relative my-3",
+        // Room above for the controls, and only while they are up. They sit in
+        // this margin rather than on the table, so the header row stays
+        // readable underneath them; a table nobody is working in keeps the
+        // spacing every other block has, rather than a gap standing open for
+        // buttons that are not there.
+        working && "mt-11"
+      )}>
+      {/* The `<tbody>` the rows go in is the renderer's, injected here — hence
+          `contentDOMElementTag` above. */}
+      <NodeViewContent<"table"> as="table" />
+
+      {working && (
+        // Outside the document as far as ProseMirror is concerned: without this
+        // the controls' own markup is treated as editable content.
+        <div
+          contentEditable={false}
+          {...testProp(`${testId}.controls`)}
+          // `bottom-full` puts the whole pill above the table's top edge rather
+          // than straddling it: overlapping the header row would cover the
+          // column names, which are the labels that say what the row controls
+          // are about to act on.
+          className="bg-card absolute right-0 bottom-full z-10 mb-1.5 flex items-center gap-0.5 rounded-full p-0.5 shadow-sm">
+          <ToolbarButton
+            testId={`${testId}.row.before.button`}
+            label="Add row above"
+            onClick={run((chain) => chain.addRowBefore())}>
+            <PanelBottomOpen className="rotate-180" />
+          </ToolbarButton>
+          <ToolbarButton
+            testId={`${testId}.row.after.button`}
+            label="Add row below"
+            onClick={run((chain) => chain.addRowAfter())}>
+            <PanelBottomOpen />
+          </ToolbarButton>
+          <ToolbarButton
+            testId={`${testId}.column.before.button`}
+            label="Add column left"
+            onClick={run((chain) => chain.addColumnBefore())}>
+            <PanelRightOpen className="rotate-180" />
+          </ToolbarButton>
+          <ToolbarButton
+            testId={`${testId}.column.after.button`}
+            label="Add column right"
+            onClick={run((chain) => chain.addColumnAfter())}>
+            <PanelRightOpen />
+          </ToolbarButton>
+
+          <Divider />
+
+          <ToolbarButton
+            testId={`${testId}.row.delete.button`}
+            label="Delete row"
+            onClick={run((chain) => chain.deleteRow())}>
+            <Rows3 />
+          </ToolbarButton>
+          <ToolbarButton
+            testId={`${testId}.column.delete.button`}
+            label="Delete column"
+            onClick={run((chain) => chain.deleteColumn())}>
+            <Columns3 />
+          </ToolbarButton>
+          <ToolbarButton
+            testId={`${testId}.delete.button`}
+            label="Delete table"
+            className="text-destructive hover:text-destructive"
+            onClick={run((chain) => chain.deleteTable())}>
+            <Trash2 />
+          </ToolbarButton>
+        </div>
+      )}
+    </NodeViewWrapper>
+  );
+}
 
 type RichTextEditorProps = {
   /**
@@ -1073,8 +1363,30 @@ type RichTextEditorProps = {
    * Called with the same value when Escape is pressed in the text — the
    * keyboard's way out of the editor, which keeps what was written rather than
    * discarding it. Left unset, Escape passes through untouched.
+   *
+   * `onCancel` takes precedence: an editor that can be cancelled answers Escape
+   * with the cancel, because two ways out that do opposite things to the same
+   * key is how writing gets lost.
    */
   onEscape?: (value: RichTextValue) => void;
+  /**
+   * Saving on purpose. Given one, the chrome grows a footer with a Save button,
+   * and this is called with the document at the moment it is pressed.
+   *
+   * A caller that wants this generally does *not* want `onBlur` as well:
+   * together they are the autosave the footer exists to replace.
+   */
+  onSave?: (value: RichTextValue) => void;
+  /**
+   * Leaving without saving. Given one, the footer grows a Cancel button and
+   * Escape answers to it. The editor puts its own text back to the `content` it
+   * was handed before calling this, so the caller only has to close it.
+   *
+   * Writing that was never saved has nowhere else to exist, so a cancel that
+   * would lose some asks first — see `cancel` below. This is called once the
+   * answer is yes, or straight away when there was nothing to lose.
+   */
+  onCancel?: () => void;
 } & TestIdProps;
 
 export function RichTextEditor({
@@ -1086,6 +1398,8 @@ export function RichTextEditor({
   chrome = true,
   onBlur,
   onEscape,
+  onSave,
+  onCancel,
   testId,
 }: RichTextEditorProps) {
   // The `:` autocomplete: the plugin owns when it opens, React owns how it is
@@ -1095,6 +1409,19 @@ export function RichTextEditor({
     null
   );
   const [highlighted, setHighlighted] = useState(0);
+  /** Whether the "throw the writing away?" question is on screen. */
+  const [discarding, setDiscarding] = useState(false);
+  /**
+   * The document as the editor itself held it when this sitting began.
+   *
+   * Deliberately not the `content` prop. Markdown does not survive a parse and
+   * a re-serialise byte for byte — a heading, a list, an escaped character all
+   * come back spelled slightly differently — so comparing the two says "changed"
+   * about a description nobody has touched. What the editor loaded is the only
+   * honest baseline for "did the user change anything", and it is re-taken
+   * every time the editor is handed a document.
+   */
+  const pristine = useRef<string | null>(null);
   const suggestionRef = useRef<EmojiSuggestionState | null>(null);
   const highlightedRef = useRef(0);
   // Escape dismisses the list without ending the shortcode, so the plugin stays
@@ -1200,6 +1527,7 @@ export function RichTextEditor({
     // in.
     autofocus: autoFocus && editable ? "end" : false,
     editorProps: { attributes: editorAttributes },
+    onCreate: ({ editor }) => remember(editor),
     // Focus moving into the editor's own chrome (the toolbar, the link popover)
     // is not the user leaving the editor — reporting a blur there tears down
     // click-to-edit views mid-interaction, closing the editor as the popover
@@ -1231,6 +1559,10 @@ export function RichTextEditor({
     if (wasEditable !== editable) editor.setEditable(editable);
     editor.setOptions({ editorProps: { attributes: editorAttributes } });
 
+    // A fresh sitting starts here, whatever was on screen while it was being
+    // read — so cancelling straight after opening asks nothing.
+    if (editable && !wasEditable) remember(editor);
+
     if (autoFocus && editable && !wasEditable) {
       editor.commands.focus("end");
     }
@@ -1238,6 +1570,46 @@ export function RichTextEditor({
     // are what matter, so the effect keys on those instead.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, editable, autoFocus, editorAttributes.class, testId]);
+
+  /**
+   * Undo the whole sitting: the text goes back to the document this editor was
+   * handed, and the caller is told to close it.
+   *
+   * The restore happens here rather than in the caller because only the editor
+   * can perform it — the `content` prop has not changed, so the sync effect
+   * below sees nothing to do and would leave the abandoned writing on screen,
+   * read-only and looking saved.
+   */
+  /** Take this document as the one nothing has been written on top of yet. */
+  const remember = (editor: Editor) => {
+    pristine.current = JSON.stringify(editor.getJSON());
+  };
+
+  const changed = (editor: Editor) =>
+    pristine.current !== JSON.stringify(editor.getJSON());
+
+  const cancel = () => {
+    if (!editor) return;
+
+    // Nothing written since it opened: there is nothing to lose, and a dialog
+    // asking whether to lose it is a question with one answer.
+    if (!changed(editor)) {
+      onCancel?.();
+      return;
+    }
+
+    setDiscarding(true);
+  };
+
+  /** The answer being yes. */
+  const discard = () => {
+    if (!editor) return;
+
+    setDiscarding(false);
+    editor.commands.setContent(content);
+    remember(editor);
+    onCancel?.();
+  };
 
   /**
    * Escape hands the document back and leaves the editor.
@@ -1254,7 +1626,8 @@ export function RichTextEditor({
    * stale callback the alternative buys.
    */
   useEffect(() => {
-    if (!editor || onEscape === undefined) return;
+    if (!editor) return;
+    if (onEscape === undefined && onCancel === undefined) return;
 
     const dom = editor.view.dom;
 
@@ -1263,7 +1636,11 @@ export function RichTextEditor({
       // A layer inside the editor — the shortcode list — answers Escape by
       // closing itself, and stops the key here so the editor stays open. See
       // `EmojiSuggestions`.
-      onEscape(valueOf(editor));
+      if (onCancel !== undefined) {
+        cancel();
+        return;
+      }
+      onEscape?.(valueOf(editor));
     };
 
     dom.addEventListener("keydown", onKeyDown);
@@ -1276,6 +1653,7 @@ export function RichTextEditor({
     if (!editor || editor.isFocused) return;
     if (holdsContent(editor, content)) return;
     editor.commands.setContent(content);
+    remember(editor);
   }, [content, editor]);
 
   const emojiList = editor && (
@@ -1295,14 +1673,29 @@ export function RichTextEditor({
   // put `EditorContent` under a different parent as `chrome` flips, which
   // unmounts it — and rebuilding the view is the whole thing being avoided.
   return (
-    <div
-      data-editor-chrome=""
-      className={cn(
-        "rounded-lg",
-        chrome && "focus-within:ring-ring border focus-within:ring-1"
-      )}>
-      {chrome && editable && editor && <Toolbar editor={editor} />}
-      <EditorContent editor={editor} />
+    <div data-editor-chrome="" className="flex flex-col">
+      <div
+        className={cn(
+          "rounded-lg",
+          chrome && "focus-within:ring-ring border focus-within:ring-1"
+        )}>
+        {chrome && editable && editor && <Toolbar editor={editor} />}
+        <EditorContent editor={editor} />
+      </div>
+      {/* Outside the box, and pinned to the bottom of whatever is scrolling —
+          see `EditorActions`. */}
+      {editable && editor && (onSave || onCancel) && (
+        <EditorActions
+          editor={editor}
+          onSave={onSave}
+          onCancel={onCancel && cancel}
+        />
+      )}
+      <DiscardConfirm
+        open={discarding}
+        onOpenChange={setDiscarding}
+        onDiscard={discard}
+      />
       {emojiList}
     </div>
   );
@@ -1461,7 +1854,18 @@ function Toolbar({ editor }: { editor: Editor }) {
   return (
     <div
       {...testProp("editor.toolbar")}
-      className="flex flex-wrap items-center gap-0.5 border-b px-1.5 py-1">
+      /*
+        Pinned to the top of whatever is scrolling the page — the modal's body,
+        or the window on the detail route. A long description scrolls the
+        formatting controls off screen exactly when they are being used, and
+        reaching them meant scrolling back to the top of a document to change
+        one word near the bottom.
+
+        It needs an opaque fill of its own to be scrolled *under*, and the
+        corner rounded to match the box it is pinned inside — a square fill
+        would paint over the border's radius.
+      */
+      className="bg-background sticky top-0 z-10 flex flex-wrap items-center gap-0.5 rounded-t-lg border-b px-1.5 py-1">
       <ToolbarButton
         testId="editor.toolbar.undo.button"
         label="Undo"
@@ -1659,32 +2063,30 @@ function ImageButton({ editor }: { editor: Editor }) {
 }
 
 /**
- * The table menu: one button that inserts a table when the caret is outside
- * one, and edits the table when the caret is inside it.
+ * The table button: a grid you pick a shape from, and nothing else.
  *
- * Rows and columns are added and removed here rather than from handles that
- * appear on hover, because the same editor is read on a phone, where there is
- * nothing to hover with.
+ * Rows and columns used to be added and removed from this menu, which meant
+ * naming the thing you were changing ("add row below" — below which?) instead
+ * of pointing at it. They live on the table now, in the same floating controls
+ * an image carries; see `TableView`. What is left here is the one thing that
+ * has no table to sit on yet: making one.
  *
- * Deleting a row, a column or the table is not the destructive action the
- * design system makes you confirm — that rule is about entities that go for
- * good. This is a document being written, and every one of these is one undo
- * away.
+ * Disabled while the caret is already in a table, because inserting there would
+ * nest a table inside a cell — which no pipe table can spell, so it would come
+ * back as HTML on the next save.
  */
 function TableMenu({ editor, inside }: { editor: Editor; inside: boolean }) {
-  const run = (action: (chain: ReturnType<Editor["chain"]>) => void) => () => {
-    const chain = editor.chain().focus();
-    action(chain);
-    chain.run();
-  };
+  // Controlled, because the grid inside is made of plain buttons rather than
+  // menu items — nothing closes the menu on its own when a size is picked.
+  const [open, setOpen] = useState(false);
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <ToolbarButton
           testId="editor.toolbar.table.menu"
-          label="Table"
-          active={inside}
+          label={inside ? "The table's own controls are on it" : "Table"}
+          disabled={inside}
           width="wide">
           <TableIcon />
           <ChevronDown className="size-3 opacity-50" />
@@ -1696,78 +2098,94 @@ function TableMenu({ editor, inside }: { editor: Editor; inside: boolean }) {
         data-editor-chrome=""
         align="start"
         // A closing menu hands focus back to the button that opened it, which
-        // is the wrong place: every item here has just put the caret in a cell,
-        // and the next thing typed belongs in that cell rather than nowhere.
-        // The commands focus the editor themselves, so the restore is only a
-        // race to undo them.
+        // is the wrong place: the caret has just been put in the new table's
+        // first cell, and the next thing typed belongs there rather than
+        // nowhere. The command focuses the editor itself, so the restore is
+        // only a race to undo it.
         onCloseAutoFocus={(event) => event.preventDefault()}
-        className="min-w-52">
-        {!inside ? (
-          <DropdownMenuItem
-            testId="editor.toolbar.table.insert.button"
-            onMouseDown={(event) => event.preventDefault()}
-            onSelect={run((chain) => chain.insertTable(NewTable))}>
-            <Plus />
-            Insert table
-          </DropdownMenuItem>
-        ) : (
-          <>
-            <DropdownMenuItem
-              testId="editor.toolbar.table.row.after.button"
-              onMouseDown={(event) => event.preventDefault()}
-              onSelect={run((chain) => chain.addRowAfter())}>
-              <PanelBottomOpen />
-              Add row below
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              testId="editor.toolbar.table.row.before.button"
-              onMouseDown={(event) => event.preventDefault()}
-              onSelect={run((chain) => chain.addRowBefore())}>
-              <PanelBottomOpen className="rotate-180" />
-              Add row above
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              testId="editor.toolbar.table.column.after.button"
-              onMouseDown={(event) => event.preventDefault()}
-              onSelect={run((chain) => chain.addColumnAfter())}>
-              <PanelRightOpen />
-              Add column right
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              testId="editor.toolbar.table.column.before.button"
-              onMouseDown={(event) => event.preventDefault()}
-              onSelect={run((chain) => chain.addColumnBefore())}>
-              <PanelRightOpen className="rotate-180" />
-              Add column left
-            </DropdownMenuItem>
-
-            <DropdownMenuSeparator />
-
-            <DropdownMenuItem
-              testId="editor.toolbar.table.row.delete.button"
-              onMouseDown={(event) => event.preventDefault()}
-              onSelect={run((chain) => chain.deleteRow())}>
-              <Trash2 />
-              Delete row
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              testId="editor.toolbar.table.column.delete.button"
-              onMouseDown={(event) => event.preventDefault()}
-              onSelect={run((chain) => chain.deleteColumn())}>
-              <Trash2 />
-              Delete column
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              testId="editor.toolbar.table.delete.button"
-              onMouseDown={(event) => event.preventDefault()}
-              onSelect={run((chain) => chain.deleteTable())}>
-              <Trash2 />
-              Delete table
-            </DropdownMenuItem>
-          </>
-        )}
+        className="w-auto p-2">
+        <TableSizePicker editor={editor} onPicked={() => setOpen(false)} />
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+/**
+ * The size grid: 8 × 8 cells, filled up to whatever is being pointed at.
+ *
+ * Every cell is a real button rather than one grid with mouse maths on top, so
+ * the shape can be picked by keyboard and read out by name — and so a spec can
+ * ask for a size instead of simulating a hover.
+ */
+function TableSizePicker({
+  editor,
+  onPicked,
+}: {
+  editor: Editor;
+  onPicked: () => void;
+}) {
+  const [over, setOver] = useState<{ rows: number; cols: number }>(NewTable);
+
+  const insert = (rows: number, cols: number) => {
+    editor
+      .chain()
+      .focus()
+      // `withHeaderRow` counts inside `rows`, which is what makes the grid's
+      // top row and the header the same row.
+      .insertTable({ rows, cols, withHeaderRow: true })
+      .run();
+    onPicked();
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div
+        // The grid is one control made of many: arrowing between cells is the
+        // keyboard's way of resizing, and each cell says what it would build.
+        role="grid"
+        aria-label="Table size"
+        className="grid grid-cols-8 gap-0.5"
+        onMouseLeave={() => setOver(NewTable)}>
+        {Array.from({ length: TableGrid.rows }, (_, row) =>
+          Array.from({ length: TableGrid.cols }, (_, col) => {
+            const rows = row + 1;
+            const cols = col + 1;
+            const within = rows <= over.rows && cols <= over.cols;
+
+            return (
+              <button
+                key={`${rows}x${cols}`}
+                {...testProp(`editor.toolbar.table.size.${rows}x${cols}`)}
+                type="button"
+                // The caret has to survive the click: it is where the table
+                // goes.
+                onMouseDown={(event) => event.preventDefault()}
+                onMouseEnter={() => setOver({ rows, cols })}
+                onFocus={() => setOver({ rows, cols })}
+                onClick={() => insert(rows, cols)}
+                aria-label={`${rows} by ${cols}`}
+                className={cn(
+                  "size-4 rounded-[3px] border transition-colors",
+                  within
+                    ? "border-primary bg-primary/70"
+                    : "border-border bg-muted",
+                  // The top row is the header, and says so even before it is
+                  // picked — otherwise "3 rows" quietly means two.
+                  rows === 1 && !within && "bg-foreground/15"
+                )}
+              />
+            );
+          })
+        )}
+      </div>
+
+      <p
+        {...testProp("editor.toolbar.table.size.label")}
+        className="text-muted-foreground text-center text-xs">
+        {over.rows} × {over.cols}
+        <span className="opacity-60"> · header + {over.rows - 1}</span>
+      </p>
+    </div>
   );
 }
 
@@ -2488,6 +2906,103 @@ type ToolbarButtonProps = Omit<
   onClick?: () => void;
   children: ReactNode;
 };
+
+/**
+ * The question in front of a cancel that would lose writing.
+ *
+ * Not portalled into the editor's chrome, unlike the popovers: this is a modal
+ * over the whole page, and it is asked *because* the editor is about to close.
+ * Keeping focus in the editor is the one thing it must not do.
+ */
+function DiscardConfirm({
+  open,
+  onOpenChange,
+  onDiscard,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onDiscard: () => void;
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent testId="editor.discard.dialog">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Throw away what you wrote?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This description has changes that were never saved. Leaving now
+            drops them, and they cannot be brought back.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel testId="editor.discard.keep">
+            Keep writing
+          </AlertDialogCancel>
+          <AlertDialogAction
+            testId="editor.discard.confirm"
+            variant="destructive"
+            onClick={onDiscard}>
+            Discard
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+/**
+ * The footer: the two ways out of an editor that saves on purpose.
+ *
+ * It floats rather than sitting in the box. Inside the border it belonged to
+ * the text — the bottom row of a long document, only reachable by scrolling to
+ * the end of the writing to agree to keep it. Pinned below the box instead, it
+ * follows the scroll and stays where it was last seen.
+ *
+ * Right-aligned and its own small surface, so it reads as being *over* the
+ * document rather than part of it, and covers as little of the text as two
+ * buttons can.
+ *
+ * Both hold the caret where it is (`onMouseDown` preventDefault) rather than
+ * taking focus. That keeps the selection for anything the caller does next, and
+ * means pressing either cannot be mistaken for the user leaving the editor.
+ */
+function EditorActions({
+  editor,
+  onSave,
+  onCancel,
+}: {
+  editor: Editor;
+  onSave?: (value: RichTextValue) => void;
+  onCancel?: () => void;
+}) {
+  return (
+    <div
+      {...testProp("editor.actions")}
+      className="bg-background/85 border-border sticky bottom-2 z-20 mt-2 ml-auto flex items-center gap-1 rounded-full border p-1 shadow-sm backdrop-blur-sm">
+      {onCancel && (
+        <Button
+          testId="editor.cancel.button"
+          type="button"
+          variant="ghost"
+          size="sm"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={onCancel}>
+          Cancel
+        </Button>
+      )}
+      {onSave && (
+        <Button
+          testId="editor.save.button"
+          type="button"
+          size="sm"
+          className="rounded-full"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => onSave(valueOf(editor))}>
+          Save
+        </Button>
+      )}
+    </div>
+  );
+}
 
 function ToolbarButton({
   label,
