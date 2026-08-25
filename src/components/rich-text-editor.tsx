@@ -26,6 +26,14 @@ import {
   TableHeader,
   TableRow,
 } from "@tiptap/extension-table";
+import { Image } from "@tiptap/extension-image";
+import { toast } from "sonner";
+import {
+  ImageSizeLimit,
+  firstImageFile,
+  fitsImageSizeLimit,
+  readImageDataUrl,
+} from "@/lib/image";
 import { Paragraph } from "@tiptap/extension-paragraph";
 import { Heading } from "@tiptap/extension-heading";
 import { Extension, getHTMLFromFragment } from "@tiptap/core";
@@ -53,6 +61,7 @@ import {
   Heading2,
   Heading3,
   Highlighter,
+  Image as ImageIcon,
   Italic,
   Link as LinkIcon,
   List,
@@ -73,6 +82,8 @@ import {
   Type as TypeIcon,
   Underline as UnderlineIcon,
   Undo2,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import {
   useEffect,
@@ -254,7 +265,7 @@ function CodeBlockView({
         <div contentEditable={false} className="absolute top-2 right-2 z-10">
           <LanguagePicker
             editor={editor}
-            index={codeBlockIndex(editor, getPos)}
+            index={nodeIndex(editor, getPos, "codeBlock")}
             language={language}
             onChange={(next) =>
               updateAttributes({
@@ -332,20 +343,22 @@ function LanguagePicker({
 }
 
 /**
- * Which code block this is, counting from the top of the document — the test id
- * needs something stable to name a block by, and a code block has no id of its
- * own. Positions shift as the document is edited; the ordinal does not.
+ * Which node of its kind this is, counting from the top of the document — the
+ * test id needs something stable to name it by, and neither a code block nor
+ * an image has an id of its own. Positions shift as the document is edited;
+ * the ordinal does not.
  */
-function codeBlockIndex(
+function nodeIndex(
   editor: Editor,
-  getPos: NodeViewProps["getPos"]
+  getPos: NodeViewProps["getPos"],
+  type: string
 ): number {
   const pos = getPos();
   if (pos === undefined) return 0;
 
   let index = 0;
   editor.state.doc.descendants((child, childPos) => {
-    if (child.type.name === "codeBlock" && childPos < pos) index += 1;
+    if (child.type.name === type && childPos < pos) index += 1;
     return true;
   });
 
@@ -658,6 +671,259 @@ const HeadingKeepingAlignment = Heading.extend({
 });
 
 /* -------------------------------------------------------------------------- */
+/* Images: scale and alignment, neither of which markdown can say              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The sizes an image can be scaled to, as a percentage of the text column.
+ *
+ * Steps rather than a drag handle: the same editor is read on a phone, where
+ * there is nothing to drag with, and a percentage of the column is the only
+ * measurement that means the same thing on both. `FullWidth` is the default —
+ * an image at full width carries no size at all, so it stays plain markdown.
+ */
+const ImageWidths = [25, 50, 75, 100] as const;
+const FullWidth = 100;
+
+/** Where an image sits in the column. `left` is the default and unwritten. */
+type ImageAlign = "left" | "center" | "right";
+const imageAlignments: { id: ImageAlign; label: string; icon: ReactNode }[] = [
+  { id: "left", label: "Align left", icon: <AlignLeft /> },
+  { id: "center", label: "Centre", icon: <AlignCenter /> },
+  { id: "right", label: "Align right", icon: <AlignRight /> },
+];
+
+/**
+ * The image, with a size and a place in the column.
+ *
+ * Markdown can say `![alt](src)` and nothing else — no width, no alignment —
+ * so an image that has been scaled or moved is written as inline HTML instead,
+ * the same fallback `writeAligned` uses for a centred paragraph. An image left
+ * at full width and flush left is the overwhelming majority and stays the
+ * portable spelling.
+ *
+ * The measurements live in `data-` attributes rather than in `width`/`style`
+ * because they have to survive the round trip through markdown, and a
+ * `data-` attribute is the one thing an html sanitiser and a markdown parser
+ * both leave alone.
+ */
+const ImageWithLayout = Image.extend({
+  // Inline, the way markdown means it: `![alt](src)` sits in a line of text.
+  // As a block it was lifted out of the paragraph it was parsed into, and the
+  // emptied paragraph left behind came back as a stray blank line on save.
+  inline: true,
+  group: "inline",
+
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      width: {
+        default: null,
+        parseHTML: (element: HTMLElement) => {
+          const raw = Number(element.getAttribute("data-width"));
+          return ImageWidths.some((width) => width === raw) ? raw : null;
+        },
+        renderHTML: (attributes: { width?: number | null }) =>
+          attributes.width === null || attributes.width === undefined
+            ? {}
+            : { "data-width": String(attributes.width) },
+      },
+      align: {
+        default: null,
+        parseHTML: (element: HTMLElement) => element.getAttribute("data-align"),
+        renderHTML: (attributes: { align?: ImageAlign | null }) =>
+          attributes.align === null || attributes.align === undefined
+            ? {}
+            : { "data-align": attributes.align },
+      },
+    };
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(ImageView);
+  },
+
+  /**
+   * Pasting and dropping a picture.
+   *
+   * A screenshot arrives as a file and nothing else — no text, no html — so
+   * ProseMirror has nothing to parse and the paste was silently doing nothing
+   * at all. The file is read here instead and put in the document as a data
+   * url, which is the only place it can go: there is no server to upload to.
+   *
+   * Reading a file is asynchronous and a paste is not, so the handler claims
+   * the event straight away and the picture arrives a tick later.
+   */
+  addProseMirrorPlugins() {
+    const insert = (files: FileList | null, at?: number): boolean => {
+      const file = firstImageFile(files);
+      if (file === null) return false;
+
+      if (!fitsImageSizeLimit(file)) {
+        toast.error("That picture is too big", {
+          description: `A picture is stored inside the todo itself, so it has to stay under ${Math.round(
+            ImageSizeLimit / (1024 * 1024)
+          )} MB.`,
+        });
+        // Claimed even though nothing is inserted: falling through would drop
+        // the file's name into the document as text.
+        return true;
+      }
+
+      readImageDataUrl(file)
+        .then((src) => {
+          const chain = this.editor.chain().focus();
+          if (at !== undefined) chain.setTextSelection(at);
+          chain.setImage({ src }).run();
+        })
+        .catch((error: unknown) => {
+          console.error(error);
+          toast.error("That picture could not be read", {
+            description: "Try saving it to a file and dropping it in instead.",
+          });
+        });
+
+      return true;
+    };
+
+    return [
+      new Plugin({
+        key: new PluginKey("imageFileHandler"),
+        props: {
+          handlePaste: (_view, event) =>
+            insert(event.clipboardData?.files ?? null),
+          handleDrop: (view, event) => {
+            const dropped = event.dataTransfer?.files ?? null;
+            if (firstImageFile(dropped) === null) return false;
+
+            // Where the picture was let go of, rather than wherever the caret
+            // happened to be left.
+            const at = view.posAtCoords({
+              left: (event as DragEvent).clientX,
+              top: (event as DragEvent).clientY,
+            })?.pos;
+
+            event.preventDefault();
+            return insert(dropped, at);
+          },
+        },
+      }),
+    ];
+  },
+
+  addStorage() {
+    return {
+      markdown: {
+        serialize(state: MarkdownSerializerState, node: ProseMirrorNode) {
+          const { src, alt, width, align } = node.attrs;
+
+          if (
+            (width === null || width === FullWidth) &&
+            (align === null || align === "left")
+          ) {
+            state.write(`![${state.esc(alt ?? "")}](${state.esc(src ?? "")})`);
+          } else {
+            state.write(
+              getHTMLFromFragment(Fragment.from(node), node.type.schema)
+            );
+          }
+        },
+        parse: {},
+      },
+    };
+  },
+});
+
+/**
+ * The image and its controls: two steps of scale and three of alignment.
+ *
+ * The controls are on screen whenever the editor is editable, the way the code
+ * block's language picker is, rather than appearing on hover — hovering is not
+ * something a phone does.
+ */
+function ImageView({ node, updateAttributes, editor, getPos }: NodeViewProps) {
+  const width: number | null = node.attrs.width;
+  const align: ImageAlign | null = node.attrs.align;
+  const testId = `editor.image.${nodeIndex(editor, getPos, "image")}`;
+
+  const at = ImageWidths.indexOf(
+    (width ?? FullWidth) as (typeof ImageWidths)[number]
+  );
+  const scale = (to: number) =>
+    updateAttributes({
+      width: ImageWidths[to] === FullWidth ? null : ImageWidths[to],
+    });
+
+  return (
+    <NodeViewWrapper
+      as="span"
+      {...testProp(testId)}
+      data-align={align ?? "left"}
+      className="my-1">
+      {/*
+        The picture and its controls in one inline box: the wrapper above is a
+        full-width block (that is what carries the alignment), so anchoring the
+        controls to it would leave them at the far edge of the line rather than
+        on the corner of a quarter-width picture.
+      */}
+      {/*
+        The size belongs to this box, not to the picture inside it. A
+        percentage width on a child of a shrink-to-fit box resolves against
+        that box's own preferred width — so a picture scaled to half sat at
+        half size inside a full-width box, and centring the box left the
+        picture looking off to one side. Sizing the box and letting the
+        picture fill it makes the two the same thing again.
+      */}
+      <span
+        data-width={width === null ? undefined : String(width)}
+        className="relative inline-block align-top">
+        <img src={node.attrs.src ?? ""} alt={node.attrs.alt ?? ""} />
+
+        {editor.isEditable && (
+          // Outside the document as far as ProseMirror is concerned: without
+          // this the controls' own markup is treated as editable content.
+          <span
+            contentEditable={false}
+            className="bg-card absolute top-2 right-2 z-10 flex items-center gap-0.5 rounded-full p-0.5 shadow-sm">
+            <ToolbarButton
+              testId={`${testId}.smaller.button`}
+              label="Smaller"
+              disabled={at <= 0}
+              onClick={() => scale(at - 1)}>
+              <ZoomOut />
+            </ToolbarButton>
+            <ToolbarButton
+              testId={`${testId}.bigger.button`}
+              label="Bigger"
+              disabled={at >= ImageWidths.length - 1}
+              onClick={() => scale(at + 1)}>
+              <ZoomIn />
+            </ToolbarButton>
+
+            <Divider />
+
+            {imageAlignments.map((option) => (
+              <ToolbarButton
+                key={option.id}
+                testId={`${testId}.align.${option.id}.button`}
+                label={option.label}
+                active={(align ?? "left") === option.id}
+                onClick={() =>
+                  updateAttributes({
+                    align: option.id === "left" ? null : option.id,
+                  })
+                }>
+                {option.icon}
+              </ToolbarButton>
+            ))}
+          </span>
+        )}
+      </span>
+    </NodeViewWrapper>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /* Tables: the pipe table, and everything it cannot say                        */
 /* -------------------------------------------------------------------------- */
 
@@ -885,6 +1151,7 @@ export function RichTextEditor({
       // Column resizing is left off: a width is a pixel measurement, and
       // markdown has nowhere to put one — dragging a column would look like it
       // worked until the todo was reopened.
+      ImageWithLayout,
       TableWritingPipes.configure({ resizable: false }),
       TableRow,
       TableHeader,
@@ -1289,6 +1556,7 @@ function Toolbar({ editor }: { editor: Editor }) {
         <SquareCode />
       </ToolbarButton>
       <LinkButton editor={editor} active={state.link} />
+      <ImageButton editor={editor} />
 
       <Divider />
 
@@ -1302,6 +1570,91 @@ function Toolbar({ editor }: { editor: Editor }) {
       />
       <EmojiButton editor={editor} />
     </div>
+  );
+}
+
+/**
+ * Adding an image: a url and the words that stand in for it.
+ *
+ * A url rather than a file picker, because there is nowhere to put a file —
+ * the app has no server, and an uploaded image would have to be carried inside
+ * the todo itself as base64.
+ *
+ * The alt text is a field rather than an afterthought: it is what a screen
+ * reader announces and what shows when the url one day stops resolving, which
+ * for an image that lives on someone else's server is a matter of time.
+ */
+function ImageButton({ editor }: { editor: Editor }) {
+  const [open, setOpen] = useState(false);
+  const [src, setSrc] = useState("");
+  const [alt, setAlt] = useState("");
+
+  const apply = () => {
+    const url = src.trim();
+    if (url === "") return;
+
+    editor
+      .chain()
+      .focus()
+      .setImage({ src: url, alt: alt.trim() || undefined })
+      .run();
+
+    setOpen(false);
+  };
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) {
+          setSrc("");
+          setAlt("");
+        }
+      }}>
+      <PopoverTrigger asChild>
+        <ToolbarButton testId="editor.toolbar.image.button" label="Image">
+          <ImageIcon />
+        </ToolbarButton>
+      </PopoverTrigger>
+
+      <PopoverContent
+        container={chrome(editor)}
+        data-editor-chrome=""
+        align="start"
+        side="bottom"
+        sideOffset={8}
+        className="w-72 p-2">
+        <form
+          className="flex flex-col gap-1.5"
+          onSubmit={(event) => {
+            event.preventDefault();
+            apply();
+          }}>
+          <LinkField
+            testId="editor.toolbar.image.url.input"
+            icon={<ImageIcon className="size-3.5" />}
+            placeholder="Image link"
+            value={src}
+            onChange={setSrc}
+            autoFocus
+          />
+          <LinkField
+            testId="editor.toolbar.image.alt.input"
+            icon={<TypeIcon className="size-3.5" />}
+            placeholder="Describe the image"
+            value={alt}
+            onChange={setAlt}
+          />
+
+          <div className="mt-0.5 flex items-center justify-end gap-1">
+            <Button testId="editor.toolbar.image.apply" size="sm" type="submit">
+              Add
+            </Button>
+          </div>
+        </form>
+      </PopoverContent>
+    </Popover>
   );
 }
 
