@@ -23,10 +23,14 @@ const imageSmaller = "editor.image.0.smaller.button";
 const imageBigger = "editor.image.0.bigger.button";
 const imageAlignCenter = "editor.image.0.align.center.button";
 const tableMenu = "editor.toolbar.table.menu";
-const tableInsert = "editor.toolbar.table.insert.button";
-const tableRowAfter = "editor.toolbar.table.row.after.button";
-const tableColumnAfter = "editor.toolbar.table.column.after.button";
-const tableDelete = "editor.toolbar.table.delete.button";
+/** A cell in the toolbar's size grid: the table it would build, header included. */
+const tableSize = (rows: number, cols: number) =>
+  `editor.toolbar.table.size.${rows}x${cols}`;
+const tableControls = "editor.table.0.controls";
+const tableRowAfter = "editor.table.0.row.after.button";
+const tableColumnAfter = "editor.table.0.column.after.button";
+const tableRowDelete = "editor.table.0.row.delete.button";
+const tableDelete = "editor.table.0.delete.button";
 const saveButton = "editor.save.button";
 const cancelButton = "editor.cancel.button";
 const discardDialog = "editor.discard.dialog";
@@ -113,17 +117,14 @@ function makeImageFile(bytes = 8): File {
  */
 async function insideTable() {
   // The dropdown runs a typeahead of its own while it is open, which eats the
-  // keystrokes a spec sends next — so the menu being gone is half of "the
-  // caret is in the table", and the button reporting itself pressed is the
-  // other half.
+  // keystrokes a spec sends next — so the grid being gone is half of "the caret
+  // is in the table", and the table's own controls appearing is the other half:
+  // they are on screen only for the table being worked in.
   await waitFor(() =>
-    expect(screen.queryByTestId(tableInsert)).not.toBeInTheDocument()
+    expect(screen.queryByTestId(tableSize(3, 3))).not.toBeInTheDocument()
   );
   await waitFor(() =>
-    expect(screen.getByTestId(tableMenu)).toHaveAttribute(
-      "aria-pressed",
-      "true"
-    )
+    expect(screen.getByTestId(tableControls)).toBeInTheDocument()
   );
   // Closing the menu hands focus back to its trigger before the editor takes
   // it again; typing in between goes to the button.
@@ -1461,6 +1462,11 @@ describe("rich text editor", () => {
     });
   });
 
+  /**
+   * The toolbar offers a shape rather than a fixed table: an 8×8 grid, where
+   * the top row is the header a pipe table cannot do without. Picking 3 × 4
+   * therefore means a header and two rows under it.
+   */
   describe("when I insert a table from the toolbar", () => {
     it("Then it is saved as a markdown table", async () => {
       const user = setupUser();
@@ -1468,12 +1474,31 @@ describe("rich text editor", () => {
 
       await user.click(screen.getByTestId(editor));
       await user.click(screen.getByTestId(tableMenu));
-      await user.click(await screen.findByTestId(tableInsert));
+      await user.click(await screen.findByTestId(tableSize(3, 3)));
       blurEditor();
 
       await waitFor(() =>
         expect(onBlur).toHaveBeenCalledWith(
           expect.stringContaining("|  |  |  |\n| --- | --- | --- |")
+        )
+      );
+    });
+
+    it("Then the size I picked is the size I get, the header being its first row", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor();
+
+      await user.click(screen.getByTestId(editor));
+      await user.click(screen.getByTestId(tableMenu));
+      await user.click(await screen.findByTestId(tableSize(2, 4)));
+      blurEditor();
+
+      // Two rows: the header, and one to write in.
+      await waitFor(() =>
+        expect(onBlur).toHaveBeenCalledWith(
+          expect.stringContaining(
+            "|  |  |  |  |\n| --- | --- | --- | --- |\n|  |  |  |  |"
+          )
         )
       );
     });
@@ -1484,7 +1509,7 @@ describe("rich text editor", () => {
 
       await user.click(screen.getByTestId(editor));
       await user.click(screen.getByTestId(tableMenu));
-      await user.click(await screen.findByTestId(tableInsert));
+      await user.click(await screen.findByTestId(tableSize(3, 3)));
       await insideTable();
       await user.keyboard("Name");
       blurEditor();
@@ -1522,30 +1547,43 @@ describe("rich text editor", () => {
     });
   });
 
+  /**
+   * Rows and columns are added and removed from the table itself now, not from
+   * the toolbar — the same floating controls an image carries, and for the same
+   * reason: the thing being changed is the thing you are pointing at.
+   */
   describe("when I work on the table I inserted", () => {
     /**
-     * Inserts a table and names its first cell.
+     * Inserts a table and leaves the caret in its first cell.
      *
-     * Built through the menu rather than loaded as content because that is
+     * Built through the toolbar rather than loaded as content because that is
      * what leaves the caret inside the table — which is the state every one of
-     * these actions needs, and the state the menu itself switches on.
+     * these actions needs, and the state the controls themselves appear for.
      */
     async function insertTable(user: User) {
       const rendered = renderEditor();
 
       await user.click(screen.getByTestId(editor));
       await user.click(screen.getByTestId(tableMenu));
-      await user.click(await screen.findByTestId(tableInsert));
+      await user.click(await screen.findByTestId(tableSize(3, 3)));
+      await insideTable();
 
       return rendered;
     }
+
+    it("Then its controls are on the table rather than in the toolbar", async () => {
+      const user = setupUser();
+      await insertTable(user);
+
+      expect(screen.getByTestId(tableControls)).toBeInTheDocument();
+      expect(screen.getByTestId(tableRowAfter)).toBeInTheDocument();
+    });
 
     it("Then adding a row writes another empty one", async () => {
       const user = setupUser();
       const { onBlur } = await insertTable(user);
 
-      await user.click(screen.getByTestId(tableMenu));
-      await user.click(await screen.findByTestId(tableRowAfter));
+      await user.click(screen.getByTestId(tableRowAfter));
       blurEditor();
 
       await waitFor(() =>
@@ -1561,8 +1599,7 @@ describe("rich text editor", () => {
       const user = setupUser();
       const { onBlur } = await insertTable(user);
 
-      await user.click(screen.getByTestId(tableMenu));
-      await user.click(await screen.findByTestId(tableColumnAfter));
+      await user.click(screen.getByTestId(tableColumnAfter));
       blurEditor();
 
       await waitFor(() =>
@@ -1572,17 +1609,56 @@ describe("rich text editor", () => {
       );
     });
 
+    /**
+     * The row that goes is the row the caret is in — which is the whole reason
+     * these controls sit on the table rather than in the toolbar. Tab walks
+     * cell by cell, so three of them from the first header cell of a 3-wide
+     * table lands in the first cell of the row below.
+     */
+    it("Then deleting a row takes the one I am in, leaving the header", async () => {
+      const user = setupUser();
+      const { onBlur } = await insertTable(user);
+
+      await user.keyboard("Head");
+      await user.keyboard("{Tab}{Tab}{Tab}");
+      await user.keyboard("Body");
+      await user.click(screen.getByTestId(tableRowDelete));
+      blurEditor();
+
+      await waitFor(() =>
+        expect(onBlur).toHaveBeenCalledWith(
+          expect.stringContaining("| Head |")
+        )
+      );
+      expect(onBlur).toHaveBeenLastCalledWith(
+        expect.not.stringContaining("Body")
+      );
+    });
+
     it("Then deleting it takes the whole table out", async () => {
       const user = setupUser();
       const { onBlur } = await insertTable(user);
 
-      await user.click(screen.getByTestId(tableMenu));
-      await user.click(await screen.findByTestId(tableDelete));
+      await user.click(screen.getByTestId(tableDelete));
       blurEditor();
 
       await waitFor(() =>
         expect(onBlur).toHaveBeenCalledWith(expect.not.stringContaining("|"))
       );
+    });
+  });
+
+  describe("when a table is only being read", () => {
+    it("Then it carries no controls to change it with", async () => {
+      renderEditor({
+        content: "| Task | Owner |\n| --- | --- |\n| Ship it | Me |",
+        editable: false,
+      });
+
+      await waitFor(() =>
+        expect(screen.getByTestId(editor)).toHaveTextContent("Ship it")
+      );
+      expect(screen.queryByTestId(tableControls)).not.toBeInTheDocument();
     });
   });
 

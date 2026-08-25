@@ -63,6 +63,7 @@ import {
   Highlighter,
   Image as ImageIcon,
   Italic,
+  Columns3,
   Link as LinkIcon,
   List,
   ListCollapse,
@@ -71,12 +72,12 @@ import {
   Pilcrow,
   PanelBottomOpen,
   PanelRightOpen,
-  Plus,
-  Trash2,
   Quote,
   Redo2,
+  Rows3,
   Smile,
   Strikethrough,
+  Trash2,
   Table as TableIcon,
   TriangleAlert,
   Type as TypeIcon,
@@ -938,11 +939,16 @@ function ImageView({ node, updateAttributes, editor, getPos }: NodeViewProps) {
 /* -------------------------------------------------------------------------- */
 
 /**
- * How many columns a table gets when it is inserted, and whether the top row
- * is a header. A header, always: a markdown pipe table has no way to write a
- * table without one, so a headerless table would be lost on the first save.
+ * The largest table the toolbar's grid offers, and the shape it starts on.
+ *
+ * A header, always: a markdown pipe table has no way to write a table without
+ * one, so a headerless table would be lost on the first save. It is the first
+ * of the rows picked rather than an extra on top — the grid draws it that way,
+ * so 3 × 4 is a header and two rows under it, which is what the picture said it
+ * would be.
  */
-const NewTable = { rows: 3, cols: 3, withHeaderRow: true } as const;
+const TableGrid = { rows: 8, cols: 8 } as const;
+const NewTable = { rows: 3, cols: 3 } as const;
 
 /**
  * Whether a table can be written as a GFM pipe table, which is a narrower
@@ -1052,7 +1058,144 @@ const TableWritingPipes = Table.extend({
       },
     };
   },
+
+  addNodeView() {
+    // `contentDOMElementTag` matters more than it looks. The React renderer
+    // injects an element of its own to hold the rows, and it is a `div` unless
+    // told otherwise — a `div` between `<table>` and `<tr>`, which is not a
+    // table row group, so the rows stop being rows: the columns collapse to
+    // their min-width and the table no longer fills its line.
+    return ReactNodeViewRenderer(TableView, { contentDOMElementTag: "tbody" });
+  },
 });
+
+/**
+ * A table and the controls for the one being worked in.
+ *
+ * The controls float on the table itself, the way an image's scale and
+ * alignment do — the row being added is the row the caret is in, and a menu in
+ * the toolbar could only ever describe that in words.
+ *
+ * They appear only while the selection is inside *this* table, which is both
+ * what makes them unambiguous and what keeps a document of several tables from
+ * wearing several sets of buttons. That is also the tap that reveals them,
+ * which matters: the same editor is read on a phone, where there is nothing to
+ * hover with.
+ *
+ * Deleting a row, a column or the table is not the destructive action the
+ * design system makes you confirm — that rule is about entities that go for
+ * good. This is a document being written, and every one of these is one undo
+ * away.
+ */
+function TableView({ editor, getPos }: NodeViewProps) {
+  const testId = `editor.table.${nodeIndex(editor, getPos, "table")}`;
+
+  // Read through `useEditorState` rather than off the editor directly: a
+  // selection moving from one cell to another is a transaction, and nothing
+  // else here would re-render for it.
+  const { editable, working } = useEditorState({
+    editor,
+    selector: ({ editor }) => {
+      const at = getPos();
+      const node = at === undefined ? null : editor.state.doc.nodeAt(at);
+      const { from, to } = editor.state.selection;
+
+      return {
+        editable: editor.isEditable,
+        working:
+          editor.isEditable &&
+          node !== null &&
+          at !== undefined &&
+          from >= at &&
+          to <= at + node.nodeSize,
+      };
+    },
+  });
+
+  const run = (action: (chain: ReturnType<Editor["chain"]>) => void) => () => {
+    const chain = editor.chain().focus();
+    action(chain);
+    chain.run();
+  };
+
+  return (
+    <NodeViewWrapper
+      {...testProp(testId)}
+      className={cn(
+        "relative my-3",
+        // Room above for the controls, kept whether or not they are showing.
+        // They sit in this margin rather than on the table, so the header row
+        // stays readable underneath them — and reserving it for the whole time
+        // the document is editable means the table does not jump down the page
+        // the moment the caret lands in it.
+        editable && "mt-11"
+      )}>
+      {/* The `<tbody>` the rows go in is the renderer's, injected here — hence
+          `contentDOMElementTag` above. */}
+      <NodeViewContent<"table"> as="table" />
+
+      {working && (
+        // Outside the document as far as ProseMirror is concerned: without this
+        // the controls' own markup is treated as editable content.
+        <div
+          contentEditable={false}
+          {...testProp(`${testId}.controls`)}
+          // `bottom-full` puts the whole pill above the table's top edge rather
+          // than straddling it: overlapping the header row would cover the
+          // column names, which are the labels that say what the row controls
+          // are about to act on.
+          className="bg-card absolute right-0 bottom-full z-10 mb-1.5 flex items-center gap-0.5 rounded-full p-0.5 shadow-sm">
+          <ToolbarButton
+            testId={`${testId}.row.before.button`}
+            label="Add row above"
+            onClick={run((chain) => chain.addRowBefore())}>
+            <PanelBottomOpen className="rotate-180" />
+          </ToolbarButton>
+          <ToolbarButton
+            testId={`${testId}.row.after.button`}
+            label="Add row below"
+            onClick={run((chain) => chain.addRowAfter())}>
+            <PanelBottomOpen />
+          </ToolbarButton>
+          <ToolbarButton
+            testId={`${testId}.column.before.button`}
+            label="Add column left"
+            onClick={run((chain) => chain.addColumnBefore())}>
+            <PanelRightOpen className="rotate-180" />
+          </ToolbarButton>
+          <ToolbarButton
+            testId={`${testId}.column.after.button`}
+            label="Add column right"
+            onClick={run((chain) => chain.addColumnAfter())}>
+            <PanelRightOpen />
+          </ToolbarButton>
+
+          <Divider />
+
+          <ToolbarButton
+            testId={`${testId}.row.delete.button`}
+            label="Delete row"
+            onClick={run((chain) => chain.deleteRow())}>
+            <Rows3 />
+          </ToolbarButton>
+          <ToolbarButton
+            testId={`${testId}.column.delete.button`}
+            label="Delete column"
+            onClick={run((chain) => chain.deleteColumn())}>
+            <Columns3 />
+          </ToolbarButton>
+          <ToolbarButton
+            testId={`${testId}.delete.button`}
+            label="Delete table"
+            className="text-destructive hover:text-destructive"
+            onClick={run((chain) => chain.deleteTable())}>
+            <Trash2 />
+          </ToolbarButton>
+        </div>
+      )}
+    </NodeViewWrapper>
+  );
+}
 
 type RichTextEditorProps = {
   /**
@@ -1783,32 +1926,30 @@ function ImageButton({ editor }: { editor: Editor }) {
 }
 
 /**
- * The table menu: one button that inserts a table when the caret is outside
- * one, and edits the table when the caret is inside it.
+ * The table button: a grid you pick a shape from, and nothing else.
  *
- * Rows and columns are added and removed here rather than from handles that
- * appear on hover, because the same editor is read on a phone, where there is
- * nothing to hover with.
+ * Rows and columns used to be added and removed from this menu, which meant
+ * naming the thing you were changing ("add row below" — below which?) instead
+ * of pointing at it. They live on the table now, in the same floating controls
+ * an image carries; see `TableView`. What is left here is the one thing that
+ * has no table to sit on yet: making one.
  *
- * Deleting a row, a column or the table is not the destructive action the
- * design system makes you confirm — that rule is about entities that go for
- * good. This is a document being written, and every one of these is one undo
- * away.
+ * Disabled while the caret is already in a table, because inserting there would
+ * nest a table inside a cell — which no pipe table can spell, so it would come
+ * back as HTML on the next save.
  */
 function TableMenu({ editor, inside }: { editor: Editor; inside: boolean }) {
-  const run = (action: (chain: ReturnType<Editor["chain"]>) => void) => () => {
-    const chain = editor.chain().focus();
-    action(chain);
-    chain.run();
-  };
+  // Controlled, because the grid inside is made of plain buttons rather than
+  // menu items — nothing closes the menu on its own when a size is picked.
+  const [open, setOpen] = useState(false);
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <ToolbarButton
           testId="editor.toolbar.table.menu"
-          label="Table"
-          active={inside}
+          label={inside ? "The table's own controls are on it" : "Table"}
+          disabled={inside}
           width="wide">
           <TableIcon />
           <ChevronDown className="size-3 opacity-50" />
@@ -1820,78 +1961,94 @@ function TableMenu({ editor, inside }: { editor: Editor; inside: boolean }) {
         data-editor-chrome=""
         align="start"
         // A closing menu hands focus back to the button that opened it, which
-        // is the wrong place: every item here has just put the caret in a cell,
-        // and the next thing typed belongs in that cell rather than nowhere.
-        // The commands focus the editor themselves, so the restore is only a
-        // race to undo them.
+        // is the wrong place: the caret has just been put in the new table's
+        // first cell, and the next thing typed belongs there rather than
+        // nowhere. The command focuses the editor itself, so the restore is
+        // only a race to undo it.
         onCloseAutoFocus={(event) => event.preventDefault()}
-        className="min-w-52">
-        {!inside ? (
-          <DropdownMenuItem
-            testId="editor.toolbar.table.insert.button"
-            onMouseDown={(event) => event.preventDefault()}
-            onSelect={run((chain) => chain.insertTable(NewTable))}>
-            <Plus />
-            Insert table
-          </DropdownMenuItem>
-        ) : (
-          <>
-            <DropdownMenuItem
-              testId="editor.toolbar.table.row.after.button"
-              onMouseDown={(event) => event.preventDefault()}
-              onSelect={run((chain) => chain.addRowAfter())}>
-              <PanelBottomOpen />
-              Add row below
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              testId="editor.toolbar.table.row.before.button"
-              onMouseDown={(event) => event.preventDefault()}
-              onSelect={run((chain) => chain.addRowBefore())}>
-              <PanelBottomOpen className="rotate-180" />
-              Add row above
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              testId="editor.toolbar.table.column.after.button"
-              onMouseDown={(event) => event.preventDefault()}
-              onSelect={run((chain) => chain.addColumnAfter())}>
-              <PanelRightOpen />
-              Add column right
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              testId="editor.toolbar.table.column.before.button"
-              onMouseDown={(event) => event.preventDefault()}
-              onSelect={run((chain) => chain.addColumnBefore())}>
-              <PanelRightOpen className="rotate-180" />
-              Add column left
-            </DropdownMenuItem>
-
-            <DropdownMenuSeparator />
-
-            <DropdownMenuItem
-              testId="editor.toolbar.table.row.delete.button"
-              onMouseDown={(event) => event.preventDefault()}
-              onSelect={run((chain) => chain.deleteRow())}>
-              <Trash2 />
-              Delete row
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              testId="editor.toolbar.table.column.delete.button"
-              onMouseDown={(event) => event.preventDefault()}
-              onSelect={run((chain) => chain.deleteColumn())}>
-              <Trash2 />
-              Delete column
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              testId="editor.toolbar.table.delete.button"
-              onMouseDown={(event) => event.preventDefault()}
-              onSelect={run((chain) => chain.deleteTable())}>
-              <Trash2 />
-              Delete table
-            </DropdownMenuItem>
-          </>
-        )}
+        className="w-auto p-2">
+        <TableSizePicker editor={editor} onPicked={() => setOpen(false)} />
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+/**
+ * The size grid: 8 × 8 cells, filled up to whatever is being pointed at.
+ *
+ * Every cell is a real button rather than one grid with mouse maths on top, so
+ * the shape can be picked by keyboard and read out by name — and so a spec can
+ * ask for a size instead of simulating a hover.
+ */
+function TableSizePicker({
+  editor,
+  onPicked,
+}: {
+  editor: Editor;
+  onPicked: () => void;
+}) {
+  const [over, setOver] = useState<{ rows: number; cols: number }>(NewTable);
+
+  const insert = (rows: number, cols: number) => {
+    editor
+      .chain()
+      .focus()
+      // `withHeaderRow` counts inside `rows`, which is what makes the grid's
+      // top row and the header the same row.
+      .insertTable({ rows, cols, withHeaderRow: true })
+      .run();
+    onPicked();
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div
+        // The grid is one control made of many: arrowing between cells is the
+        // keyboard's way of resizing, and each cell says what it would build.
+        role="grid"
+        aria-label="Table size"
+        className="grid grid-cols-8 gap-0.5"
+        onMouseLeave={() => setOver(NewTable)}>
+        {Array.from({ length: TableGrid.rows }, (_, row) =>
+          Array.from({ length: TableGrid.cols }, (_, col) => {
+            const rows = row + 1;
+            const cols = col + 1;
+            const within = rows <= over.rows && cols <= over.cols;
+
+            return (
+              <button
+                key={`${rows}x${cols}`}
+                {...testProp(`editor.toolbar.table.size.${rows}x${cols}`)}
+                type="button"
+                // The caret has to survive the click: it is where the table
+                // goes.
+                onMouseDown={(event) => event.preventDefault()}
+                onMouseEnter={() => setOver({ rows, cols })}
+                onFocus={() => setOver({ rows, cols })}
+                onClick={() => insert(rows, cols)}
+                aria-label={`${rows} by ${cols}`}
+                className={cn(
+                  "size-4 rounded-[3px] border transition-colors",
+                  within
+                    ? "border-primary bg-primary/70"
+                    : "border-border bg-muted",
+                  // The top row is the header, and says so even before it is
+                  // picked — otherwise "3 rows" quietly means two.
+                  rows === 1 && !within && "bg-foreground/15"
+                )}
+              />
+            );
+          })
+        )}
+      </div>
+
+      <p
+        {...testProp("editor.toolbar.table.size.label")}
+        className="text-muted-foreground text-center text-xs">
+        {over.rows} × {over.cols}
+        <span className="opacity-60"> · header + {over.rows - 1}</span>
+      </p>
+    </div>
   );
 }
 
