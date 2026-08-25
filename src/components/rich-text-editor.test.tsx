@@ -13,6 +13,11 @@ const linkUrl = "editor.toolbar.link.url.input";
 const linkApply = "editor.toolbar.link.apply";
 const linkRemove = "editor.toolbar.link.remove";
 const toolbar = "editor.toolbar";
+const tableMenu = "editor.toolbar.table.menu";
+const tableInsert = "editor.toolbar.table.insert.button";
+const tableRowAfter = "editor.toolbar.table.row.after.button";
+const tableColumnAfter = "editor.toolbar.table.column.after.button";
+const tableDelete = "editor.toolbar.table.delete.button";
 
 function renderEditor(
   props: Partial<Parameters<typeof RichTextEditor>[0]> = {}
@@ -73,6 +78,32 @@ function paste({
       },
     },
   });
+}
+
+/**
+ * Waits until the caret is inside a table.
+ *
+ * The table menu reports it — the button is pressed while the caret is in one —
+ * so waiting on it is what makes the keystrokes that follow land in a cell
+ * rather than beside the table.
+ */
+async function insideTable() {
+  // The dropdown runs a typeahead of its own while it is open, which eats the
+  // keystrokes a spec sends next — so the menu being gone is half of "the
+  // caret is in the table", and the button reporting itself pressed is the
+  // other half.
+  await waitFor(() =>
+    expect(screen.queryByTestId(tableInsert)).not.toBeInTheDocument()
+  );
+  await waitFor(() =>
+    expect(screen.getByTestId(tableMenu)).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    )
+  );
+  // Closing the menu hands focus back to its trigger before the editor takes
+  // it again; typing in between goes to the button.
+  await waitFor(() => expect(screen.getByTestId(editor)).toHaveFocus());
 }
 
 /** Selects the whole document, so a spec can act on "the selected text". */
@@ -1335,6 +1366,131 @@ describe("rich text editor", () => {
         expect(onBlur).toHaveBeenCalledWith(
           expect.stringContaining("## Notes\n\n- first\n- second")
         )
+      );
+    });
+  });
+
+  describe("when I insert a table from the toolbar", () => {
+    it("Then it is saved as a markdown table", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor();
+
+      await user.click(screen.getByTestId(editor));
+      await user.click(screen.getByTestId(tableMenu));
+      await user.click(await screen.findByTestId(tableInsert));
+      blurEditor();
+
+      await waitFor(() =>
+        expect(onBlur).toHaveBeenCalledWith(
+          expect.stringContaining("|  |  |  |\n| --- | --- | --- |")
+        )
+      );
+    });
+
+    it("Then what I type lands in its first cell", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor();
+
+      await user.click(screen.getByTestId(editor));
+      await user.click(screen.getByTestId(tableMenu));
+      await user.click(await screen.findByTestId(tableInsert));
+      await insideTable();
+      await user.keyboard("Name");
+      blurEditor();
+
+      await waitFor(() =>
+        expect(onBlur).toHaveBeenCalledWith(
+          expect.stringContaining("| Name |  |  |")
+        )
+      );
+    });
+  });
+
+  describe("when the content already holds a markdown table", () => {
+    const table = "| Task | Owner |\n| --- | --- |\n| Ship it | Me |";
+
+    it("Then its cells are on screen", async () => {
+      renderEditor({ content: table });
+
+      await waitFor(() =>
+        expect(screen.getByTestId(editor)).toHaveTextContent("Ship it")
+      );
+    });
+
+    it("Then it survives a round trip unchanged", async () => {
+      const { onBlur } = renderEditor({ content: table });
+
+      await waitFor(() =>
+        expect(screen.getByTestId(editor)).toHaveTextContent("Ship it")
+      );
+      blurEditor();
+
+      await waitFor(() =>
+        expect(onBlur).toHaveBeenCalledWith(expect.stringContaining(table))
+      );
+    });
+  });
+
+  describe("when I work on the table I inserted", () => {
+    /**
+     * Inserts a table and names its first cell.
+     *
+     * Built through the menu rather than loaded as content because that is
+     * what leaves the caret inside the table — which is the state every one of
+     * these actions needs, and the state the menu itself switches on.
+     */
+    async function insertTable(user: User) {
+      const rendered = renderEditor();
+
+      await user.click(screen.getByTestId(editor));
+      await user.click(screen.getByTestId(tableMenu));
+      await user.click(await screen.findByTestId(tableInsert));
+
+      return rendered;
+    }
+
+    it("Then adding a row writes another empty one", async () => {
+      const user = setupUser();
+      const { onBlur } = await insertTable(user);
+
+      await user.click(screen.getByTestId(tableMenu));
+      await user.click(await screen.findByTestId(tableRowAfter));
+      blurEditor();
+
+      await waitFor(() =>
+        expect(onBlur).toHaveBeenCalledWith(
+          expect.stringContaining(
+            "| --- | --- | --- |\n|  |  |  |\n|  |  |  |\n|  |  |  |"
+          )
+        )
+      );
+    });
+
+    it("Then adding a column widens every row", async () => {
+      const user = setupUser();
+      const { onBlur } = await insertTable(user);
+
+      await user.click(screen.getByTestId(tableMenu));
+      await user.click(await screen.findByTestId(tableColumnAfter));
+      blurEditor();
+
+      await waitFor(() =>
+        expect(onBlur).toHaveBeenCalledWith(
+          expect.stringContaining("|  |  |  |  |\n| --- | --- | --- | --- |")
+        )
+      );
+    });
+
+    it("Then deleting it takes the whole table out", async () => {
+      const user = setupUser();
+      const { onBlur } = await insertTable(user);
+
+      await user.click(screen.getByTestId(tableMenu));
+      await user.click(await screen.findByTestId(tableDelete));
+      blurEditor();
+
+      await waitFor(() =>
+        expect(onBlur).toHaveBeenCalledWith(expect.not.stringContaining("|"))
       );
     });
   });

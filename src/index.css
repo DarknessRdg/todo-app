@@ -552,6 +552,70 @@
   .tiptap code {
     @apply bg-muted rounded px-1 py-0.5 text-sm;
   }
+  /*
+    Tables. Hairlines rather than a filled card: a table is already a grid, and
+    a fill under one that sits inside a card reads as a second card. The header
+    row takes the mist fill so it is told apart from the body without a rule of
+    its own weight.
+
+    `table-layout: fixed` is what keeps a long cell from stretching its column
+    past the others; the wrapper scrolls when the whole table outgrows the page,
+    so the document itself never scrolls sideways.
+  */
+  .tiptap table {
+    /*
+      Separate rather than collapsed borders: a collapsed table cannot be
+      rounded — the cell borders win over the table's own, and the corners come
+      back square. With `border-spacing: 0` the grid still reads as one ruled
+      block, and the four corner cells take the radius themselves.
+    */
+    @apply border-border my-3 w-full table-fixed rounded-md border text-sm;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+  .tiptap table td,
+  .tiptap table th {
+    @apply border-border relative min-w-24 border-t border-l p-2 align-top;
+  }
+  /* The table's own border draws the top and left edges; cells draw the rest. */
+  .tiptap table tr > :first-child {
+    @apply border-l-0;
+  }
+  .tiptap table tr:first-child > * {
+    @apply border-t-0;
+  }
+  .tiptap table tr:first-child > :first-child {
+    @apply rounded-tl-md;
+  }
+  .tiptap table tr:first-child > :last-child {
+    @apply rounded-tr-md;
+  }
+  .tiptap table tr:last-child > :first-child {
+    @apply rounded-bl-md;
+  }
+  .tiptap table tr:last-child > :last-child {
+    @apply rounded-br-md;
+  }
+  .tiptap table th {
+    @apply bg-muted text-left font-medium;
+  }
+  .tiptap table p {
+    @apply my-0;
+  }
+  /* The cell the caret is in, and any cell dragged over. */
+  .tiptap table .selectedCell::after {
+    @apply bg-accent pointer-events-none absolute inset-0 z-0 content-[""];
+  }
+  .tiptap table .selectedCell > * {
+    @apply relative z-10;
+  }
+  .tiptap .tableWrapper {
+    @apply my-3 overflow-x-auto;
+  }
+  .tiptap .tableWrapper table {
+    @apply my-0;
+  }
+
   .tiptap pre {
     @apply bg-muted my-2 overflow-x-auto rounded-lg p-3 text-sm;
   }

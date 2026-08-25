@@ -20,6 +20,12 @@ import {
   DetailsSummary,
 } from "@tiptap/extension-details";
 import { TextAlign } from "@tiptap/extension-text-align";
+import {
+  Table,
+  TableCell,
+  TableHeader,
+  TableRow,
+} from "@tiptap/extension-table";
 import { Paragraph } from "@tiptap/extension-paragraph";
 import { Heading } from "@tiptap/extension-heading";
 import { Extension, getHTMLFromFragment } from "@tiptap/core";
@@ -54,10 +60,15 @@ import {
   ListOrdered,
   ListTodo,
   Pilcrow,
+  PanelBottomOpen,
+  PanelRightOpen,
+  Plus,
+  Trash2,
   Quote,
   Redo2,
   Smile,
   Strikethrough,
+  Table as TableIcon,
   TriangleAlert,
   Type as TypeIcon,
   Underline as UnderlineIcon,
@@ -615,6 +626,127 @@ const HeadingKeepingAlignment = Heading.extend({
   },
 });
 
+/* -------------------------------------------------------------------------- */
+/* Tables: the pipe table, and everything it cannot say                        */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * How many columns a table gets when it is inserted, and whether the top row
+ * is a header. A header, always: a markdown pipe table has no way to write a
+ * table without one, so a headerless table would be lost on the first save.
+ */
+const NewTable = { rows: 3, cols: 3, withHeaderRow: true } as const;
+
+/**
+ * Whether a table can be written as a GFM pipe table, which is a narrower
+ * thing than a table: one header row on top, one paragraph of plain inline
+ * text per cell, every row the same width, and no cell containing the `|` that
+ * separates them.
+ *
+ * Everything else — a merged cell, a list inside a cell, a centred column, a
+ * literal pipe — has no pipe-table spelling, so it goes out as HTML instead of
+ * being silently flattened into a table that says something different.
+ */
+function isPipeTable(node: ProseMirrorNode): boolean {
+  if (node.childCount === 0) return false;
+
+  const width = node.firstChild?.childCount ?? 0;
+  if (width === 0) return false;
+
+  let ok = true;
+  node.forEach((row, _offset, rowIndex) => {
+    if (row.childCount !== width) ok = false;
+
+    row.forEach((cell) => {
+      const isHeader = cell.type.name === "tableHeader";
+      // The header row is the first one and nothing else — GFM has no
+      // spelling for a header in the middle of a table.
+      if (isHeader !== (rowIndex === 0)) ok = false;
+      if (cell.attrs.colspan !== 1 || cell.attrs.rowspan !== 1) ok = false;
+      if (!isPlainCell(cell)) ok = false;
+    });
+  });
+
+  return ok;
+}
+
+/** One paragraph of unaligned, pipe-free text — all a pipe table cell holds. */
+function isPlainCell(cell: ProseMirrorNode): boolean {
+  const paragraph = cell.firstChild;
+  if (cell.childCount !== 1 || paragraph?.type.name !== "paragraph") {
+    return false;
+  }
+
+  const align: string | null = paragraph.attrs.textAlign;
+  if (align !== null && align !== "left") return false;
+  if (paragraph.textContent.includes("|")) return false;
+
+  // A hard break, or anything else inline that is not text, would end the row
+  // halfway through it.
+  let plain = true;
+  paragraph.forEach((child) => {
+    if (!child.isText) plain = false;
+  });
+  return plain;
+}
+
+/**
+ * The pipe table, written row by row. The header underline is emitted after
+ * the first row rather than from the column count alone, so a table can never
+ * claim more columns than it wrote.
+ */
+function writePipeTable(
+  state: MarkdownSerializerState,
+  node: ProseMirrorNode
+): void {
+  node.forEach((row, _offset, rowIndex) => {
+    state.write("|");
+    row.forEach((cell) => {
+      state.write(" ");
+      // Guarded by `isPlainCell`: the only child is the paragraph.
+      state.renderInline(cell.firstChild!);
+      state.write(" |");
+    });
+    state.ensureNewLine();
+
+    if (rowIndex === 0) {
+      state.write("|");
+      row.forEach(() => state.write(" --- |"));
+      state.ensureNewLine();
+    }
+  });
+
+  state.closeBlock(node);
+}
+
+/**
+ * A table markdown can carry, or the HTML that says the same thing.
+ *
+ * The HTML branch is the trick alignment already uses: `html: true` on the
+ * markdown parser means a raw `<table>` comes back as the table it was, so a
+ * merged cell survives being saved even though no pipe table can express it.
+ */
+const TableWritingPipes = Table.extend({
+  addStorage() {
+    return {
+      markdown: {
+        serialize(state: MarkdownSerializerState, node: ProseMirrorNode) {
+          if (isPipeTable(node)) {
+            writePipeTable(state, node);
+            return;
+          }
+
+          state.write(
+            getHTMLFromFragment(Fragment.from(node), node.type.schema)
+          );
+          state.closeBlock(node);
+        },
+        parse: {},
+      },
+    };
+  },
+});
+
 type RichTextEditorProps = {
   /**
    * The document to load, in either spelling.
@@ -719,6 +851,13 @@ export function RichTextEditor({
       CalloutDetails,
       DetailsSummary,
       DetailsContent,
+      // Column resizing is left off: a width is a pixel measurement, and
+      // markdown has nowhere to put one — dragging a column would look like it
+      // worked until the todo was reopened.
+      TableWritingPipes.configure({ resizable: false }),
+      TableRow,
+      TableHeader,
+      TableCell,
       EmojiSuggestion.configure({
         onChange: (next) => {
           if (next === null) dismissedRef.current = false;
@@ -1011,6 +1150,7 @@ function Toolbar({ editor }: { editor: Editor }) {
       underline: editor.isActive("underline"),
       blockquote: editor.isActive("blockquote"),
       details: activeDetails(editor),
+      table: editor.isActive("table"),
       highlight: activeHighlight(editor),
       block: activeBlock(editor),
       list: activeList(editor),
@@ -1067,6 +1207,7 @@ function Toolbar({ editor }: { editor: Editor }) {
         <Quote />
       </ToolbarButton>
       <DetailsMenu editor={editor} variant={state.details} />
+      <TableMenu editor={editor} inside={state.table} />
 
       <Divider />
 
@@ -1130,6 +1271,119 @@ function Toolbar({ editor }: { editor: Editor }) {
       />
       <EmojiButton editor={editor} />
     </div>
+  );
+}
+
+/**
+ * The table menu: one button that inserts a table when the caret is outside
+ * one, and edits the table when the caret is inside it.
+ *
+ * Rows and columns are added and removed here rather than from handles that
+ * appear on hover, because the same editor is read on a phone, where there is
+ * nothing to hover with.
+ *
+ * Deleting a row, a column or the table is not the destructive action the
+ * design system makes you confirm — that rule is about entities that go for
+ * good. This is a document being written, and every one of these is one undo
+ * away.
+ */
+function TableMenu({ editor, inside }: { editor: Editor; inside: boolean }) {
+  const run = (action: (chain: ReturnType<Editor["chain"]>) => void) => () => {
+    const chain = editor.chain().focus();
+    action(chain);
+    chain.run();
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <ToolbarButton
+          testId="editor.toolbar.table.menu"
+          label="Table"
+          active={inside}
+          width="wide">
+          <TableIcon />
+          <ChevronDown className="size-3 opacity-50" />
+        </ToolbarButton>
+      </DropdownMenuTrigger>
+
+      <DropdownMenuContent
+        container={chrome(editor)}
+        data-editor-chrome=""
+        align="start"
+        // A closing menu hands focus back to the button that opened it, which
+        // is the wrong place: every item here has just put the caret in a cell,
+        // and the next thing typed belongs in that cell rather than nowhere.
+        // The commands focus the editor themselves, so the restore is only a
+        // race to undo them.
+        onCloseAutoFocus={(event) => event.preventDefault()}
+        className="min-w-52">
+        {!inside ? (
+          <DropdownMenuItem
+            testId="editor.toolbar.table.insert.button"
+            onMouseDown={(event) => event.preventDefault()}
+            onSelect={run((chain) => chain.insertTable(NewTable))}>
+            <Plus />
+            Insert table
+          </DropdownMenuItem>
+        ) : (
+          <>
+            <DropdownMenuItem
+              testId="editor.toolbar.table.row.after.button"
+              onMouseDown={(event) => event.preventDefault()}
+              onSelect={run((chain) => chain.addRowAfter())}>
+              <PanelBottomOpen />
+              Add row below
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              testId="editor.toolbar.table.row.before.button"
+              onMouseDown={(event) => event.preventDefault()}
+              onSelect={run((chain) => chain.addRowBefore())}>
+              <PanelBottomOpen className="rotate-180" />
+              Add row above
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              testId="editor.toolbar.table.column.after.button"
+              onMouseDown={(event) => event.preventDefault()}
+              onSelect={run((chain) => chain.addColumnAfter())}>
+              <PanelRightOpen />
+              Add column right
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              testId="editor.toolbar.table.column.before.button"
+              onMouseDown={(event) => event.preventDefault()}
+              onSelect={run((chain) => chain.addColumnBefore())}>
+              <PanelRightOpen className="rotate-180" />
+              Add column left
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuItem
+              testId="editor.toolbar.table.row.delete.button"
+              onMouseDown={(event) => event.preventDefault()}
+              onSelect={run((chain) => chain.deleteRow())}>
+              <Trash2 />
+              Delete row
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              testId="editor.toolbar.table.column.delete.button"
+              onMouseDown={(event) => event.preventDefault()}
+              onSelect={run((chain) => chain.deleteColumn())}>
+              <Trash2 />
+              Delete column
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              testId="editor.toolbar.table.delete.button"
+              onMouseDown={(event) => event.preventDefault()}
+              onSelect={run((chain) => chain.deleteTable())}>
+              <Trash2 />
+              Delete table
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
