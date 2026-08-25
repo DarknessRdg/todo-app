@@ -553,6 +553,47 @@
     @apply bg-muted rounded px-1 py-0.5 text-sm;
   }
   /*
+    Images. The size is a percentage of the text column rather than a pixel
+    width — the same picture is read on a phone and on a desktop, and only a
+    proportion means the same thing on both. The four steps match
+    `ImageWidths` in the editor; a picture with no `data-width` is full width.
+  */
+  .tiptap img {
+    @apply h-auto max-w-full rounded-lg;
+  }
+  /*
+    The scale is worn by the box around the picture — see the note in
+    `ImageView` — and the picture fills whatever that box turned out to be.
+    A picture at full size has no box to size, so it keeps its own.
+  */
+  .tiptap span[data-width] > img {
+    @apply w-full;
+  }
+  .tiptap span[data-width="25"] {
+    @apply w-1/4;
+  }
+  .tiptap span[data-width="50"] {
+    @apply w-1/2;
+  }
+  .tiptap span[data-width="75"] {
+    @apply w-3/4;
+  }
+  /*
+    Alignment sits on the wrapper the node view renders, so the picture and the
+    controls that ride on it move together. `block` is what makes the auto
+    margins bite — an inline image cannot be centred by margin alone.
+  */
+  .tiptap span[data-align] {
+    @apply block;
+  }
+  .tiptap span[data-align="center"] {
+    @apply text-center;
+  }
+  .tiptap span[data-align="right"] {
+    @apply text-right;
+  }
+
+  /*
     Tables. Hairlines rather than a filled card: a table is already a grid, and
     a fill under one that sits inside a card reads as a second card. The header
     row takes the mist fill so it is told apart from the body without a rule of

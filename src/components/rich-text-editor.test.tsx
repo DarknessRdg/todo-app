@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { RichTextEditor } from "@/components/rich-text-editor";
 import type { RichTextValue } from "@/lib/rich-text";
+import { ImageSizeLimit } from "@/lib/image";
 
 const editor = "editor.content";
 const codeBlockButton = "editor.toolbar.codeblock.button";
@@ -13,6 +14,14 @@ const linkUrl = "editor.toolbar.link.url.input";
 const linkApply = "editor.toolbar.link.apply";
 const linkRemove = "editor.toolbar.link.remove";
 const toolbar = "editor.toolbar";
+const imageButton = "editor.toolbar.image.button";
+const imageUrl = "editor.toolbar.image.url.input";
+const imageAlt = "editor.toolbar.image.alt.input";
+const imageApply = "editor.toolbar.image.apply";
+const image = "editor.image.0";
+const imageSmaller = "editor.image.0.smaller.button";
+const imageBigger = "editor.image.0.bigger.button";
+const imageAlignCenter = "editor.image.0.align.center.button";
 const tableMenu = "editor.toolbar.table.menu";
 const tableInsert = "editor.toolbar.table.insert.button";
 const tableRowAfter = "editor.toolbar.table.row.after.button";
@@ -59,16 +68,19 @@ const blurEditor = () => fireEvent.blur(screen.getByTestId(editor));
  * three.
  */
 function paste({
-  text,
+  text = "",
   html = "",
   mode,
+  files = [],
 }: {
-  text: string;
+  text?: string;
   html?: string;
   mode?: string;
+  files?: File[];
 }) {
   fireEvent.paste(screen.getByTestId(editor), {
     clipboardData: {
+      files,
       getData: (type: string) => {
         if (type === "text/plain") return text;
         if (type === "text/html") return html;
@@ -78,6 +90,13 @@ function paste({
       },
     },
   });
+}
+
+/** A picture on the clipboard, the way a screenshot arrives. */
+function makeImageFile(bytes = 8): File {
+  const file = new File(["x"], "screenshot.png", { type: "image/png" });
+  Object.defineProperty(file, "size", { value: bytes });
+  return file;
 }
 
 /**
@@ -1561,4 +1580,153 @@ describe("rich text editor", () => {
       );
     });
   });
+
+  describe("when I add an image from the toolbar", () => {
+    it("Then it is saved as a markdown image", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor();
+
+      await user.click(screen.getByTestId(editor));
+      await user.click(screen.getByTestId(imageButton));
+      await user.type(
+        await screen.findByTestId(imageUrl),
+        "https://example.com/cat.png"
+      );
+      await user.type(screen.getByTestId(imageAlt), "a cat");
+      await user.click(screen.getByTestId(imageApply));
+      blurEditor();
+
+      await waitFor(() =>
+        expect(onBlur).toHaveBeenCalledWith(
+          expect.stringContaining("![a cat](https://example.com/cat.png)")
+        )
+      );
+    });
+  });
+
+  describe("when the content already holds an image", () => {
+    it("Then it is on screen", async () => {
+      renderEditor({ content: "![a cat](https://example.com/cat.png)" });
+
+      expect(await screen.findByTestId(image)).toBeInTheDocument();
+    });
+  });
+
+  describe("when I scale an image down", () => {
+    it("Then the size is saved with it", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor({
+        content: "![a cat](https://example.com/cat.png)",
+      });
+
+      await user.click(await screen.findByTestId(imageSmaller));
+      blurEditor();
+
+      await waitFor(() =>
+        expect(onBlur).toHaveBeenCalledWith(
+          expect.stringContaining('data-width="75"')
+        )
+      );
+    });
+
+    it("Then scaling it back to full size returns it to plain markdown", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor({
+        content: "![a cat](https://example.com/cat.png)",
+      });
+
+      await user.click(await screen.findByTestId(imageSmaller));
+      await user.click(screen.getByTestId(imageBigger));
+      blurEditor();
+
+      await waitFor(() =>
+        expect(onBlur).toHaveBeenCalledWith(
+          "![a cat](https://example.com/cat.png)"
+        )
+      );
+    });
+  });
+
+  describe("when I align an image", () => {
+    it("Then the alignment is saved with it", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor({
+        content: "![a cat](https://example.com/cat.png)",
+      });
+
+      await user.click(await screen.findByTestId(imageAlignCenter));
+      blurEditor();
+
+      await waitFor(() =>
+        expect(onBlur).toHaveBeenCalledWith(
+          expect.stringContaining('data-align="center"')
+        )
+      );
+    });
+  });
+
+  describe("when the content already holds a scaled image", () => {
+    const scaled =
+      '<img src="https://example.com/cat.png" alt="a cat" data-width="50" data-align="center">';
+
+    it("Then it survives a round trip unchanged", async () => {
+      const { onBlur } = renderEditor({ content: scaled });
+
+      await screen.findByTestId(image);
+      blurEditor();
+
+      await waitFor(() =>
+        expect(onBlur).toHaveBeenCalledWith(expect.stringContaining(scaled))
+      );
+    });
+  });
+
+  describe("when I paste a picture from the clipboard", () => {
+    it("Then it is put in the document", async () => {
+      const user = setupUser();
+      renderEditor();
+
+      await user.click(screen.getByTestId(editor));
+      paste({ files: [makeImageFile()] });
+
+      expect(await screen.findByTestId(image)).toBeInTheDocument();
+    });
+
+    it("Then it is carried inside the todo, since there is nowhere to upload it", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor();
+
+      await user.click(screen.getByTestId(editor));
+      paste({ files: [makeImageFile()] });
+      await screen.findByTestId(image);
+      blurEditor();
+
+      await waitFor(() =>
+        expect(onBlur).toHaveBeenCalledWith(
+          expect.stringContaining("data:image/png;base64,")
+        )
+      );
+    });
+
+    it("Then one too big to carry is turned away rather than swallowed", async () => {
+      const user = setupUser();
+      renderEditor();
+
+      await user.click(screen.getByTestId(editor));
+      paste({ files: [makeImageFile(ImageSizeLimit + 1)] });
+
+      await waitFor(() =>
+        expect(screen.queryByTestId(image)).not.toBeInTheDocument()
+      );
+    });
+  });
+
+  /*
+    Dropping a picture is deliberately not specced here, and cannot be.
+    ProseMirror resolves a drop through `view.posAtCoords`, which needs layout
+    to answer — jsdom has none, so it returns null and the `handleDrop` prop is
+    never reached, whatever the spec does. The path shares everything but that
+    one line with the paste above, which is covered; the rest is a browser's to
+    prove.
+  */
 });
