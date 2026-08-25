@@ -1093,22 +1093,19 @@ function TableView({ editor, getPos }: NodeViewProps) {
   // Read through `useEditorState` rather than off the editor directly: a
   // selection moving from one cell to another is a transaction, and nothing
   // else here would re-render for it.
-  const { editable, working } = useEditorState({
+  const working = useEditorState({
     editor,
     selector: ({ editor }) => {
-      const at = getPos();
-      const node = at === undefined ? null : editor.state.doc.nodeAt(at);
-      const { from, to } = editor.state.selection;
+      if (!editor.isEditable) return false;
 
-      return {
-        editable: editor.isEditable,
-        working:
-          editor.isEditable &&
-          node !== null &&
-          at !== undefined &&
-          from >= at &&
-          to <= at + node.nodeSize,
-      };
+      const at = getPos();
+      if (at === undefined) return false;
+
+      const node = editor.state.doc.nodeAt(at);
+      if (!node) return false;
+
+      const { from, to } = editor.state.selection;
+      return from >= at && to <= at + node.nodeSize;
     },
   });
 
@@ -1123,12 +1120,12 @@ function TableView({ editor, getPos }: NodeViewProps) {
       {...testProp(testId)}
       className={cn(
         "relative my-3",
-        // Room above for the controls, kept whether or not they are showing.
-        // They sit in this margin rather than on the table, so the header row
-        // stays readable underneath them — and reserving it for the whole time
-        // the document is editable means the table does not jump down the page
-        // the moment the caret lands in it.
-        editable && "mt-11"
+        // Room above for the controls, and only while they are up. They sit in
+        // this margin rather than on the table, so the header row stays
+        // readable underneath them; a table nobody is working in keeps the
+        // spacing every other block has, rather than a gap standing open for
+        // buttons that are not there.
+        working && "mt-11"
       )}>
       {/* The `<tbody>` the rows go in is the renderer's, injected here — hence
           `contentDOMElementTag` above. */}
