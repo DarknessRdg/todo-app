@@ -22,6 +22,7 @@ const image = "editor.image.0";
 const imageSmaller = "editor.image.0.smaller.button";
 const imageBigger = "editor.image.0.bigger.button";
 const imageAlignCenter = "editor.image.0.align.center.button";
+const imageControls = "editor.image.0.controls";
 const tableMenu = "editor.toolbar.table.menu";
 /** A cell in the toolbar's size grid: the table it would build, header included. */
 const tableSize = (rows: number, cols: number) =>
@@ -1693,6 +1694,34 @@ describe("rich text editor", () => {
     });
   });
 
+  /**
+   * The controls are the table's: on the thing being changed, and only while it
+   * is the thing being worked on. Clicking the picture is what selects it, so
+   * every one of these opens by doing that.
+   */
+  describe("when the caret comes to rest on an image", () => {
+    it("Then its controls are on it", async () => {
+      const user = setupUser();
+      renderEditor({ content: "![a cat](https://example.com/cat.png)" });
+
+      await user.click(screen.getByTestId(editor));
+
+      expect(await screen.findByTestId(imageControls)).toBeInTheDocument();
+    });
+
+    it("Then a picture the caret is nowhere near carries none", async () => {
+      const user = setupUser();
+      renderEditor({
+        content: "some words\n\n![a cat](https://example.com/cat.png)",
+      });
+
+      await user.click(screen.getByTestId(editor));
+      await screen.findByTestId(image);
+
+      expect(screen.queryByTestId(imageControls)).not.toBeInTheDocument();
+    });
+  });
+
   describe("when I scale an image down", () => {
     it("Then the size is saved with it", async () => {
       const user = setupUser();
@@ -1700,12 +1729,38 @@ describe("rich text editor", () => {
         content: "![a cat](https://example.com/cat.png)",
       });
 
+      await user.click(screen.getByTestId(editor));
       await user.click(await screen.findByTestId(imageSmaller));
       blurEditor();
 
       await waitFor(() =>
         expect(onBlur).toHaveBeenCalledWith(
-          expect.stringContaining('data-width="75"')
+          expect.stringContaining('data-width="95"')
+        )
+      );
+    });
+
+    /**
+     * The four fixed sizes are gone: the buttons walk a 5% rung at a time for
+     * as far as there is room, so a picture can be tuned rather than picked
+     * from a shortlist.
+     */
+    it("Then it keeps stepping down past where the old four sizes stopped", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor({
+        content: "![a cat](https://example.com/cat.png)",
+      });
+
+      await user.click(screen.getByTestId(editor));
+      const smaller = await screen.findByTestId(imageSmaller);
+      await user.click(smaller);
+      await user.click(smaller);
+      await user.click(smaller);
+      blurEditor();
+
+      await waitFor(() =>
+        expect(onBlur).toHaveBeenCalledWith(
+          expect.stringContaining('data-width="85"')
         )
       );
     });
@@ -1716,6 +1771,7 @@ describe("rich text editor", () => {
         content: "![a cat](https://example.com/cat.png)",
       });
 
+      await user.click(screen.getByTestId(editor));
       await user.click(await screen.findByTestId(imageSmaller));
       await user.click(screen.getByTestId(imageBigger));
       blurEditor();
@@ -1735,6 +1791,7 @@ describe("rich text editor", () => {
         content: "![a cat](https://example.com/cat.png)",
       });
 
+      await user.click(screen.getByTestId(editor));
       await user.click(await screen.findByTestId(imageAlignCenter));
       blurEditor();
 

@@ -693,8 +693,29 @@ const HeadingKeepingAlignment = Heading.extend({
  * measurement that means the same thing on both. `FullWidth` is the default —
  * an image at full width carries no size at all, so it stays plain markdown.
  */
-const ImageWidths = [25, 50, 75, 100] as const;
+/**
+ * How a picture is sized: a percentage of the text column, walked in rungs.
+ *
+ * Rungs rather than a fixed shortlist of sizes, because the corners can now be
+ * dragged to anything in between — the buttons snap to the nearest rung and
+ * move one, so they stay useful on a width that was never picked from a list.
+ * The floor is a picture still big enough to be a picture; the ceiling is the
+ * column, past which the editor would scroll sideways.
+ */
+const ImageStep = 5;
+const MinWidth = 5;
 const FullWidth = 100;
+
+/** The corners a picture can be pulled by, and which way each one grows. */
+const imageCorners = [
+  { id: "nw", grows: -1, className: "top-0 left-0 cursor-nwse-resize" },
+  { id: "ne", grows: 1, className: "top-0 right-0 cursor-nesw-resize" },
+  { id: "sw", grows: -1, className: "bottom-0 left-0 cursor-nesw-resize" },
+  { id: "se", grows: 1, className: "right-0 bottom-0 cursor-nwse-resize" },
+] as const;
+
+const clampWidth = (width: number) =>
+  Math.min(FullWidth, Math.max(MinWidth, Math.round(width)));
 
 /** Where an image sits in the column. `left` is the default and unwritten. */
 type ImageAlign = "left" | "center" | "right";
@@ -732,7 +753,11 @@ const ImageWithLayout = Image.extend({
         default: null,
         parseHTML: (element: HTMLElement) => {
           const raw = Number(element.getAttribute("data-width"));
-          return ImageWidths.some((width) => width === raw) ? raw : null;
+          // Any percentage inside the range, not one of a fixed few: a width
+          // that came from a dragged corner is whatever the drag made it.
+          return Number.isFinite(raw) && raw >= MinWidth && raw <= FullWidth
+            ? Math.round(raw)
+            : null;
         },
         renderHTML: (attributes: { width?: number | null }) =>
           attributes.width === null || attributes.width === undefined
@@ -846,24 +871,105 @@ const ImageWithLayout = Image.extend({
 });
 
 /**
- * The image and its controls: two steps of scale and three of alignment.
+ * The image, its handles and its controls.
  *
- * The controls are on screen whenever the editor is editable, the way the code
- * block's language picker is, rather than appearing on hover — hovering is not
- * something a phone does.
+ * All of it appears on selection and not before, the way a table's controls do:
+ * a picture nobody is working on is a picture, not a picture wearing furniture.
+ * Clicking it is what selects it, which is also the tap that reveals the
+ * controls — and a tap is the one gesture a phone has.
  */
 function ImageView({ node, updateAttributes, editor, getPos }: NodeViewProps) {
   const width: number | null = node.attrs.width;
   const align: ImageAlign | null = node.attrs.align;
   const testId = `editor.image.${nodeIndex(editor, getPos, "image")}`;
+  const box = useRef<HTMLSpanElement>(null);
 
-  const at = ImageWidths.indexOf(
-    (width ?? FullWidth) as (typeof ImageWidths)[number]
-  );
-  const scale = (to: number) =>
+  /**
+   * Whether this is the picture being worked on — the same question the table
+   * asks, and the same answer: the selection is on it or beside it.
+   *
+   * Not `NodeViewProps.selected`, which is only true for a node *selection*.
+   * A picture is an inline atom, so the caret coming to rest against it is the
+   * ordinary way of arriving at one, and the controls have to be there when it
+   * does. Read through `useEditorState` because a caret moving is a
+   * transaction, and nothing else here would re-render for it.
+   */
+  const working = useEditorState({
+    editor,
+    selector: ({ editor }) => {
+      if (!editor.isEditable) return false;
+
+      const at = getPos();
+      if (at === undefined) return false;
+
+      const { from, to } = editor.state.selection;
+      return from >= at && to <= at + node.nodeSize;
+    },
+  });
+
+  // Full width is stored as nothing at all, which is what keeps an untouched
+  // picture spelled `![alt](src)` rather than as inline HTML.
+  const setWidth = (next: number) =>
     updateAttributes({
-      width: ImageWidths[to] === FullWidth ? null : ImageWidths[to],
+      width: clampWidth(next) === FullWidth ? null : clampWidth(next),
     });
+
+  /**
+   * One rung up or down from wherever the picture is now.
+   *
+   * Snapped to the rung grid on the way: a width dragged to 37% steps to 40 or
+   * 35, not to 42 — otherwise the buttons carry the drag's arbitrary offset
+   * around with them forever.
+   */
+  const step = (by: 1 | -1) => {
+    const from = width ?? FullWidth;
+    const rung =
+      by > 0
+        ? Math.floor(from / ImageStep) * ImageStep
+        : Math.ceil(from / ImageStep) * ImageStep;
+
+    setWidth(rung + by * ImageStep);
+  };
+
+  /**
+   * Dragging a corner.
+   *
+   * The pointer's travel is read against the column the picture sits in, so
+   * what is stored stays a percentage — the same picture is read on a phone and
+   * on a desktop, and only a proportion means the same thing on both.
+   *
+   * The pointer is captured, so a fast drag that outruns the cursor keeps
+   * feeding this handle rather than being lost to whatever is underneath.
+   */
+  const pull = (grows: number) => (event: React.PointerEvent<HTMLSpanElement>) => {
+    const picture = box.current;
+    const column = picture?.parentElement?.getBoundingClientRect().width ?? 0;
+    if (!picture || column === 0) return;
+
+    const startX = event.clientX;
+    const startWidth = picture.getBoundingClientRect().width;
+    const handle = event.currentTarget;
+
+    // Keeps ProseMirror from taking the gesture as a click into the document,
+    // which would drop the selection the handles are showing for.
+    event.preventDefault();
+    handle.setPointerCapture(event.pointerId);
+
+    const move = (moved: PointerEvent) =>
+      setWidth(
+        ((startWidth + (moved.clientX - startX) * grows) / column) * 100
+      );
+
+    const done = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", done);
+      handle.removeEventListener("pointercancel", done);
+    };
+
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", done);
+    handle.addEventListener("pointercancel", done);
+  };
 
   return (
     <NodeViewWrapper
@@ -886,47 +992,81 @@ function ImageView({ node, updateAttributes, editor, getPos }: NodeViewProps) {
         picture fill it makes the two the same thing again.
       */}
       <span
+        ref={box}
         data-width={width === null ? undefined : String(width)}
-        className="relative inline-block align-top">
+        // Inline rather than a class per size: the width is now any percentage
+        // a drag can land on, and a stylesheet cannot hold a rule for each.
+        style={width === null ? undefined : { width: `${width}%` }}
+        className={cn(
+          "relative inline-block align-top",
+          // The ring says which picture the controls belong to — and with the
+          // controls sitting above rather than on it, something has to.
+          working &&
+            "ring-ring ring-offset-background rounded-lg ring-2 ring-offset-2",
+          // Room for the controls, made only while they are up — the same
+          // bargain the table strikes.
+          working && "mt-11"
+        )}>
         <img src={node.attrs.src ?? ""} alt={node.attrs.alt ?? ""} />
 
-        {editor.isEditable && (
+        {working && (
           // Outside the document as far as ProseMirror is concerned: without
           // this the controls' own markup is treated as editable content.
-          <span
-            contentEditable={false}
-            className="bg-card absolute top-2 right-2 z-10 flex items-center gap-0.5 rounded-full p-0.5 shadow-sm">
-            <ToolbarButton
-              testId={`${testId}.smaller.button`}
-              label="Smaller"
-              disabled={at <= 0}
-              onClick={() => scale(at - 1)}>
-              <ZoomOut />
-            </ToolbarButton>
-            <ToolbarButton
-              testId={`${testId}.bigger.button`}
-              label="Bigger"
-              disabled={at >= ImageWidths.length - 1}
-              onClick={() => scale(at + 1)}>
-              <ZoomIn />
-            </ToolbarButton>
-
-            <Divider />
-
-            {imageAlignments.map((option) => (
-              <ToolbarButton
-                key={option.id}
-                testId={`${testId}.align.${option.id}.button`}
-                label={option.label}
-                active={(align ?? "left") === option.id}
-                onClick={() =>
-                  updateAttributes({
-                    align: option.id === "left" ? null : option.id,
-                  })
-                }>
-                {option.icon}
-              </ToolbarButton>
+          <span contentEditable={false}>
+            {imageCorners.map((corner) => (
+              <span
+                key={corner.id}
+                {...testProp(`${testId}.resize.${corner.id}`)}
+                onPointerDown={pull(corner.grows)}
+                // Pulled by the corner, so it sits *on* the corner rather than
+                // beside it.
+                className={cn(
+                  "border-background bg-primary absolute z-10 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2",
+                  corner.className,
+                  corner.id === "ne" && "translate-x-1/2",
+                  corner.id === "se" && "translate-x-1/2 translate-y-1/2",
+                  corner.id === "sw" && "translate-y-1/2"
+                )}
+              />
             ))}
+
+            <span
+              {...testProp(`${testId}.controls`)}
+              // Above the picture rather than over it: a pill in the corner
+              // covers the one thing being looked at.
+              className="bg-card absolute right-0 bottom-full z-10 mb-1.5 flex items-center gap-0.5 rounded-full p-0.5 shadow-sm">
+              <ToolbarButton
+                testId={`${testId}.smaller.button`}
+                label="Smaller"
+                disabled={(width ?? FullWidth) <= MinWidth}
+                onClick={() => step(-1)}>
+                <ZoomOut />
+              </ToolbarButton>
+              <ToolbarButton
+                testId={`${testId}.bigger.button`}
+                label="Bigger"
+                disabled={width === null}
+                onClick={() => step(1)}>
+                <ZoomIn />
+              </ToolbarButton>
+
+              <Divider />
+
+              {imageAlignments.map((option) => (
+                <ToolbarButton
+                  key={option.id}
+                  testId={`${testId}.align.${option.id}.button`}
+                  label={option.label}
+                  active={(align ?? "left") === option.id}
+                  onClick={() =>
+                    updateAttributes({
+                      align: option.id === "left" ? null : option.id,
+                    })
+                  }>
+                  {option.icon}
+                </ToolbarButton>
+              ))}
+            </span>
           </span>
         )}
       </span>

@@ -555,8 +555,10 @@
   /*
     Images. The size is a percentage of the text column rather than a pixel
     width — the same picture is read on a phone and on a desktop, and only a
-    proportion means the same thing on both. The four steps match
-    `ImageWidths` in the editor; a picture with no `data-width` is full width.
+    proportion means the same thing on both. The percentage itself is worn as
+    an inline style by the node view, because a dragged corner can land on any
+    of them and a stylesheet cannot hold a rule for each; a picture with no
+    `data-width` is full width.
   */
   .tiptap img {
     @apply h-auto max-w-full rounded-lg;
@@ -568,15 +570,6 @@
   */
   .tiptap span[data-width] > img {
     @apply w-full;
-  }
-  .tiptap span[data-width="25"] {
-    @apply w-1/4;
-  }
-  .tiptap span[data-width="50"] {
-    @apply w-1/2;
-  }
-  .tiptap span[data-width="75"] {
-    @apply w-3/4;
   }
   /*
     Alignment sits on the wrapper the node view renders, so the picture and the
