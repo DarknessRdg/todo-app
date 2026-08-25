@@ -153,16 +153,27 @@ const CodeBlockWithLanguage = CodeBlockLowlight.extend({
   },
 
   /**
-   * Copying out of a text editor puts three flavours on the clipboard at once:
-   * the plain text, a syntax-coloured `text/html` rendering of it, and VS
-   * Code's `vscode-editor-data` naming the language. The code block ships a
-   * handler for that last one, which turns any such paste into a fenced block
-   * — right for a `.ts` file, wrong for a `.md` one, where it buries the
-   * markdown the editor exists to render.
+   * Where a code block comes from: a block you opened, and nothing else.
    *
-   * So the markdown modes are pulled out first and parsed as markdown; every
-   * other language falls through to the stock handler and still lands in a
-   * code block.
+   * Copying out of any text editor puts two flavours of the same thing on the
+   * clipboard — the plain text, and an html rendering of the editor's own
+   * screen: a `<pre>` of coloured `<span>`s. That `<pre>` is what ProseMirror
+   * prefers (html wins over text whenever both are there), and `<pre>` is the
+   * code block's own parse rule, so a README pasted out of an IDE arrived as
+   * one long code block with its markdown showing.
+   *
+   * The rendering carries no information the text does not — only colour and a
+   * font — so it is dropped and the text is read as the markdown it is. Which
+   * editor it came from does not matter: VS Code names the language on the
+   * clipboard, JetBrains does not, and neither has to be asked.
+   *
+   * Two things this deliberately does not touch:
+   *
+   * - **A paste inside a code block.** ProseMirror already keeps text literal
+   *   there, and that is the one route to a code block: open one, then paste.
+   * - **Genuinely formatted content.** A web page, a document, an email — that
+   *   html is headings and links and lists, not a bare `<pre>`, so it takes
+   *   the html path and keeps its formatting.
    */
   addProseMirrorPlugins() {
     return [
@@ -176,35 +187,55 @@ const CodeBlockWithLanguage = CodeBlockLowlight.extend({
             if (this.editor.isActive(this.type.name)) return false;
 
             const text = clipboard.getData("text/plain");
-            if (!text || !isMarkdownClipboard(clipboard)) return false;
+            if (!text) return false;
 
-            // The html flavour is a colourised rendering of the same text, so
-            // it is dropped: the plain text is the markdown, and parsing it is
-            // the whole point.
+            const html = clipboard.getData("text/html");
+            if (html !== "" && !isPlainTextRendering(html)) return false;
+
             return this.editor.commands.insertContent(
               parseMarkdown(this.editor, text)
             );
           },
         },
       }),
-      ...(this.parent?.() ?? []),
+      // The stock handler is left out rather than fallen through to: it makes
+      // a code block out of anything carrying `vscode-editor-data`, which is
+      // the behaviour being replaced.
+      ...(this.parent?.() ?? []).filter(notVsCodeCodeBlockHandler),
     ];
   },
 });
 
-/** The VS Code editor modes whose content *is* markdown rather than code. */
-const MarkdownModes = new Set(["markdown", "md", "mdx"]);
+/** Drops the code block's own "paste from VS Code" plugin. */
+function notVsCodeCodeBlockHandler(plugin: Plugin): boolean {
+  return !String(plugin.spec.key).startsWith("codeBlockVSCodeHandler");
+}
 
-/** Whether a clipboard payload was copied out of a markdown file. */
-function isMarkdownClipboard(clipboard: DataTransfer): boolean {
-  const vscode = clipboard.getData("vscode-editor-data");
-  if (!vscode) return false;
+/**
+ * The tags an editor's screen is drawn with. Between them they say nothing:
+ * a box, a run of coloured text, a line break. Everything an editor renders —
+ * JetBrains wraps a `<pre>` of `<span>`s, VS Code nests `<div>`s of them — is
+ * made of these and inline styles.
+ */
+const StylingOnlyTags = new Set(["DIV", "SPAN", "PRE", "BR"]);
 
-  try {
-    return MarkdownModes.has(JSON.parse(vscode)?.mode);
-  } catch {
-    return false;
+/**
+ * Whether an html payload is only a styled rendering of the plain text beside
+ * it — which is to say, whether it carries any meaning at all.
+ *
+ * The line is semantic markup, not the source: a heading, a list, a link, a
+ * `<strong>`, a `<code>` all state something the plain text cannot, so that
+ * html is kept and parsed as the formatted content it is. A payload built from
+ * nothing but boxes and coloured spans states only what colour someone's
+ * editor theme is, so it is dropped in favour of the text.
+ */
+function isPlainTextRendering(html: string): boolean {
+  const body = new DOMParser().parseFromString(html, "text/html").body;
+
+  for (const element of body.querySelectorAll("*")) {
+    if (!StylingOnlyTags.has(element.tagName)) return false;
   }
+  return true;
 }
 
 function CodeBlockView({

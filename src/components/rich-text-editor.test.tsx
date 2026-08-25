@@ -1337,7 +1337,7 @@ describe("rich text editor", () => {
   });
 
   describe("when I paste code copied out of a code editor", () => {
-    it("Then it still becomes a fenced code block in that language", async () => {
+    it("Then it is read as text, because a code block is something you open on purpose", async () => {
       const user = setupUser();
       const { onBlur } = renderEditor();
 
@@ -1346,8 +1346,75 @@ describe("rich text editor", () => {
       blurEditor();
 
       await waitFor(() =>
+        expect(onBlur).toHaveBeenCalledWith(expect.not.stringContaining("```"))
+      );
+    });
+  });
+
+  describe("when I paste inside a code block I opened", () => {
+    it("Then the text stays literal instead of being read as markdown", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor();
+
+      await user.click(screen.getByTestId(editor));
+      await user.click(screen.getByTestId(codeBlockButton));
+      paste({ text: "# not a heading" });
+      blurEditor();
+
+      await waitFor(() =>
         expect(onBlur).toHaveBeenCalledWith(
-          expect.stringContaining("```typescript\nconst answer = 42\n```")
+          expect.stringContaining("```\n# not a heading\n```")
+        )
+      );
+    });
+  });
+
+  describe("when I paste markdown copied out of a JetBrains IDE", () => {
+    /**
+     * What GoLand actually puts on the clipboard: no `vscode-editor-data` to
+     * name the language, and an html flavour that is the IDE's own screen —
+     * a `<pre>` of coloured `<span>`s, spaces as `&#32;` and newlines as
+     * `<br>`. Nothing in it but styling, which is the whole point.
+     */
+    const jetBrainsHtml =
+      '<html><head><meta http-equiv="content-type" content="text/html; charset=UTF-8"></head>' +
+      '<body><div style="background-color:#1e1f22;color:#bcbec4">' +
+      "<pre style=\"font-family:'JetBrains Mono',monospace;font-size:9,8pt;\">" +
+      '<span style="color:#cf8e6d;">#&#32;</span>Agenda&#32;Backend<br><br>' +
+      "API&#32;backend.</pre></div></body></html>";
+
+    it("Then it is parsed as rich text rather than buried in a code block", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor();
+
+      await user.click(screen.getByTestId(editor));
+      paste({
+        text: "# Agenda Backend\r\n\r\nAPI backend.",
+        html: jetBrainsHtml,
+      });
+      blurEditor();
+
+      await waitFor(() =>
+        expect(onBlur).toHaveBeenCalledWith("# Agenda Backend\n\nAPI backend.")
+      );
+    });
+  });
+
+  describe("when I paste formatted content from a web page", () => {
+    it("Then its formatting is kept rather than flattened into markdown source", async () => {
+      const user = setupUser();
+      const { onBlur } = renderEditor();
+
+      await user.click(screen.getByTestId(editor));
+      paste({
+        text: "Read the docs",
+        html: "<p>Read <strong>the docs</strong></p>",
+      });
+      blurEditor();
+
+      await waitFor(() =>
+        expect(onBlur).toHaveBeenCalledWith(
+          expect.stringContaining("Read **the docs**")
         )
       );
     });
