@@ -80,7 +80,7 @@ export function ProjectSelect({
     // from clearing as though something had been created.
     if (name === "") return;
 
-    const project = await create.mutateAsync(name);
+    const project = await create.mutateAsync({ name });
     setDraft("");
 
     // An existing name comes back as the project already under it, so asking
