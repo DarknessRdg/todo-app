@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import { ListPlus, Pencil, Tag, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 
@@ -146,11 +147,17 @@ export function LabelsPage() {
               ) : (
                 <>
                   <Tag className="text-muted-foreground size-4 shrink-0" />
-                  <span
+                  {/*
+                    A real link, not a click handler: this page manages labels,
+                    and reading the todos carrying one is a different page with
+                    a url of its own that can be shared and returned to.
+                  */}
+                  <Link
+                    to={`/label/${label.id}`}
                     {...testProp(`labels.page.${label.id}.name`)}
-                    className="truncate text-sm">
+                    className="truncate text-sm hover:underline">
                     {label.name}
-                  </span>
+                  </Link>
 
                   <span
                     {...testProp(`labels.page.${label.id}.usage`)}

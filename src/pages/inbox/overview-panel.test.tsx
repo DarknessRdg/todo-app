@@ -11,6 +11,7 @@ import {
 } from "@/test/container";
 import { makeTodo } from "@/test/todo-factory";
 import { dayKey } from "@/lib/due-dates";
+import { todosInProject } from "@/lib/todo-scope";
 
 const openCount = "home.overview.open.count";
 
@@ -20,9 +21,13 @@ const openCount = "home.overview.open.count";
  */
 function renderRightRail(todos: TodoEntity[], projectId?: string) {
   const repository = inMemoryTodoRepository(todos);
+  // The page narrows before the rail sees anything — the rail summarises what
+  // the page is about, and is never handed the whole workspace to sift itself.
+  const shown =
+    projectId === undefined ? todos : todosInProject(todos, projectId);
 
   return {
-    ...renderWithContainer(<RightRail projectId={projectId} />, {
+    ...renderWithContainer(<RightRail todos={shown} />, {
       diContainer: createTestContainer(repository),
     }),
     repository,
@@ -74,12 +79,11 @@ describe("overview panel", () => {
       });
     });
 
-    it("Then an empty inbox reads as zero rather than as complete", async () => {
-      const { repository } = renderRightRail([]);
+    it("Then an empty inbox reads as zero rather than as complete", () => {
+      // No wait: the panel is handed its todos rather than fetching them, so
+      // there is no pre-fetch state for zero to be mistaken for.
+      renderRightRail([]);
 
-      // Zero is also the pre-fetch state, so wait for the read to have happened
-      // before believing the zeroes on screen.
-      await waitFor(() => expect(repository.listAll).toHaveBeenCalled());
       expect(shownStats()).toEqual({
         open: "0",
         done: "0",

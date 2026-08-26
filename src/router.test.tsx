@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { AppRouteTable } from "@/router";
@@ -7,7 +7,6 @@ import { setupUser, waitFor } from "@/test/user";
 
 const notFound = "not-found";
 const notFoundInboxLink = "not-found.inbox.link";
-const comingSoon = "coming-soon";
 
 function renderAt(route: string) {
   return renderWithContainer(<AppRouteTable />, { route });
@@ -46,11 +45,31 @@ describe("routing", () => {
   });
 
   describe("when the url matches a route", () => {
+    /**
+     * Every view in the sidebar now has a page of its own, so nothing lands on
+     * a placeholder any more — `ComingSoon` is gone with the last of them.
+     */
     it("Then the not-found page stays away", async () => {
       renderAt("/overdue");
 
-      expect(await screen.findByTestId(comingSoon)).toBeInTheDocument();
+      expect(
+        await screen.findByTestId("overdue.page.title")
+      ).toBeInTheDocument();
       expect(screen.queryByTestId(notFound)).not.toBeInTheDocument();
+    });
+
+    it("Then /upcoming and /completed are pages of their own too", async () => {
+      renderAt("/upcoming");
+      expect(
+        await screen.findByTestId("upcoming.page.title")
+      ).toBeInTheDocument();
+
+      cleanup();
+
+      renderAt("/completed");
+      expect(
+        await screen.findByTestId("completed.page.title")
+      ).toBeInTheDocument();
     });
 
     it("Then /settings is a page of its own, not the placeholder", async () => {
@@ -59,7 +78,6 @@ describe("routing", () => {
       expect(
         await screen.findByTestId("settings.page.title")
       ).toBeInTheDocument();
-      expect(screen.queryByTestId(comingSoon)).not.toBeInTheDocument();
       expect(screen.queryByTestId(notFound)).not.toBeInTheDocument();
     });
 
@@ -69,14 +87,12 @@ describe("routing", () => {
       expect(
         await screen.findByTestId("labels.page.title")
       ).toBeInTheDocument();
-      expect(screen.queryByTestId(comingSoon)).not.toBeInTheDocument();
     });
 
     it("Then /today is the built view, not the placeholder", async () => {
       renderAt("/today");
 
       expect(await screen.findByTestId("today.page.title")).toBeInTheDocument();
-      expect(screen.queryByTestId(comingSoon)).not.toBeInTheDocument();
     });
   });
 });
