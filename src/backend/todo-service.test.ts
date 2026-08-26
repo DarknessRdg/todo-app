@@ -32,6 +32,63 @@ describe("TodoService", () => {
     });
   });
 
+  /**
+   * There is no level meaning "none": a todo nobody has triaged carries no
+   * priority at all, the same way an undated one carries no due date. So the
+   * service applies no default — there is nothing to default to.
+   */
+  describe("when I create a todo", () => {
+    it("Then it carries no priority, none having been given", async () => {
+      const repository = mockTodoRepository();
+
+      await serviceWith(repository).create(makeCreateTodo());
+
+      expect(repository.create.mock.calls[0][0].priority).toBeUndefined();
+    });
+
+    it("Then a priority I do give is persisted with it", async () => {
+      const repository = mockTodoRepository();
+
+      await serviceWith(repository).create(
+        makeCreateTodo({ priority: "urgent" })
+      );
+
+      expect(repository.create.mock.calls[0][0].priority).toBe("urgent");
+    });
+  });
+
+  describe("when I set a todo's priority", () => {
+    it("Then it is persisted against it", async () => {
+      const repository = mockTodoRepository();
+      const todo = makeTodo();
+
+      await serviceWith(repository).updatePriority({
+        id: todo.id,
+        priority: "high",
+      });
+
+      expect(repository.updatePriority).toHaveBeenCalledWith({
+        id: todo.id,
+        priority: "high",
+      });
+    });
+
+    it("Then clearing it passes nothing rather than a level", async () => {
+      const repository = mockTodoRepository();
+      const todo = makeTodo();
+
+      await serviceWith(repository).updatePriority({
+        id: todo.id,
+        priority: undefined,
+      });
+
+      expect(repository.updatePriority).toHaveBeenCalledWith({
+        id: todo.id,
+        priority: undefined,
+      });
+    });
+  });
+
   it("when a todo is created, Then it starts with no subtasks", async () => {
     const repository = mockTodoRepository();
 

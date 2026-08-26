@@ -1,3 +1,4 @@
+import type { TodoPriority } from "@/lib/priority";
 import { Tables, type AppIDB } from "@/backend/adapter/indexed-db/indexed-db";
 import type { RichTextDoc } from "@/lib/rich-text";
 import type {
@@ -57,6 +58,16 @@ export class TodoRepositoryIndexedDB implements TodoRepository {
     await this.mutateTodo(id, (todo) => ({ ...todo, dueDate }));
   };
 
+  updatePriority = async ({
+    id,
+    priority,
+  }: {
+    id: string;
+    priority: TodoPriority | undefined;
+  }) => {
+    await this.mutateTodo(id, (todo) => ({ ...todo, priority }));
+  };
+
   updateProject = async ({
     id,
     projectId,
@@ -101,6 +112,23 @@ export class TodoRepositoryIndexedDB implements TodoRepository {
    * holds one workspace's todos, and a label is on a handful of them. An index
    * on an array field would be the answer at a scale this app does not have.
    */
+  /**
+   * The project equivalent of `removeLabelEverywhere`, and the same shape: one
+   * readwrite transaction, read-modify-write over every row. An index on
+   * `projectId` would be the answer at a scale this app does not have.
+   */
+  clearProjectEverywhere = async (projectId: string) => {
+    const transaction = this.db.transaction(Tables.Todo, "readwrite");
+    const store = transaction.store;
+
+    for (const todo of await store.getAll()) {
+      if (todo.projectId !== projectId) continue;
+      await store.put({ ...todo, projectId: undefined });
+    }
+
+    await transaction.done;
+  };
+
   removeLabelEverywhere = async (labelId: string) => {
     const transaction = this.db.transaction(Tables.Todo, "readwrite");
     const store = transaction.objectStore(Tables.Todo);

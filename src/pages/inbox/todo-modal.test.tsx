@@ -170,6 +170,40 @@ describe("todo detail modal", { timeout: 3000 }, () => {
     expect(url).toHaveValue("https://x.dev");
   });
 
+  /**
+   * The trap this guards: a Radix popper opened inside the dialog is portalled
+   * to an inert body and clipped by `DialogContent`'s own overflow unless it is
+   * handed the dialog as both container and collision boundary. It works
+   * perfectly on `/todo/:id` and does nothing here.
+   */
+  describe("when I set a priority from inside the modal", () => {
+    it("Then the levels are reachable", async () => {
+      const user = setupUser();
+      renderInboxWithModalOpen();
+
+      await user.click(await screen.findByTestId("todo.detail.priority"));
+
+      expect(
+        await screen.findByTestId("todo.detail.priority.urgent")
+      ).toBeInTheDocument();
+    });
+
+    it("Then the one I pick is persisted", async () => {
+      const user = setupUser();
+      const { repository, todo } = renderInboxWithModalOpen();
+
+      await user.click(await screen.findByTestId("todo.detail.priority"));
+      await user.click(await screen.findByTestId("todo.detail.priority.urgent"));
+
+      await waitFor(() =>
+        expect(repository.updatePriority).toHaveBeenCalledWith({
+          id: todo.id,
+          priority: "urgent",
+        })
+      );
+    });
+  });
+
   describe("when I press escape while editing the description", () => {
     /** Opens the modal with the description already in its editor. */
     async function editDescription(user: User) {

@@ -1,3 +1,4 @@
+import { TodoPriorities, type TodoPriority } from "@/lib/priority";
 import type { RichTextDoc } from "@/lib/rich-text";
 import { uuidV7 } from "@/lib/uuid";
 import { zodAsValidator } from "@/lib/validator";
@@ -32,6 +33,12 @@ const createTodoZodScheme = z.object({
   descriptionDoc: z.record(z.string(), z.unknown()).optional(),
   /** Which project it belongs to. Unset means the inbox — no project yet. */
   projectId: z.string().optional(),
+  /**
+   * How urgent it is. Unset means nobody has said — which is a different thing
+   * from saying it is unimportant, and is why there is no "none" level to
+   * store. See `@/lib/priority`.
+   */
+  priority: z.enum(TodoPriorities).optional(),
 });
 
 const todoZodScheme = createTodoZodScheme.extend({
@@ -70,6 +77,10 @@ export interface TodoRepository {
     id: string;
     dueDate: Date | undefined;
   }): Promise<void>;
+  updatePriority(params: {
+    id: string;
+    priority: TodoPriority | undefined;
+  }): Promise<void>;
   updateDescription(params: {
     id: string;
     description: string;
@@ -78,6 +89,12 @@ export interface TodoRepository {
   updateLabels(params: { id: string; labelIds: string[] }): Promise<void>;
   /** Takes one label off every todo carrying it — what deleting it means. */
   removeLabelEverywhere(labelId: string): Promise<void>;
+  /**
+   * Takes one project off every todo filed under it — half of what deleting a
+   * project means. The other half is the project row itself, which belongs to
+   * a different store and a different service.
+   */
+  clearProjectEverywhere(projectId: string): Promise<void>;
   count(): Promise<number>;
   getById(id: string): Promise<TodoEntity | undefined>;
   addSubtask(params: { id: string; subtask: SubtaskEntity }): Promise<void>;
@@ -148,6 +165,30 @@ export class TodoService {
   /** Setting a due date, or clearing the one it had. */
   updateDueDate = async (params: { id: string; dueDate: Date | undefined }) => {
     return this.repository.updateDueDate(params);
+  };
+
+  /**
+   * Setting how urgent a todo is, or taking the answer back.
+   *
+   * `undefined` clears it, the way it does for a due date — there is no level
+   * meaning "none", so leaving the field empty is the only way to say it.
+   */
+  updatePriority = async (params: {
+    id: string;
+    priority: TodoPriority | undefined;
+  }) => {
+    return this.repository.updatePriority(params);
+  };
+
+  /**
+   * Sends every todo filed under a project back to the inbox.
+   *
+   * The todos survive their project: unfiling one is a change rather than a
+   * destruction, and the work still exists — which is what makes deleting a
+   * project a safe thing to confirm once.
+   */
+  clearProjectEverywhere = async (projectId: string) => {
+    return this.repository.clearProjectEverywhere(projectId);
   };
 
   /** Moving a todo between projects, or out of one entirely. */
