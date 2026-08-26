@@ -2,7 +2,6 @@ import { TodoCheckerInput, TodoTitle } from "@/components/todo";
 import { Text } from "@/components/ui/text";
 import { testProp, type TestIdProps } from "@/lib/test-id";
 import { Timing } from "@/lib/timing";
-import { useTodoList } from "./use-todo-list";
 import { EmptyList } from "@/pages/inbox/empty-list";
 import { useTodoUpdate } from "@/pages/inbox/use-todo-update";
 import { DeleteButton } from "@/pages/inbox/delete-button";
@@ -14,7 +13,6 @@ import {
   LabelChips,
   PriorityBadge,
   SubtaskIndicator,
-  metaFor,
 } from "@/pages/inbox/todo-meta.tsx";
 import { useNavigate } from "react-router";
 import { useEffect, useRef, useState } from "react";
@@ -25,37 +23,65 @@ import { useStickyToggle } from "@/hooks/use-sticky-toggle";
 import { ConfettiBurst } from "@/components/confetti-burst";
 import { TodoProjectBadge } from "@/pages/inbox/todo-project-badge";
 import { useLabels } from "@/pages/inbox/use-labels";
-import type { TodoFilter } from "@/lib/todo-filter";
+import {
+  applyTodoFilter,
+  defaultTodoSort,
+  emptyTodoFilter,
+  sortTodos,
+  type TodoFilter,
+  type TodoSort,
+} from "@/lib/todo-filter";
 import { useSetting } from "@/hooks/use-setting";
 
 export function TodoList({
-  projectId,
-  dueOn,
-  filter,
-  scope: scopeOverride,
+  todos,
+  filter = emptyTodoFilter,
+  sort = defaultTodoSort,
+  scope = "inbox",
+  sections = "split",
   empty,
 }: {
-  projectId?: string;
-  /** Narrows the list to one calendar day — see `useTodoList`. */
-  dueOn?: Date;
+  /**
+   * The todos this page is about, before the reader's own narrowing.
+   * `undefined` means the query has not answered yet — which is not the same
+   * as a page with nothing on it, and draws a skeleton rather than an empty
+   * state.
+   */
+  todos: TodoEntity[] | undefined;
   /** The reader's own narrowing — see `@/lib/todo-filter`. */
   filter?: TodoFilter;
+  /** The order rows are read in. See `@/lib/todo-filter`. */
+  sort?: TodoSort;
   /** Where this list's collapsed sections are remembered. */
   scope?: string;
+  /**
+   * `flat` is one list rather than open and done apart — for a page that is
+   * already only one of the two, where a "To do" heading would stand over
+   * nothing.
+   */
+  sections?: "split" | "flat";
   /** What stands in for an empty list, when "Inbox zero" is the wrong words. */
   empty?: React.ReactNode;
-} = {}) {
-  const { todoList, doneList, count, isLoading } = useTodoList({
-    projectId,
-    dueOn,
-    filter,
-  });
+}) {
+  const isLoading = todos === undefined;
 
-  // Each page keeps its own: collapsing Done in the inbox says nothing about
-  // whether it should be collapsed in a project.
-  const scope = scopeOverride ?? projectId ?? "inbox";
+  // Sorted once and then split: `filter` keeps the order it is given, so the
+  // two sections cannot disagree, and a done todo never rises into the open one
+  // whatever the sort says.
+  const shown =
+    todos === undefined
+      ? undefined
+      : sortTodos(applyTodoFilter(todos, filter, new Date()), sort);
 
-  const [hideDone] = useSetting("hideDone");
+  const todoList = shown?.filter((todo) => !todo.done);
+  const doneList = shown?.filter((todo) => todo.done);
+  const count = shown?.length ?? 0;
+
+  // The setting hides finished work from lists that are *about* open work. A
+  // flat list is a page whose whole subject is one side of that split, so
+  // obeying it there would empty the page by construction.
+  const [hideDoneSetting] = useSetting("hideDone");
+  const hideDone = sections === "split" && hideDoneSetting;
   const openCount = todoList?.length ?? 0;
 
   if (isLoading) return <TodoListSkeleton />;
@@ -68,6 +94,10 @@ export function TodoList({
 
   const doneCount = doneList?.length ?? 0;
   const percentage = count > 0 ? (doneCount / count) * 100 : 0;
+
+  // One list, no headings: the page is already only open todos or only done
+  // ones, so a section would be a label standing over the whole thing.
+  if (sections === "flat") return <TodoListContainer todoList={shown} />;
 
   return (
     <div className="flex flex-col gap-8">
@@ -213,7 +243,6 @@ function TodoItem({ todo }: { todo: TodoEntity }) {
   const navigate = useNavigate();
   const { labels } = useLabels();
 
-  const meta = metaFor(todo.id);
   // Resolved by id, so a renamed label reads its new name here without the row
   // being rewritten, and a deleted one simply stops appearing.
   const todoLabels = todo.labelIds
@@ -294,7 +323,10 @@ function TodoItem({ todo }: { todo: TodoEntity }) {
         </div>
 
         <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5">
-          <PriorityBadge priority={meta.priority} />
+          <PriorityBadge
+            priority={todo.priority}
+            testId={`home.todo.${todo.id}.priority`}
+          />
           <TodoProjectBadge projectId={todo.projectId} />
           <LabelChips labels={todoLabels} max={2} />
           {todo.dueDate ? <DueBadge date={todo.dueDate} /> : null}

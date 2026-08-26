@@ -24,8 +24,8 @@ export function AppSidebar({ className }: { className?: string } = {}) {
   const { pathname } = useLocation();
   // Open todos only: a sidebar count is a to-do count, not a total, and one
   // that includes finished work never goes down.
-  const { todoList } = useTodoList();
-  const openCount = todoList?.length ?? 0;
+  const { allTodos } = useTodoList();
+  const openCount = allTodos?.filter((todo) => !todo.done).length ?? 0;
   const settingsActive = pathname === "/settings";
 
   return (

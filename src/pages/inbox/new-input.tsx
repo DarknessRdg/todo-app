@@ -1,6 +1,8 @@
 import type { CreateTodoEntity } from "@/backend/todo-service";
 import { useAppForm, useFieldContext } from "@/components/app-form/app-form";
 import { ProjectSelect } from "@/components/project-select";
+import { PrioritySelect } from "@/components/priority-select";
+import type { TodoPriority } from "@/lib/priority";
 import { TodoCheckerInput } from "@/components/todo";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -20,15 +22,34 @@ import { projectForCapture } from "@/lib/todo-capture";
  * `projectId` files whatever is captured into that project — the project page
  * passes its own, so adding from there does not mean picking it again for
  * every todo, and cannot file it anywhere else.
+ *
+ * `dueDate` seeds the date the same way, for a page that *is* a day: `/today`
+ * promises that what you capture there is due today, so it says so rather than
+ * relying on a default. Unlike the project it is only a seed — the picker is
+ * still open, because the page's promise is about where the todo lands, not
+ * about forbidding another date.
  */
-export function NewInput({ projectId }: { projectId?: string } = {}) {
+export function NewInput({
+  projectId,
+  dueDate,
+  priority,
+}: {
+  projectId?: string;
+  dueDate?: Date;
+  priority?: TodoPriority;
+} = {}) {
   const { create, validateField } = useTodoCreate();
 
   const form = useAppForm({
     defaultValues: {
       title: "",
-      dueDate: new Date(),
+      // Undated unless the reader picks one, or the page pinned one. A date
+      // nobody chose is still a promise the todo goes on to make — it turns up
+      // in Today, and in Overdue the morning after, on the strength of a
+      // default that was never a decision.
+      dueDate,
       projectId,
+      priority,
     } as CreateTodoEntity,
     onSubmit: ({ value, formApi }) => {
       create.mutate({
@@ -94,6 +115,17 @@ export function NewInput({ projectId }: { projectId?: string } = {}) {
               validators={inputValidations("dueDate")}
               children={(field) => (
                 <DueDateButton initial={field.state.value as Date} />
+              )}
+            />
+
+            <form.AppField
+              name="priority"
+              children={(field) => (
+                <PrioritySelect
+                  testId="home.todo.create.priority"
+                  value={field.state.value as TodoPriority | undefined}
+                  onChange={(next) => field.handleChange(next)}
+                />
               )}
             />
 

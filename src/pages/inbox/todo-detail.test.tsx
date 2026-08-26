@@ -29,6 +29,9 @@ const checkButton = "todo.detail.check.button";
 const completedDate = "todo.detail.completed.date";
 const projectPicker = "todo.detail.project";
 const duePicker = "todo.detail.duedate.button";
+const priorityPicker = "todo.detail.priority";
+const priorityBadge = "todo.detail.priority.badge";
+const priorityOption = (level: string) => `todo.detail.priority.${level}`;
 const dueClear = "todo.detail.duedate.clear";
 const dueToday = "todo.detail.duedate.today";
 const projectOption = (id: string) => `todo.detail.project.option.${id}`;
@@ -237,6 +240,67 @@ describe("todo detail", () => {
       await waitFor(() =>
         expect(screen.getByTestId(duePicker)).toHaveTextContent("Add a date")
       );
+    });
+  });
+
+  describe("when I set a todo's priority", () => {
+    it("Then the level I pick is persisted", async () => {
+      const user = setupUser();
+      const todo = makeTodo({ priority: undefined });
+      const { repository } = renderDetail(todo);
+
+      await user.click(await screen.findByTestId(priorityPicker));
+      await user.click(await screen.findByTestId(priorityOption("urgent")));
+
+      await waitFor(() =>
+        expect(repository.updatePriority).toHaveBeenCalledWith({
+          id: todo.id,
+          priority: "urgent",
+        })
+      );
+    });
+
+    it("Then the detail shows the level it now carries", async () => {
+      const user = setupUser();
+      const { repository } = renderDetail(makeTodo({ priority: undefined }));
+
+      await user.click(await screen.findByTestId(priorityPicker));
+      await user.click(await screen.findByTestId(priorityOption("high")));
+
+      await waitFor(() => expect(repository.updatePriority).toHaveBeenCalled());
+      expect(await screen.findByTestId(priorityBadge)).toHaveTextContent(
+        "High"
+      );
+    });
+
+    /**
+     * Taking the answer back is a real answer — there is no level meaning
+     * "none", so clearing it stores nothing rather than a fifth value.
+     */
+    it("Then clearing it stores no level at all", async () => {
+      const user = setupUser();
+      const todo = makeTodo({ priority: "high" });
+      const { repository } = renderDetail(todo);
+
+      await user.click(await screen.findByTestId(priorityPicker));
+      await user.click(await screen.findByTestId(priorityOption("none")));
+
+      await waitFor(() =>
+        expect(repository.updatePriority).toHaveBeenCalledWith({
+          id: todo.id,
+          priority: undefined,
+        })
+      );
+    });
+  });
+
+  describe("when a todo carries no priority", () => {
+    it("Then no priority badge is shown", async () => {
+      renderDetail(makeTodo({ priority: undefined }));
+
+      await screen.findByTestId(title);
+
+      expect(screen.queryByTestId(priorityBadge)).not.toBeInTheDocument();
     });
   });
 

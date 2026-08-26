@@ -56,6 +56,56 @@ Zod is **not** used directly in the domain. Instead:
 - Import alias `@/` maps to `src/` (configured in both `vite.config.ts` and `tsconfig`).
 - Prettier is the formatter (`.prettierrc.json`, with `prettier-plugin-tailwindcss` for class sorting).
 
+### Composition over configuration
+
+**Anything several pages share is a set of parts that share context, assembled by
+the caller — never one component configured through a long prop list.** The
+caller writes the structure; the parts supply the behaviour.
+
+```tsx
+// ✅ the caller assembles what it needs, and places its own content
+<ListingContainer scopeKey={`project:${id}`}>
+  <ListingMain>
+    <ListingHeader eyebrow="Project">{project.name}</ListingHeader>
+    <ListingCapture projectId={id} />
+    <ListingFilter />
+    <ListingContent todos={todos} />
+  </ListingMain>
+  <ListingRail todos={todos} />
+  <ListingModal />
+</ListingContainer>
+
+// ❌ one component that grows a prop for every page that ever uses it
+<TodoListView
+  title={project.name} eyebrow="Project" banner={<Hero />} select={…}
+  capture={{ projectId: id }} sections="split" rail showFilterBar empty={…}
+/>
+```
+
+The reference implementation is `src/components/listing/` — one part per file,
+its spec beside it, shared state on a context the container publishes.
+
+Rules that keep the shape honest:
+
+- **A slot passed as a prop is the smell.** `banner={<Hero />}`, `header={…}`,
+  `footer={…}` all mean the caller wanted to place something and was not allowed
+  to. Let it place a child instead.
+- **A boolean that hides a part is the same smell.** `showFilterBar={false}` is a
+  part the caller should simply not have written.
+- **Shared state goes on the context, not through props.** A part reads what it
+  needs (the filter, the sort, the scope key) from the container; it is not
+  handed down through every level, and two parts cannot disagree about it.
+- **A part must be usable on its own terms.** If `ListingContent` only works when
+  `ListingFilter` happens to be rendered above it, that is a context it should be
+  reading, not an ordering the caller has to know.
+- **Plain props are still right for a leaf with one job.** `PriorityBadge
+  priority=`, `EmptyList title=`, `Skeleton className=`. The rule is about shared
+  *features*, not about every component taking zero props.
+
+Composition also lets structure carry a rule that a comment used to: `ListingModal`
+is part of the listing, so a page that lists todos cannot forget to render the
+route that opens them.
+
 ## Testing policy
 
 **Behavior changes start from a test.** Before writing the implementation for any

@@ -1,13 +1,18 @@
-import { TodoList } from "./list";
-import { TodoModalRoute } from "@/pages/inbox/todo-modal-route.tsx";
-import { RightRail } from "@/pages/inbox/right-rail.tsx";
-import { NewInput } from "@/pages/inbox/new-input";
+import type { TodoEntity } from "@/backend/todo-service";
+import {
+  ListingCapture,
+  ListingContainer,
+  ListingContent,
+  ListingFilter,
+  ListingMain,
+  ListingModal,
+  ListingRail,
+  useListing,
+} from "@/components/listing";
 import { useTodoList } from "@/pages/inbox/use-todo-list";
 import { Text } from "@/components/ui/text";
 import { type TestIdProps } from "@/lib/test-id";
 import { EmptyList } from "@/pages/inbox/empty-list";
-import { FilterBar } from "@/pages/inbox/filter-bar";
-import { useTodoFilter } from "@/pages/inbox/use-todo-filter";
 import { dayKey } from "@/lib/due-dates";
 import {
   dayFromKey,
@@ -31,12 +36,84 @@ export function Inbox() {
   // The hero reads the whole workspace, filtered or not: it is the summary the
   // page is titled after, and a number that moves when you type in the search
   // box is not a summary of anything.
-  const { count, doneList } = useTodoList();
-  const { filter, setFilter, updateFilter } = useTodoFilter();
+  const { allTodos } = useTodoList();
 
-  const doneCount = doneList?.length ?? 0;
+  const doneCount = allTodos?.filter((todo) => todo.done).length ?? 0;
+  const count = allTodos?.length ?? 0;
   const openCount = count - doneCount;
   const percentage = count > 0 ? Math.round((doneCount / count) * 100) : 0;
+
+  // The rail is a month of day buttons, and every keystroke in the search box
+  // is a new filter object. Memoised against what the calendar actually draws —
+  // the due window, and nothing else — so typing does not redraw the calendar.
+  return (
+    <ListingContainer scopeKey="inbox">
+      <ListingMain>
+        <div className="mb-6 flex items-end justify-between gap-4">
+          <div>
+            <Text variant="eyebrow" className="mb-1">
+              Workspace
+            </Text>
+            <Text variant="h1">Inbox</Text>
+          </div>
+        </div>
+
+        {/*
+          The hero is the inbox's alone, so it is written here rather than
+          reached through a prop on the listing: a page that wants a banner
+          simply puts one in its own column.
+
+          It reads the whole workspace, filtered or not — it is the summary the
+          page is titled after, and a number that moves when you type in the
+          search box is not a summary of anything.
+        */}
+        <HeroPanel
+          openCount={openCount}
+          doneCount={doneCount}
+          percentage={percentage}
+        />
+
+        <ListingCapture />
+        <ListingFilter />
+        <InboxList todos={allTodos} />
+      </ListingMain>
+
+      <InboxRail todos={allTodos} />
+      <ListingModal />
+    </ListingContainer>
+  );
+}
+
+/** The list, and the words for when the reader's filter has emptied it. */
+function InboxList({ todos }: { todos: TodoEntity[] | undefined }) {
+  const { filter } = useListing();
+
+  return (
+    <ListingContent
+      todos={todos}
+      empty={
+        isTodoFilterActive(filter) ? (
+          <EmptyList
+            testId="home.todo.empty.filtered"
+            icon={<SearchX className="size-5" />}
+            title="Nothing matches"
+            message="No todo fits the filters above. Widen them, or clear them to see the lot."
+          />
+        ) : undefined
+      }
+    />
+  );
+}
+
+/**
+ * The rail, and the one place a calendar is a control rather than a picture.
+ *
+ * It stays unfiltered on purpose: picking a day is how the filter gets set, and
+ * a calendar showing only the day already picked cannot be used to pick another.
+ * It highlights the filter instead of obeying it.
+ */
+function InboxRail({ todos }: { todos: TodoEntity[] | undefined }) {
+  const { filter, updateFilter } = useListing();
 
   // The rail is a month of day buttons, and every keystroke in the search box
   // is a new filter object. Memoised against what the calendar actually draws —
@@ -69,59 +146,12 @@ export function Inbox() {
   );
 
   return (
-    <div className="flex items-start gap-8">
-      <div className="min-w-0 grow">
-        <div className="mb-6 flex items-end justify-between gap-4">
-          <div>
-            <Text variant="eyebrow" className="mb-1">
-              Workspace
-            </Text>
-            <Text variant="h1">Inbox</Text>
-          </div>
-        </div>
-
-        <HeroPanel
-          openCount={openCount}
-          doneCount={doneCount}
-          percentage={percentage}
-        />
-
-        <div className="my-6">
-          <NewInput />
-        </div>
-
-        <div className="mb-5">
-          <FilterBar filter={filter} onChange={setFilter} />
-        </div>
-
-        <TodoList
-          filter={filter}
-          empty={
-            isTodoFilterActive(filter) ? (
-              <EmptyList
-                testId="home.todo.empty.filtered"
-                icon={<SearchX className="size-5" />}
-                title="Nothing matches"
-                message="No todo fits the filters above. Widen them, or clear them to see the lot."
-              />
-            ) : undefined
-          }
-        />
-      </div>
-
-      {/*
-        The rail stays unfiltered on purpose: its calendar is how a day gets
-        picked, and a calendar showing only the day already picked cannot be
-        used to pick another. It highlights the filter instead of obeying it.
-      */}
-      <RightRail
-        highlight={calendar.highlight}
-        selectedDay={calendar.selectedDay}
-        onSelectDay={pickDay}
-      />
-
-      <TodoModalRoute />
-    </div>
+    <ListingRail
+      todos={todos}
+      highlight={calendar.highlight}
+      selectedDay={calendar.selectedDay}
+      onSelectDay={pickDay}
+    />
   );
 }
 

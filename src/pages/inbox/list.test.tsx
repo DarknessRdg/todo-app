@@ -12,6 +12,7 @@ import {
 } from "@/test/container";
 import { makeSubtask, makeTodo } from "@/test/todo-factory";
 import { writeSetting } from "@/lib/settings";
+import { todosInProject } from "@/lib/todo-scope";
 
 // Settings live in localStorage, so one spec's choice would otherwise be the
 // next spec's starting point.
@@ -440,13 +441,19 @@ describe("todo list", () => {
   describe("when I move from one project to another without leaving the page", () => {
     /**
      * `/project/a` and `/project/b` render the same element, so `TodoList` is
-     * never unmounted between them — only its `projectId` changes.
+     * never unmounted between them — only its `scope` changes.
      */
     function renderProjectList(projectId: string, todos: TodoEntity[]) {
-      return renderWithContainer(<TodoList projectId={projectId} />, {
-        diContainer: createTestContainer(inMemoryTodoRepository(todos)),
-        route: `/project/${projectId}`,
-      });
+      return renderWithContainer(
+        <TodoList
+          todos={todosInProject(todos, projectId)}
+          scope={`project:${projectId}`}
+        />,
+        {
+          diContainer: createTestContainer(inMemoryTodoRepository(todos)),
+          route: `/project/${projectId}`,
+        }
+      );
     }
 
     it("Then the section I collapsed in the first is not collapsed in the second", async () => {
@@ -462,7 +469,9 @@ describe("todo list", () => {
         expect(screen.queryByTestId(rowTitle(mine))).not.toBeInTheDocument()
       );
 
-      rerender(<TodoList projectId="b" />);
+      rerender(
+        <TodoList todos={todosInProject([mine, theirs], "b")} scope="project:b" />
+      );
 
       expect(await screen.findByTestId(rowTitle(theirs))).toBeInTheDocument();
     });
@@ -480,10 +489,14 @@ describe("todo list", () => {
         expect(screen.queryByTestId(rowTitle(mine))).not.toBeInTheDocument()
       );
 
-      rerender(<TodoList projectId="b" />);
+      rerender(
+        <TodoList todos={todosInProject([mine, theirs], "b")} scope="project:b" />
+      );
       await screen.findByTestId(rowTitle(theirs));
 
-      rerender(<TodoList projectId="a" />);
+      rerender(
+        <TodoList todos={todosInProject([mine, theirs], "a")} scope="project:a" />
+      );
 
       await screen.findByTestId(openToggle);
       expect(screen.queryByTestId(rowTitle(mine))).not.toBeInTheDocument();

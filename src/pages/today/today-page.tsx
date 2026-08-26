@@ -1,13 +1,22 @@
-import { Text } from "@/components/ui/text";
-import { EmptyList } from "@/pages/inbox/empty-list";
-import { TodoList } from "@/pages/inbox/list";
-import { NewInput } from "@/pages/inbox/new-input";
-import { RightRail } from "@/pages/inbox/right-rail";
-import { TodoModalRoute } from "@/pages/inbox/todo-modal-route";
+import { useMemo } from "react";
 import { Sun } from "lucide-react";
 
+import { EmptyList } from "@/pages/inbox/empty-list";
+import { todosDueOn } from "@/lib/todo-scope";
+import {
+  ListingCapture,
+  ListingContainer,
+  ListingContent,
+  ListingFilter,
+  ListingHeader,
+  ListingMain,
+  ListingModal,
+  ListingRail,
+} from "@/components/listing";
+import { useTodoList } from "@/pages/inbox/use-todo-list";
+
 /**
- * Everything due today — the same list the inbox renders, narrowed to one
+ * Everything due today — the same listing the inbox assembles, handed one
  * calendar day.
  *
  * Only *today*: overdue todos have their own view, and folding them in here
@@ -19,28 +28,34 @@ export function TodayPage() {
   // Read once per render rather than per consumer, so the list, the rail and
   // the heading cannot disagree about which day it is.
   const today = new Date();
+  const { allTodos } = useTodoList();
+
+  const todos = useMemo(
+    () => todosDueOn(allTodos, today),
+    // The day, not the instant: a new `Date` every render would rebuild this
+    // list on every keystroke elsewhere on the page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allTodos, today.toDateString()]
+  );
 
   return (
-    <div className="flex items-start gap-8">
-      <div className="min-w-0 grow">
-        <div className="mb-6">
-          <Text variant="eyebrow" className="mb-1">
-            Today
-          </Text>
-          <Text testId="today.page.title" variant="h1">
-            {longDate(today)}
-          </Text>
-        </div>
+    <ListingContainer scopeKey="today">
+      <ListingMain>
+        <ListingHeader testId="today.page.title" eyebrow="Today">
+          {longDate(today)}
+        </ListingHeader>
 
-        {/* The capture bar already defaults a new todo to today, so anything
-            added from here belongs to the page it was added on. */}
-        <div className="my-6">
-          <NewInput />
-        </div>
+        {/* Pinned rather than defaulted: capture is undated everywhere else,
+            and this page's whole promise is that what you add here is due
+            today. */}
+        <ListingCapture dueDate={today} />
 
-        <TodoList
-          dueOn={today}
-          scope="today"
+        {/* No due control: this page *is* one, and offering to widen it would
+            take the reader somewhere the heading no longer describes. */}
+        <ListingFilter hide={["due"]} />
+
+        <ListingContent
+          todos={todos}
           empty={
             <EmptyList
               testId="today.todo.empty"
@@ -50,17 +65,16 @@ export function TodayPage() {
             />
           }
         />
-      </div>
+      </ListingMain>
 
-      <RightRail dueOn={today} />
-
-      <TodoModalRoute />
-    </div>
+      <ListingRail todos={todos} />
+      <ListingModal />
+    </ListingContainer>
   );
 }
 
-/** "Monday, 10 August" — the day itself, since the eyebrow already says Today. */
-function longDate(date: Date): string {
+/** "Wednesday, 12 August" — the heading is the day, so it is spelled out. */
+function longDate(date: Date) {
   return date.toLocaleDateString(undefined, {
     weekday: "long",
     day: "numeric",

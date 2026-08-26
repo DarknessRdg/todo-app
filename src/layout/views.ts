@@ -34,7 +34,14 @@ export const views: View[] = [
   { id: "upcoming", title: "Upcoming", path: "/upcoming", icon: CalendarDays },
   { id: "overdue", title: "Overdue", path: "/overdue", icon: CalendarClock },
   { id: "completed", title: "Completed", path: "/completed", icon: CheckCircle2 },
-  { id: "labels", title: "Labels", path: "/labels", icon: Tag },
+  {
+    id: "labels",
+    title: "Labels",
+    path: "/labels",
+    icon: Tag,
+    // One label's todos live at `/label/<id>`, reached from this page.
+    owns: ["/label"],
+  },
 ];
 
 /**

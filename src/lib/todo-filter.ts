@@ -8,6 +8,11 @@ import {
 } from "date-fns";
 
 import { dayKey } from "@/lib/due-dates";
+import {
+  parsePriority,
+  priorityRank,
+  type TodoPriority,
+} from "@/lib/priority";
 
 /**
  * The list filter: what it is, how it is read off the url, and how it is
@@ -37,12 +42,15 @@ export type TodoFilter = {
   /** Only todos that still have something unchecked under them. */
   openSubtasks: boolean;
   /**
-   * Priority is *not* stored on a todo — `todo-meta.ts` derives it from the id,
-   * so there is nothing to filter on and nothing the reader could change. It is
-   * carried here, and offered in the bar, so the shape of the finished filter is
-   * visible; `applyTodoFilter` deliberately ignores it.
+   * A level, or `"unset"` for the todos nobody has ranked.
+   *
+   * `"unset"` is filter vocabulary only — the todo itself carries no such
+   * value, it simply has no priority. "What have I not triaged yet" is a real
+   * question about a real absence, and it needs a word here to be asked, but
+   * giving the model a fifth level to mean it would put a value on every row
+   * standing in for one nobody chose.
    */
-  priority?: string;
+  priority?: TodoPriority | "unset";
   /**
    * Label *ids*, matched against what a todo carries. Several means "any of
    * these": a todo carries labels rather than one label, and asking for Bug and
@@ -72,6 +80,8 @@ type FilterableTodo = {
   title: string;
   done: boolean;
   dueDate?: Date | undefined;
+  /** Absent is the untriaged case — see `TodoFilter.priority`. */
+  priority?: TodoPriority | undefined;
   subtasks: readonly { done: boolean }[];
   labelIds: readonly string[];
 };
@@ -91,9 +101,21 @@ export function parseTodoFilter(params: URLSearchParams): TodoFilter {
     labels: [...new Set(params.getAll("label"))],
   };
 
-  const priority = params.get("priority");
+  const priority = parseFilterPriority(params.get("priority"));
 
-  return { ...filter, ...(priority === null ? {} : { priority }) };
+  return { ...filter, ...(priority === undefined ? {} : { priority }) };
+}
+
+/**
+ * A level, the word for the untriaged, or nothing. An unreadable value is
+ * dropped rather than honoured, the same way `parseDue` falls back.
+ */
+function parseFilterPriority(
+  value: string | null
+): TodoPriority | "unset" | undefined {
+  if (value === "unset") return "unset";
+
+  return parsePriority(value);
 }
 
 /**
@@ -215,9 +237,22 @@ export function applyTodoFilter<T extends FilterableTodo>(
     ) {
       return false;
     }
+    if (filter.priority !== undefined && !matchesPriority(todo, filter.priority)) {
+      return false;
+    }
 
     return matchesDue(todo, filter.due, window, today);
   });
+}
+
+/** `"unset"` asks for the todos nobody has ranked; a level asks for that level. */
+function matchesPriority(
+  todo: FilterableTodo,
+  priority: TodoPriority | "unset"
+): boolean {
+  return priority === "unset"
+    ? todo.priority === undefined
+    : todo.priority === priority;
 }
 
 function matchesDue(
@@ -237,4 +272,104 @@ function matchesDue(
   if (window === undefined) return true;
 
   return todo.dueDate >= window.from && todo.dueDate <= window.to;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Sorting                                                                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * What order a list is read in.
+ *
+ * A sibling of `TodoFilter` rather than a field on it, because the two do
+ * different things: a filter *hides* todos, a sort *rearranges* them. Folding
+ * one into the other would mean `isTodoFilterActive` — which lights the Clear
+ * button and decides whether an empty list says "nothing matches" — had to
+ * learn to ignore a key, and the first place that forgot would offer to clear a
+ * filter nobody set.
+ *
+ * `manual` is the store's own order, which uuid v7 makes chronological. It is
+ * the default and writes nothing to the url, so sorting is strictly additive:
+ * a list nobody has sorted reads exactly as it always did.
+ */
+export type TodoSort = "manual" | "due" | "priority" | "title";
+
+export const defaultTodoSort: TodoSort = "manual";
+
+const sorts: TodoSort[] = ["manual", "due", "priority", "title"];
+
+/** An unreadable value falls back rather than shuffling the list. */
+export function parseTodoSort(value: string | null | undefined): TodoSort {
+  return sorts.find((sort) => sort === value) ?? defaultTodoSort;
+}
+
+/** Everything the url says about how a list is being read. */
+export type TodoListViewState = { filter: TodoFilter; sort: TodoSort };
+
+export function parseTodoListView(params: URLSearchParams): TodoListViewState {
+  return {
+    filter: parseTodoFilter(params),
+    sort: parseTodoSort(params.get("sort")),
+  };
+}
+
+/**
+ * The whole query string, filter and sort together.
+ *
+ * One owner on purpose: the hook that writes this replaces everything except
+ * `?todo=`, so a `sort` param set anywhere else would be dropped by the next
+ * keystroke in the search box.
+ */
+export function todoListViewToParams({
+  filter,
+  sort,
+}: TodoListViewState): URLSearchParams {
+  const params = todoFilterToParams(filter);
+
+  // Only what is actually set, the same rule the filter follows — an untouched
+  // view leaves the url alone.
+  if (sort !== defaultTodoSort) params.set("sort", sort);
+
+  return params;
+}
+
+type SortableTodo = {
+  title: string;
+  dueDate?: Date | undefined;
+  priority?: TodoPriority | undefined;
+};
+
+/**
+ * A sorted copy — never the array it was handed, which belongs to the caller
+ * (and, upstream of that, to the query cache).
+ *
+ * Stable, so todos that tie keep the order the store gave them, and the absent
+ * value always sorts last: an undated todo is not due in 1970, and one nobody
+ * has ranked has not been ranked bottom.
+ */
+export function sortTodos<T extends SortableTodo>(
+  todos: readonly T[],
+  sort: TodoSort
+): T[] {
+  const ordered = [...todos];
+
+  if (sort === "manual") return ordered;
+
+  return ordered.sort((a, b) => {
+    if (sort === "title") {
+      return a.title.localeCompare(b.title, undefined, {
+        sensitivity: "base",
+      });
+    }
+    if (sort === "priority") {
+      return priorityRank(a.priority) - priorityRank(b.priority);
+    }
+
+    return dueRank(a.dueDate) - dueRank(b.dueDate);
+  });
+}
+
+/** Undated sorts after every date, however far off. */
+function dueRank(dueDate: Date | undefined): number {
+  return dueDate === undefined ? Number.POSITIVE_INFINITY : dueDate.getTime();
 }

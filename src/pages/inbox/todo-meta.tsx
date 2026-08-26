@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge.tsx";
 import { cn } from "@/lib/utils.ts";
 import { testProp, type TestIdProps } from "@/lib/test-id";
+import { priorityLabel, type TodoPriority } from "@/lib/priority";
 import {
   AlertTriangle,
   CalendarIcon,
@@ -15,26 +16,15 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-/* -------------------------------------------------------------------------- */
-/* Illustrative metadata                                                       */
-/* Subtasks, the project and labels are real and stored; priority and assignee */
-/* are not — they are derived deterministically from the id so every surface   */
-/* (list, modal, page) agrees on the same made-up value.                       */
-/* -------------------------------------------------------------------------- */
-
-const PRIORITIES = ["Low", "Medium", "High", "Urgent"] as const;
-
+/**
+ * A stable number from an id, so the display ticket key below is the same one
+ * every time a todo is looked at. Priority used to be derived from this too —
+ * it is a stored field now, and `metaFor` is gone with it.
+ */
 export function hash(id: string) {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
   return h;
-}
-
-export function metaFor(id: string) {
-  const h = hash(id);
-  return {
-    priority: PRIORITIES[(h >>> 3) % PRIORITIES.length],
-  };
 }
 
 export function formatDate(date: Date) {
@@ -77,38 +67,50 @@ export function StatusBadge({ done }: { done: boolean }) {
 }
 
 // Monochrome escalation — darkness carries the weight, icons carry the meaning.
-const PRIORITY_STYLES: Record<string, string> = {
-  Low: "bg-foreground/[0.06] text-muted-foreground",
-  Medium: "bg-foreground/[0.09] text-foreground",
-  High: "bg-foreground/[0.16] text-foreground",
-  Urgent: "bg-foreground text-background",
+const PRIORITY_STYLES: Record<TodoPriority, string> = {
+  low: "bg-foreground/[0.06] text-muted-foreground",
+  medium: "bg-foreground/[0.09] text-foreground",
+  high: "bg-foreground/[0.16] text-foreground",
+  urgent: "bg-foreground text-background",
 };
 
-const PRIORITY_ICONS: Record<string, LucideIcon> = {
-  Low: SignalLow,
-  Medium: SignalMedium,
-  High: SignalHigh,
-  Urgent: AlertTriangle,
+const PRIORITY_ICONS: Record<TodoPriority, LucideIcon> = {
+  low: SignalLow,
+  medium: SignalMedium,
+  high: SignalHigh,
+  urgent: AlertTriangle,
 };
 
+/**
+ * How urgent a todo is, when anyone has said.
+ *
+ * Nothing at all when nobody has. An untriaged todo is the ordinary case, and a
+ * badge on every row saying so would be a badge that carries no information —
+ * it would also drown the rows that *are* ranked, which is the whole point of
+ * the escalation.
+ */
 export function PriorityBadge({
   priority,
   className,
-}: {
-  priority: string;
+  testId,
+}: TestIdProps & {
+  priority: TodoPriority | undefined;
   className?: string;
 }) {
-  const Icon = PRIORITY_ICONS[priority] ?? SignalHigh;
+  if (priority === undefined) return null;
+
+  const Icon = PRIORITY_ICONS[priority];
 
   return (
     <Badge
+      {...testProp(testId)}
       className={cn(
         "gap-1.5 border-transparent font-normal",
         PRIORITY_STYLES[priority],
         className
       )}>
       <Icon className="size-3.5" />
-      {priority}
+      {priorityLabel[priority]}
     </Badge>
   );
 }

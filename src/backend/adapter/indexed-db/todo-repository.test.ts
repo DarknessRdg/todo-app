@@ -153,6 +153,38 @@ describe("TodoRepositoryIndexedDB", () => {
     });
   });
 
+  describe("when I set a todo's priority", () => {
+    it("Then the stored todo carries it", async () => {
+      const todo = makeTodo({ priority: undefined });
+      const repository = await repositoryWith([todo]);
+
+      await repository.updatePriority({ id: todo.id, priority: "urgent" });
+
+      const stored = await repository.getById(todo.id);
+      expect(stored?.priority).toBe("urgent");
+    });
+
+    it("Then clearing it takes the level away rather than storing one", async () => {
+      const todo = makeTodo({ priority: "high" });
+      const repository = await repositoryWith([todo]);
+
+      await repository.updatePriority({ id: todo.id, priority: undefined });
+
+      const stored = await repository.getById(todo.id);
+      expect(stored?.priority).toBeUndefined();
+    });
+
+    it("Then the rest of the todo is left untouched", async () => {
+      const todo = makeTodo({ priority: undefined, done: true });
+      const repository = await repositoryWith([todo]);
+
+      await repository.updatePriority({ id: todo.id, priority: "low" });
+
+      const stored = await repository.getById(todo.id);
+      expect(stored).toEqual({ ...todo, priority: "low" });
+    });
+  });
+
   describe("when I move a todo to a project", () => {
     it("Then the stored todo carries that project", async () => {
       const todo = makeTodo({ projectId: undefined });

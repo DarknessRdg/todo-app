@@ -80,4 +80,63 @@ describe("ProjectRepositoryIndexedDB", () => {
       expect(await repository.findByName("Nothing here")).toBeUndefined();
     });
   });
+
+  describe("when I rename a project", () => {
+    it("Then the stored project carries the new name", async () => {
+      const garden = makeProject({ name: "Garden" });
+      const repository = await repositoryWith([garden]);
+
+      await repository.rename({ id: garden.id, name: "Allotment" });
+
+      expect((await repository.listAll())[0].name).toBe("Allotment");
+    });
+
+    it("Then one that is no longer there is left alone rather than recreated", async () => {
+      const repository = await repositoryWith();
+
+      await repository.rename({ id: "gone", name: "Ghost" });
+
+      expect(await repository.listAll()).toEqual([]);
+    });
+  });
+
+  describe("when I file a project under another", () => {
+    it("Then it reads back under its new parent", async () => {
+      const work = makeProject({ name: "Work" });
+      const stray = makeProject({ name: "Stray" });
+      const repository = await repositoryWith([work, stray]);
+
+      await repository.move({ id: stray.id, parentId: work.id });
+
+      const stored = (await repository.listAll()).find(
+        (project) => project.id === stray.id
+      );
+      expect(stored?.parentId).toBe(work.id);
+    });
+
+    it("Then taking it back to the top level leaves it with no parent", async () => {
+      const work = makeProject({ name: "Work" });
+      const child = makeProject({ name: "Child", parentId: work.id });
+      const repository = await repositoryWith([work, child]);
+
+      await repository.move({ id: child.id, parentId: undefined });
+
+      const stored = (await repository.listAll()).find(
+        (project) => project.id === child.id
+      );
+      expect(stored?.parentId).toBeUndefined();
+    });
+  });
+
+  describe("when I delete a project", () => {
+    it("Then it is gone from the list", async () => {
+      const garden = makeProject({ name: "Garden" });
+      const work = makeProject({ name: "Work" });
+      const repository = await repositoryWith([garden, work]);
+
+      await repository.delete(garden.id);
+
+      expect((await repository.listAll()).map((it) => it.id)).toEqual([work.id]);
+    });
+  });
 });

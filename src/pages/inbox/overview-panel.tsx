@@ -5,7 +5,7 @@ import { WeekStartsOn } from "@/lib/todo-filter";
 import { cn } from "@/lib/utils";
 import { testProp, type TestIdProps } from "@/lib/test-id";
 import { Progress } from "@/components/ui/progress";
-import { useTodoList } from "@/pages/inbox/use-todo-list";
+import type { TodoEntity } from "@/backend/todo-service";
 import { CheckCircle2, Circle, CalendarClock } from "lucide-react";
 
 function isSameDay(a: Date, b: Date) {
@@ -17,14 +17,17 @@ function isSameDay(a: Date, b: Date) {
 }
 
 export function OverviewPanel({
-  projectId,
-  dueOn,
+  todos,
   highlight,
   selectedDay,
   onSelectDay,
 }: {
-  projectId?: string;
-  dueOn?: Date;
+  /**
+   * The todos the page beside this is about — *before* the reader's filter.
+   * The panel summarises the view the page is titled after, and a number that
+   * moved when you typed in the search box would be a summary of nothing.
+   */
+  todos: TodoEntity[] | undefined;
   /** The days the list is filtered to, drawn behind the dates. */
   highlight?: { from: Date; to: Date };
   selectedDay?: Date;
@@ -35,7 +38,9 @@ export function OverviewPanel({
    */
   onSelectDay?: (day: Date | undefined) => void;
 }) {
-  const { todoList, doneList, count } = useTodoList({ projectId, dueOn });
+  const todoList = todos?.filter((todo) => !todo.done);
+  const doneList = todos?.filter((todo) => todo.done);
+  const count = todos?.length ?? 0;
 
   const doneCount = doneList?.length ?? 0;
   const openCount = count - doneCount;

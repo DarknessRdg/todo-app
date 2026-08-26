@@ -12,7 +12,6 @@ import {
   PriorityBadge,
   StatusBadge,
   formatDate,
-  metaFor,
   shortId,
 } from "@/pages/inbox/todo-meta.tsx";
 import {
@@ -31,6 +30,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ConfettiBurst } from "@/components/confetti-burst";
 import { InlineEdit } from "@/components/inline-edit";
 import { ProjectSelect } from "@/components/project-select";
+import { PrioritySelect } from "@/components/priority-select";
 import { TodoProjectBadge } from "@/pages/inbox/todo-project-badge";
 import { useTodoProjectName } from "@/pages/inbox/use-todo-project";
 import { Timing } from "@/lib/timing";
@@ -94,7 +94,6 @@ export function TodoDetailTopBar({
 
 /** The todo itself: its checkbox, its name, and what it is at a glance. */
 export function TodoDetailHeading({ todo }: { todo: TodoEntity }) {
-  const meta = metaFor(todo.id);
 
   return (
     <div className="flex flex-col gap-4">
@@ -107,7 +106,10 @@ export function TodoDetailHeading({ todo }: { todo: TodoEntity }) {
 
       <div className="flex flex-wrap items-center gap-2">
         <StatusBadge done={todo.done} />
-        <PriorityBadge priority={meta.priority} />
+        <PriorityBadge
+          priority={todo.priority}
+          testId="todo.detail.priority.badge"
+        />
         {todo.dueDate ? <DueBadge date={todo.dueDate} /> : null}
         <TodoProjectBadge projectId={todo.projectId} />
       </div>
@@ -459,8 +461,6 @@ function PropertiesPanel({
   todo: TodoEntity;
   panes?: boolean;
 }) {
-  const meta = metaFor(todo.id);
-
   return (
     <aside
       className={cn(
@@ -481,7 +481,7 @@ function PropertiesPanel({
       </PropertyRow>
 
       <PropertyRow icon={<SignalHigh className="size-3.5" />} label="Priority">
-        <PriorityBadge priority={meta.priority} />
+        <TodoPriorityPicker todo={todo} />
       </PropertyRow>
 
       <PropertyRow icon={<FolderIcon className="size-3.5" />} label="Project">
@@ -683,6 +683,27 @@ function DueDatePicker({ todo }: { todo: TodoEntity }) {
 }
 
 /** Moves the todo between projects, from the properties panel. */
+/**
+ * How urgent this todo is, from the properties panel.
+ *
+ * Same treatment as the project picker below, and for the same reason: this
+ * panel is rendered inside the todo modal as well as on the todo's own page,
+ * and a popper that has not been told about the dialog is inert there.
+ */
+function TodoPriorityPicker({ todo }: { todo: TodoEntity }) {
+  const { updatePriority } = useTodoUpdate();
+
+  return (
+    <PrioritySelect
+      testId="todo.detail.priority"
+      value={todo.priority}
+      onChange={(priority) => updatePriority.mutate({ id: todo.id, priority })}
+      align="end"
+      className="-mr-2 h-7"
+    />
+  );
+}
+
 function TodoProjectPicker({ todo }: { todo: TodoEntity }) {
   const { updateProject } = useTodoUpdate();
 

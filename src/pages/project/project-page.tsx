@@ -1,25 +1,40 @@
+import { useMemo } from "react";
 import { useParams } from "react-router";
 
-import { Text } from "@/components/ui/text";
 import { Skeleton } from "@/components/ui/skeleton";
 import { testProp } from "@/lib/test-id";
 import { NotFound } from "@/pages/not-found/not-found";
-import { TodoList } from "@/pages/inbox/list";
-import { NewInput } from "@/pages/inbox/new-input";
-import { RightRail } from "@/pages/inbox/right-rail";
-import { TodoModalRoute } from "@/pages/inbox/todo-modal-route";
+import { todosInProject } from "@/lib/todo-scope";
+import {
+  ListingCapture,
+  ListingContainer,
+  ListingContent,
+  ListingFilter,
+  ListingHeader,
+  ListingMain,
+  ListingModal,
+  ListingRail,
+} from "@/components/listing";
 import { useProjects } from "@/pages/inbox/use-projects";
+import { useTodoList } from "@/pages/inbox/use-todo-list";
 
 /**
- * One project's todos. The same list the inbox renders, narrowed — and the
- * same capture bar, pre-filed into this project so adding from here does not
- * mean choosing it again every time.
+ * One project's todos. The same listing every other view assembles, handed a
+ * narrower set — and the same capture bar, pre-filed into this project so
+ * adding from here does not mean choosing it again every time.
+ *
+ * Its own todos only, never a sub-project's: the tree is for filing, and a
+ * parent that quietly showed everything underneath would make "which project
+ * is this in" unanswerable from the list.
  */
 export function ProjectPage() {
   // `:id` never matches an empty segment, so by the time this renders the id
   // is always there — `/project` falls through to the catch-all route.
   const { id = "" } = useParams();
   const { projects, isLoading } = useProjects();
+  const { allTodos } = useTodoList();
+
+  const todos = useMemo(() => todosInProject(allTodos, id), [allTodos, id]);
 
   if (isLoading) {
     return (
@@ -41,27 +56,19 @@ export function ProjectPage() {
   if (project === undefined) return <NotFound />;
 
   return (
-    <div className="flex items-start gap-8">
-      <div className="min-w-0 grow">
-        <div className="mb-6">
-          <Text variant="eyebrow" className="mb-1">
-            Project
-          </Text>
-          <Text testId="project.page.title" variant="h1">
-            {project.name}
-          </Text>
-        </div>
+    <ListingContainer scopeKey={`project:${project.id}`}>
+      <ListingMain>
+        <ListingHeader testId="project.page.title" eyebrow="Project">
+          {project.name}
+        </ListingHeader>
 
-        <div className="my-6">
-          <NewInput projectId={project.id} />
-        </div>
+        <ListingCapture projectId={project.id} />
+        <ListingFilter />
+        <ListingContent todos={todos} />
+      </ListingMain>
 
-        <TodoList projectId={project.id} />
-      </div>
-
-      <RightRail projectId={project.id} />
-
-      <TodoModalRoute />
-    </div>
+      <ListingRail todos={todos} />
+      <ListingModal />
+    </ListingContainer>
   );
 }

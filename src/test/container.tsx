@@ -51,6 +51,9 @@ export function mockTodoRepository(
     updateDueDate: vi
       .fn<TodoRepository["updateDueDate"]>()
       .mockResolvedValue(undefined),
+    updatePriority: vi
+      .fn<TodoRepository["updatePriority"]>()
+      .mockResolvedValue(undefined),
     updateDescription: vi
       .fn<TodoRepository["updateDescription"]>()
       .mockResolvedValue(undefined),
@@ -59,6 +62,9 @@ export function mockTodoRepository(
       .mockResolvedValue(undefined),
     removeLabelEverywhere: vi
       .fn<TodoRepository["removeLabelEverywhere"]>()
+      .mockResolvedValue(undefined),
+    clearProjectEverywhere: vi
+      .fn<TodoRepository["clearProjectEverywhere"]>()
       .mockResolvedValue(undefined),
     count: vi.fn<TodoRepository["count"]>().mockResolvedValue(0),
     getById: vi.fn<TodoRepository["getById"]>().mockResolvedValue(undefined),
@@ -135,6 +141,12 @@ export function inMemoryTodoRepository(
         if (row) row.dueDate = dueDate;
       }
     ),
+    updatePriority: vi.fn<TodoRepository["updatePriority"]>(
+      async ({ id, priority }) => {
+        const row = find(id);
+        if (row) row.priority = priority;
+      }
+    ),
     updateTitle: vi.fn<TodoRepository["updateTitle"]>(async ({ id, title }) => {
       const row = find(id);
       if (row) row.title = title;
@@ -155,6 +167,13 @@ export function inMemoryTodoRepository(
       async (labelId) => {
         for (const row of rows) {
           row.labelIds = row.labelIds.filter((it) => it !== labelId);
+        }
+      }
+    ),
+    clearProjectEverywhere: vi.fn<TodoRepository["clearProjectEverywhere"]>(
+      async (projectId) => {
+        for (const row of rows) {
+          if (row.projectId === projectId) row.projectId = undefined;
         }
       }
     ),
@@ -197,6 +216,9 @@ export function mockProjectRepository(
     findByName: vi
       .fn<ProjectRepository["findByName"]>()
       .mockResolvedValue(undefined),
+    rename: vi.fn<ProjectRepository["rename"]>().mockResolvedValue(undefined),
+    move: vi.fn<ProjectRepository["move"]>().mockResolvedValue(undefined),
+    delete: vi.fn<ProjectRepository["delete"]>().mockResolvedValue(undefined),
     ...overrides,
   };
 }
@@ -220,6 +242,18 @@ export function inMemoryProjectRepository(
     findByName: vi.fn<ProjectRepository["findByName"]>(async (name) => {
       const wanted = name.trim().toLocaleLowerCase();
       return rows.find((row) => row.name.toLocaleLowerCase() === wanted);
+    }),
+    rename: vi.fn<ProjectRepository["rename"]>(async ({ id, name }) => {
+      const row = rows.find((it) => it.id === id);
+      if (row) row.name = name;
+    }),
+    move: vi.fn<ProjectRepository["move"]>(async ({ id, parentId }) => {
+      const row = rows.find((it) => it.id === id);
+      if (row) row.parentId = parentId;
+    }),
+    delete: vi.fn<ProjectRepository["delete"]>(async (id) => {
+      const index = rows.findIndex((it) => it.id === id);
+      if (index >= 0) rows.splice(index, 1);
     }),
   });
 }
