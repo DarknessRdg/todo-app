@@ -394,24 +394,94 @@ describe("inbox filter bar", () => {
     });
   });
 
-  describe("when I pick a priority, which no todo actually carries", () => {
-    it("Then it is remembered in the url, and the list is left alone", async () => {
+  describe("when I change the sort", () => {
+    it("Then the url carries it", async () => {
       const user = setupUser();
-      const one = makeTodo({ done: false });
-      const two = makeTodo({ done: false });
-      const { currentLocation } = renderInbox([one, two]);
+      const todo = makeTodo({ done: false });
+      const { currentLocation } = renderInbox([todo]);
 
-      await waitFor(() => expect(isListed(one)).toBe(true));
-      await user.click(screen.getByTestId("home.filter.priority.menu"));
+      await waitFor(() => expect(isListed(todo)).toBe(true));
+      await user.click(screen.getByTestId("home.filter.sort.menu"));
+      await user.click(await screen.findByTestId("home.filter.sort.due.button"));
+
+      await waitFor(() => expect(currentLocation()).toContain("sort=due"));
+    });
+
+    /**
+     * Sorting hides nothing, so it must not put the list into the state that
+     * offers to clear filters nobody set.
+     */
+    it("Then the filters do not start claiming to be set", async () => {
+      const user = setupUser();
+      const todo = makeTodo({ done: false });
+      renderInbox([todo]);
+
+      await waitFor(() => expect(isListed(todo)).toBe(true));
+      await user.click(screen.getByTestId("home.filter.sort.menu"));
       await user.click(
-        await screen.findByTestId("home.filter.priority.urgent.button")
+        await screen.findByTestId("home.filter.sort.title.button")
       );
 
       await waitFor(() =>
-        expect(currentLocation()).toContain("priority=Urgent")
+        expect(screen.getByTestId("home.filter.sort.menu")).toHaveTextContent(
+          "Title"
+        )
       );
-      expect(isListed(one)).toBe(true);
-      expect(isListed(two)).toBe(true);
+      expect(
+        screen.queryByTestId("home.filter.clear.button")
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when I pick a priority", () => {
+    /** An urgent todo and an unranked one, so both halves are visible. */
+    const ranked = () => [
+      makeTodo({ done: false, priority: "urgent" }),
+      makeTodo({ done: false, priority: undefined }),
+    ];
+
+    async function pick(user: User, level: string, todos: TodoEntity[]) {
+      const rendered = renderInbox(todos);
+
+      await waitFor(() => expect(isListed(todos[0])).toBe(true));
+      await user.click(screen.getByTestId("home.filter.priority.menu"));
+      await user.click(
+        await screen.findByTestId(`home.filter.priority.${level}.button`)
+      );
+
+      return rendered;
+    }
+
+    it("Then it is remembered in the url", async () => {
+      const user = setupUser();
+      const todos = ranked();
+      const { currentLocation } = await pick(user, "urgent", todos);
+
+      await waitFor(() =>
+        expect(currentLocation()).toContain("priority=urgent")
+      );
+    });
+
+    it("Then only todos carrying that level stay in the list", async () => {
+      const user = setupUser();
+      const [urgent, untriaged] = ranked();
+      await pick(user, "urgent", [urgent, untriaged]);
+
+      await waitFor(() => expect(isListed(untriaged)).toBe(false));
+      expect(isListed(urgent)).toBe(true);
+    });
+
+    /**
+     * The one question that can only be asked of an absence — see
+     * `TodoFilter.priority`. There is no "none" level on the todo itself.
+     */
+    it("Then asking for none leaves the todos nobody has ranked", async () => {
+      const user = setupUser();
+      const [urgent, untriaged] = ranked();
+      await pick(user, "unset", [urgent, untriaged]);
+
+      await waitFor(() => expect(isListed(urgent)).toBe(false));
+      expect(isListed(untriaged)).toBe(true);
     });
   });
 });

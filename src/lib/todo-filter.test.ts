@@ -7,6 +7,11 @@ import {
   isTodoFilterActive,
   parseTodoFilter,
   todoFilterToParams,
+  parseTodoSort,
+  parseTodoListView,
+  todoListViewToParams,
+  sortTodos,
+  defaultTodoSort,
   type TodoFilter,
 } from "@/lib/todo-filter";
 
@@ -21,6 +26,7 @@ const todo = (overrides: Partial<Filterable> = {}): Filterable => ({
   title: "Write the thing",
   done: false,
   dueDate: undefined,
+  priority: undefined,
   subtasks: [],
   labelIds: [],
   ...overrides,
@@ -64,11 +70,25 @@ describe("parseTodoFilter", () => {
     expect(parse("due=someday").due).toEqual({ kind: "any" });
   });
 
-  it("when the url carries the fields that are not stored yet, Then they are still read back", () => {
-    expect(parse("priority=High&label=Bug")).toMatchObject({
-      priority: "High",
+  it("when the url carries a priority and a label, Then both are read back", () => {
+    expect(parse("priority=high&label=Bug")).toMatchObject({
+      priority: "high",
       labels: ["Bug"],
     });
+  });
+
+  it("when the url asks for the untriaged, Then that is read back too", () => {
+    expect(parse("priority=unset").priority).toBe("unset");
+  });
+
+  /**
+   * Levels are stored lowercase, so the url carries them lowercase. A value
+   * wearing its display spelling names no level, and is dropped rather than
+   * honoured — the same fallback `due` gets.
+   */
+  it("when the url names no level we know, Then the priority is dropped", () => {
+    expect(parse("priority=High").priority).toBeUndefined();
+    expect(parse("priority=critical").priority).toBeUndefined();
   });
 
   it("when the url names several labels, Then all of them are asked for", () => {
@@ -94,7 +114,7 @@ describe("todoFilterToParams", () => {
       hideDone: true,
       due: { kind: "day", day: "2026-08-12" },
       openSubtasks: true,
-      priority: "Urgent",
+      priority: "urgent",
       labels: ["Bug", "UX"],
     });
 
@@ -113,8 +133,8 @@ describe("isTodoFilterActive", () => {
     expect(isTodoFilterActive(emptyTodoFilter)).toBe(false);
   });
 
-  it("when only the inert fields are set, Then it still counts as active, so it can be cleared", () => {
-    expect(isTodoFilterActive(filter({ priority: "Low" }))).toBe(true);
+  it("when only a priority or a label is set, Then it counts as active, so it can be cleared", () => {
+    expect(isTodoFilterActive(filter({ priority: "low" }))).toBe(true);
     expect(isTodoFilterActive(filter({ labels: ["Bug"] }))).toBe(true);
   });
 
@@ -333,12 +353,34 @@ describe("applyTodoFilter", () => {
     expect(result[0].dueDate).toEqual(at(12));
   });
 
-  it("when only the priority is set, which is not stored, Then nothing is filtered out", () => {
-    const todos = [todo({ title: "a" }), todo({ title: "b" })];
+  describe("when I filter by priority", () => {
+    const urgent = todo({ title: "urgent", priority: "urgent" });
+    const low = todo({ title: "low", priority: "low" });
+    const untriaged = todo({ title: "untriaged", priority: undefined });
+    const todos = [urgent, low, untriaged];
 
-    expect(
-      applyTodoFilter(todos, filter({ priority: "Urgent" }), today)
-    ).toEqual(todos);
+    it("Then only todos carrying that level are kept", () => {
+      expect(applyTodoFilter(todos, filter({ priority: "urgent" }), today)).toEqual([
+        urgent,
+      ]);
+    });
+
+    /**
+     * `"unset"` is the filter's word for an absence, not a fifth level — see
+     * `TodoFilter.priority`. It is the only way to ask what has not been
+     * triaged, which is the question a ranked list makes worth asking.
+     */
+    it("Then asking for none keeps the todos nobody has ranked", () => {
+      expect(applyTodoFilter(todos, filter({ priority: "unset" }), today)).toEqual([
+        untriaged,
+      ]);
+    });
+
+    it("Then an unranked todo is left out of a level's list", () => {
+      expect(
+        applyTodoFilter(todos, filter({ priority: "low" }), today)
+      ).not.toContain(untriaged);
+    });
   });
 
   describe("when I filter by label", () => {
@@ -367,5 +409,139 @@ describe("applyTodoFilter", () => {
         applyTodoFilter(todos, filter({ labels: ["bug-id"] }), today)
       ).not.toContain(bare);
     });
+  });
+});
+
+describe("parseTodoSort", () => {
+  it("when the url names a sort, Then it is read back", () => {
+    expect(parseTodoSort("due")).toBe("due");
+  });
+
+  /** A hand-edited url shows a plain list, never an empty or shuffled one. */
+  it("when the url names a sort that does not exist, Then the default stands", () => {
+    expect(parseTodoSort("whenever")).toBe(defaultTodoSort);
+  });
+
+  it("when the url says nothing, Then the default stands", () => {
+    expect(parseTodoSort(null)).toBe(defaultTodoSort);
+  });
+});
+
+describe("todoListViewToParams", () => {
+  const roundTrip = (filter: TodoFilter, sort: Parameters<typeof sortTodos>[1]) =>
+    parseTodoListView(todoListViewToParams({ filter, sort }));
+
+  /**
+   * The whole query string has one owner: the hook that writes it replaces
+   * everything but `?todo=`, so a sort written outside this function would be
+   * dropped by the next keystroke in the search box.
+   */
+  it("when a filter and a sort are both set, Then both survive the url", () => {
+    const value = filter({ query: "docs" });
+
+    expect(roundTrip(value, "priority")).toEqual({
+      filter: value,
+      sort: "priority",
+    });
+  });
+
+  it("when the sort is the default, Then it writes nothing to the url", () => {
+    expect(
+      todoListViewToParams({ filter: emptyTodoFilter, sort: defaultTodoSort })
+        .toString()
+    ).toBe("");
+  });
+
+  /**
+   * Sorting hides nothing, so it must not light up the Clear button or the
+   * "nothing matches" empty state — both of which read `isTodoFilterActive`.
+   */
+  it("when only the sort is set, Then the filter does not read as active", () => {
+    const { filter: parsed } = roundTrip(emptyTodoFilter, "title");
+
+    expect(isTodoFilterActive(parsed)).toBe(false);
+  });
+});
+
+describe("sortTodos", () => {
+  const sortable = (overrides: Partial<Filterable> & { createdAt?: Date } = {}) =>
+    ({ ...todo(), createdAt: at(1), ...overrides }) as Filterable & {
+      createdAt: Date;
+    };
+
+  it("when I do not choose a sort, Then the order the store gave is left alone", () => {
+    const todos = [
+      sortable({ title: "b", dueDate: at(1) }),
+      sortable({ title: "a", dueDate: at(2) }),
+    ];
+
+    expect(titles(sortTodos(todos, "manual"))).toEqual(["b", "a"]);
+  });
+
+  it("when I sort, Then the list I was given is not rearranged under me", () => {
+    const todos = [sortable({ title: "b" }), sortable({ title: "a" })];
+
+    sortTodos(todos, "title");
+
+    expect(titles(todos)).toEqual(["b", "a"]);
+  });
+
+  describe("when I sort by due date", () => {
+    it("Then the soonest comes first", () => {
+      const todos = [
+        sortable({ title: "later", dueDate: at(20) }),
+        sortable({ title: "sooner", dueDate: at(2) }),
+      ];
+
+      expect(titles(sortTodos(todos, "due"))).toEqual(["sooner", "later"]);
+    });
+
+    /** An undated todo is not due in 1970; it is not due at all. */
+    it("Then an undated todo goes last", () => {
+      const todos = [
+        sortable({ title: "undated", dueDate: undefined }),
+        sortable({ title: "dated", dueDate: at(20) }),
+      ];
+
+      expect(titles(sortTodos(todos, "due"))).toEqual(["dated", "undated"]);
+    });
+
+    it("Then todos sharing a date keep the order they arrived in", () => {
+      const todos = [
+        sortable({ title: "second", dueDate: at(5) }),
+        sortable({ title: "first", dueDate: at(5) }),
+      ];
+
+      expect(titles(sortTodos(todos, "due"))).toEqual(["second", "first"]);
+    });
+  });
+
+  describe("when I sort by priority", () => {
+    it("Then urgent comes first", () => {
+      const todos = [
+        sortable({ title: "low", priority: "low" }),
+        sortable({ title: "urgent", priority: "urgent" }),
+      ];
+
+      expect(titles(sortTodos(todos, "priority"))).toEqual(["urgent", "low"]);
+    });
+
+    it("Then a todo nobody ranked goes last", () => {
+      const todos = [
+        sortable({ title: "unranked", priority: undefined }),
+        sortable({ title: "low", priority: "low" }),
+      ];
+
+      expect(titles(sortTodos(todos, "priority"))).toEqual(["low", "unranked"]);
+    });
+  });
+
+  it("when I sort by title, Then it is alphabetical whatever the case", () => {
+    const todos = [
+      sortable({ title: "banana" }),
+      sortable({ title: "Apple" }),
+    ];
+
+    expect(titles(sortTodos(todos, "title"))).toEqual(["Apple", "banana"]);
   });
 });

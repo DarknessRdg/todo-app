@@ -3,7 +3,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -19,17 +18,25 @@ import { Text } from "@/components/ui/text";
 import { Toggle } from "@/components/ui/toggle";
 import { testProp } from "@/lib/test-id";
 import {
+  defaultTodoSort,
   emptyTodoFilter,
   isTodoFilterActive,
   type DueFilter,
   type TodoFilter,
+  type TodoSort,
 } from "@/lib/todo-filter";
 import { cn } from "@/lib/utils";
 import { formatDateShort } from "@/pages/inbox/todo-meta";
 import { useLabels } from "@/pages/inbox/use-labels";
+import {
+  TodoPriorities,
+  priorityLabel,
+  type TodoPriority,
+} from "@/lib/priority";
 import type { LabelEntity } from "@/backend/label-service";
 import { dayFromKey } from "@/lib/todo-filter";
 import {
+  ArrowUpDown,
   CalendarRange,
   ChevronDown,
   ListChecks,
@@ -58,16 +65,19 @@ const dueOptions: { id: string; label: string; due: DueFilter }[] = [
 ];
 
 /**
- * Priority is not stored on a todo — `todo-meta.ts` makes it up from the id.
- * This menu is the finished shape of that filter waiting for the data: it
- * selects, it shows in the url, and it narrows nothing. It says so where the
- * reader can see it, because a control that silently does nothing is worse
- * than one that is missing. (Labels used to be in the same boat and are now
- * real, which is what that menu should look like once priority follows.)
+ * Most urgent first, and then the todos nobody has ranked.
+ *
+ * `"unset"` is not a level — see `TodoFilter.priority`. It is here because
+ * "what have I not triaged yet" is one of the more useful things to ask a list,
+ * and it can only be asked of an absence.
  */
-const priorityOptions = ["Low", "Medium", "High", "Urgent"];
-
-const NotStoredYet = "Preview — not stored yet";
+const priorityOptions: { id: TodoPriority | "unset"; label: string }[] = [
+  ...[...TodoPriorities].reverse().map((priority) => ({
+    id: priority,
+    label: priorityLabel[priority],
+  })),
+  { id: "unset", label: "None" },
+];
 
 /* -------------------------------------------------------------------------- */
 
@@ -89,11 +99,24 @@ const NotStoredYet = "Preview — not stored yet";
 export function FilterBar({
   filter,
   onChange,
+  sort,
+  onSortChange,
+  hide = [],
 }: {
   filter: TodoFilter;
   onChange: (filter: TodoFilter) => void;
+  sort: TodoSort;
+  onSortChange: (sort: TodoSort) => void;
+  /**
+   * Controls the page has already decided, and the reader cannot. `/overdue` is
+   * a due filter, so offering a due menu there would be offering to widen a
+   * page past what it is — a control that either does nothing or takes you
+   * somewhere the heading no longer describes.
+   */
+  hide?: FilterControl[];
 }) {
   const set = (patch: Partial<TodoFilter>) => onChange({ ...filter, ...patch });
+  const shows = (control: FilterControl) => !hide.includes(control);
 
   return (
     <div
@@ -111,37 +134,42 @@ export function FilterBar({
         />
       </div>
 
-      <DueMenu filter={filter} onChange={onChange} />
+      {shows("due") && <DueMenu filter={filter} onChange={onChange} />}
 
-      <PickMenu
-        testId="home.filter.priority"
-        label="Priority"
-        icon={<SignalHigh className="size-3.5" />}
-        options={priorityOptions}
-        value={filter.priority}
-        note={NotStoredYet}
-        onPick={(priority) => set({ priority })}
-      />
+      {shows("priority") && (
+        <PriorityMenu
+          value={filter.priority}
+          onPick={(priority) => set({ priority })}
+        />
+      )}
 
-      <LabelPicker
-        selected={filter.labels}
-        onChange={(labels) => set({ labels })}
-      />
+      <SortMenu value={sort} onPick={onSortChange} />
 
-      <FilterToggle
-        testId="home.filter.done.toggle"
-        label="Hide done"
-        pressed={filter.hideDone}
-        onPressedChange={(hideDone) => set({ hideDone })}
-      />
+      {shows("labels") && (
+        <LabelPicker
+          selected={filter.labels}
+          onChange={(labels) => set({ labels })}
+        />
+      )}
 
-      <FilterToggle
-        testId="home.filter.subtasks.toggle"
-        label="Open subtasks"
-        icon={<ListChecks className="size-3.5" />}
-        pressed={filter.openSubtasks}
-        onPressedChange={(openSubtasks) => set({ openSubtasks })}
-      />
+      {shows("done") && (
+        <FilterToggle
+          testId="home.filter.done.toggle"
+          label="Hide done"
+          pressed={filter.hideDone}
+          onPressedChange={(hideDone) => set({ hideDone })}
+        />
+      )}
+
+      {shows("subtasks") && (
+        <FilterToggle
+          testId="home.filter.subtasks.toggle"
+          label="Open subtasks"
+          icon={<ListChecks className="size-3.5" />}
+          pressed={filter.openSubtasks}
+          onPressedChange={(openSubtasks) => set({ openSubtasks })}
+        />
+      )}
 
       {isTodoFilterActive(filter) && (
         <Button
@@ -337,46 +365,88 @@ function labelTriggerText(selected: string[], labels: LabelEntity[]): string {
 }
 
 /** One of the two menus over data the app does not store yet. */
-function PickMenu({
-  testId,
-  label,
-  icon,
-  options,
+/**
+ * Sorting sits in the same bar as the filters and the same query string, but it
+ * is not one of them: it never hides a todo, so it deliberately does not count
+ * towards `isTodoFilterActive` and the Clear button leaves it alone. Clearing a
+ * filter you set is one thing; being put back in an order you did not choose is
+ * another.
+ */
+/** The controls a page can take off the bar because it has already decided. */
+export type FilterControl = "due" | "priority" | "labels" | "done" | "subtasks";
+
+const sortOptions: { id: TodoSort; label: string }[] = [
+  { id: "manual", label: "Default order" },
+  { id: "due", label: "Due date" },
+  { id: "priority", label: "Priority" },
+  { id: "title", label: "Title" },
+];
+
+function SortMenu({
   value,
-  note,
   onPick,
 }: {
-  testId: string;
-  label: string;
-  icon: React.ReactNode;
-  options: string[];
-  value: string | undefined;
-  note: string;
-  onPick: (value: string | undefined) => void;
+  value: TodoSort;
+  onPick: (sort: TodoSort) => void;
 }) {
+  const chosen = sortOptions.find((option) => option.id === value);
+
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
-        <FilterTrigger testId={`${testId}.menu`} active={value !== undefined}>
-          {icon}
-          {value ?? label}
+        <FilterTrigger
+          testId="home.filter.sort.menu"
+          active={value !== defaultTodoSort}>
+          <ArrowUpDown className="size-3.5" />
+          {value === defaultTodoSort ? "Sort" : chosen?.label}
           <ChevronDown className="size-3 opacity-50" />
         </FilterTrigger>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="start" className="min-w-44">
-        <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
-          {note}
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-
-        {options.map((option) => (
+        {sortOptions.map((option) => (
           <DropdownMenuItem
-            key={option}
-            testId={`${testId}.${option.toLowerCase()}.button`}
-            onSelect={() => onPick(option)}
-            className={cn(option === value && "bg-accent")}>
-            {option}
+            key={option.id}
+            testId={`home.filter.sort.${option.id}.button`}
+            onSelect={() => onPick(option.id)}
+            className={cn(option.id === value && "bg-accent")}>
+            {option.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+const testId = "home.filter.priority";
+
+function PriorityMenu({
+  value,
+  onPick,
+}: {
+  value: TodoPriority | "unset" | undefined;
+  onPick: (value: TodoPriority | "unset" | undefined) => void;
+}) {
+  const chosen = priorityOptions.find((option) => option.id === value);
+
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <FilterTrigger testId={`${testId}.menu`} active={value !== undefined}>
+          <SignalHigh className="size-3.5" />
+          {chosen?.label ?? "Priority"}
+          <ChevronDown className="size-3 opacity-50" />
+        </FilterTrigger>
+      </DropdownMenuTrigger>
+
+      <DropdownMenuContent align="start" className="min-w-44">
+        {priorityOptions.map((option) => (
+          <DropdownMenuItem
+            key={option.id}
+            testId={`${testId}.${option.id}.button`}
+            onSelect={() => onPick(option.id)}
+            className={cn(option.id === value && "bg-accent")}>
+            {option.label}
           </DropdownMenuItem>
         ))}
 
@@ -386,7 +456,7 @@ function PickMenu({
             <DropdownMenuItem
               testId={`${testId}.any.button`}
               onSelect={() => onPick(undefined)}>
-              Any {label.toLowerCase()}
+              Any priority
             </DropdownMenuItem>
           </>
         )}
