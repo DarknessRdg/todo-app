@@ -329,7 +329,9 @@ function TodoItem({ todo }: { todo: TodoEntity }) {
           />
           <TodoProjectBadge projectId={todo.projectId} />
           <LabelChips labels={todoLabels} max={2} />
-          {todo.dueDate ? <DueBadge date={todo.dueDate} /> : null}
+          {todo.dueDate ? (
+            <DueBadge date={todo.dueDate} done={todo.done} />
+          ) : null}
           {subtasks.length > 0 ? (
             <SubtaskIndicator
               testId={`home.todo.${todo.id}.subtask.count`}

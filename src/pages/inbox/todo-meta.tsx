@@ -2,12 +2,15 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { cn } from "@/lib/utils.ts";
 import { testProp, type TestIdProps } from "@/lib/test-id";
 import { priorityLabel, type TodoPriority } from "@/lib/priority";
+import { dueState, type DueState } from "@/lib/due-dates";
+import { tintFill, type Tint } from "@/lib/tint";
 import {
   type AppIcon,
   DoneStatusIcon,
   DueDateIcon,
   LabelIcon,
   OpenStatusIcon,
+  OverdueIcon,
   PriorityHighIcon,
   PriorityLowIcon,
   PriorityMediumIcon,
@@ -52,7 +55,8 @@ export function shortId(id: string) {
 
 export function StatusBadge({ done }: { done: boolean }) {
   return done ? (
-    <Badge className="bg-accent text-accent-foreground gap-1.5 border-transparent font-normal">
+    <Badge
+      className={cn("gap-1.5 border-transparent font-normal", tintFill.green)}>
       <DoneStatusIcon className="size-3.5" />
       Done
     </Badge>
@@ -66,12 +70,13 @@ export function StatusBadge({ done }: { done: boolean }) {
   );
 }
 
-// Monochrome escalation — darkness carries the weight, icons carry the meaning.
-const PRIORITY_STYLES: Record<TodoPriority, string> = {
-  low: "bg-foreground/[0.06] text-muted-foreground",
-  medium: "bg-foreground/[0.09] text-foreground",
-  high: "bg-foreground/[0.16] text-foreground",
-  urgent: "bg-foreground text-background",
+// Escalation by hue, cool to hot, with the icon carrying the same meaning
+// for anyone who cannot tell the colours apart.
+const PRIORITY_TINTS: Record<TodoPriority, Tint> = {
+  low: "gray",
+  medium: "blue",
+  high: "orange",
+  urgent: "red",
 };
 
 const PRIORITY_ICONS: Record<TodoPriority, AppIcon> = {
@@ -106,7 +111,7 @@ export function PriorityBadge({
       {...testProp(testId)}
       className={cn(
         "gap-1.5 border-transparent font-normal",
-        PRIORITY_STYLES[priority],
+        tintFill[PRIORITY_TINTS[priority]],
         className
       )}>
       <Icon className="size-3.5" />
@@ -130,16 +135,51 @@ export function ProjectBadge({
   );
 }
 
+/**
+ * Overdue and today are the two dates that ask for something, so they are the
+ * two that get a colour; a date further out stays quiet. The state is also
+ * spoken, not only drawn: colour is not the only way it is said.
+ */
+const DUE_TINTS: Record<DueState, Tint | undefined> = {
+  overdue: "red",
+  today: "orange",
+  upcoming: undefined,
+  settled: undefined,
+};
+
+const DUE_SPOKEN: Record<DueState, string | undefined> = {
+  overdue: "Overdue",
+  today: "Due today",
+  upcoming: undefined,
+  settled: undefined,
+};
+
 export function DueBadge({
   date,
+  done = false,
   className,
 }: {
   date: Date;
+  /** A done todo's date is history, never overdue. */
+  done?: boolean;
   className?: string;
 }) {
+  const state = dueState({ dueDate: date, done }, new Date());
+  const tint = DUE_TINTS[state];
+  const Icon = state === "overdue" ? OverdueIcon : DueDateIcon;
+
   return (
-    <Badge variant="secondary" className={cn("gap-1.5 font-normal", className)}>
-      <DueDateIcon className="size-3.5" />
+    <Badge
+      variant={tint ? "default" : "secondary"}
+      className={cn(
+        "gap-1.5 font-normal",
+        tint && ["border-transparent", tintFill[tint]],
+        className
+      )}>
+      <Icon className="size-3.5" />
+      {DUE_SPOKEN[state] ? (
+        <span className="sr-only">{DUE_SPOKEN[state]}, </span>
+      ) : null}
       {formatDateShort(date)}
     </Badge>
   );

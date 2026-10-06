@@ -111,7 +111,9 @@ export function TodoDetailHeading({ todo }: { todo: TodoEntity }) {
           priority={todo.priority}
           testId="todo.detail.priority.badge"
         />
-        {todo.dueDate ? <DueBadge date={todo.dueDate} /> : null}
+        {todo.dueDate ? (
+          <DueBadge date={todo.dueDate} done={todo.done} />
+        ) : null}
         <TodoProjectBadge projectId={todo.projectId} />
       </div>
     </div>

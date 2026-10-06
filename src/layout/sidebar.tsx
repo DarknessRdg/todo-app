@@ -18,6 +18,7 @@ import { SidebarProjects } from "@/layout/sidebar-projects";
 import { views, viewIsActive } from "@/layout/views";
 import { useTodoList } from "@/pages/inbox/use-todo-list";
 import { SettingsIcon } from "@/icons";
+import { tintText } from "@/lib/tint";
 import { Link, useLocation } from "react-router";
 
 export function AppSidebar({ className }: { className?: string } = {}) {
@@ -69,7 +70,9 @@ export function AppSidebar({ className }: { className?: string } = {}) {
                         to={view.path}
                         aria-current={active ? "page" : undefined}
                         {...testProp(`sidebar.view.${view.id}.link`)}>
-                        <view.icon className="size-4.5" />
+                        <view.icon
+                          className={cn("size-4.5", tintText[view.tint])}
+                        />
                         <span>{view.title}</span>
                         {count > 0 ? (
                           <span
