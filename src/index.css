@@ -18,7 +18,7 @@
   --secondary-foreground: #1f1f1f;
   --muted: #f1f0ec;
   --muted-foreground: #6b6a65; /* warm mid gray, AA on canvas and on cards */
-  --accent: #f6f7ed; /* Sage — the single tint (hero panel, highlights) */
+  --accent: #eef1f4; /* cool gray: the stats panel, selected and hover states */
   --accent-foreground: #1f1f1f;
   --destructive: #d64545;
   --destructive-foreground: #ffffff;
@@ -53,7 +53,7 @@
   --border: #ebeae6; /* soft divider */
   --input: #8c8a83; /* control hairline: 3:1 on a card, the non-text minimum */
   --ring: #1f1f1f; /* ink focus */
-  --card-hover: #edeee1; /* sage-tinted hover — warm, never cool */
+  --card-hover: #eceef1; /* cool gray hover: a step off the card, no hue */
   /* Scrollbars. A rail is chrome, not content: it sits a step above the
        divider hairline so it can be found, and only reaches ink-adjacent grey
        while it is under the pointer. Tune here — every scroll area reads it. */
@@ -131,7 +131,7 @@
   --secondary-foreground: #f4f4f4;
   --muted: #2a2a29;
   --muted-foreground: #9b9a97;
-  --accent: #262a20; /* dark sage: the accent keeps its hue in the dark */
+  --accent: #23272c; /* cool slate: the stats panel and selected states */
   --accent-foreground: #f4f4f4;
   --destructive: #e5675f;
   --destructive-foreground: #ffffff;
@@ -156,7 +156,7 @@
   --border: #2f2f2e;
   --input: #706f6b; /* control hairline: 3:1 on a card */
   --ring: #f4f4f4;
-  --card-hover: #23251d; /* sage-tinted hover, warm, never cool */
+  --card-hover: #26292e; /* cool slate hover, a step up from the card */
   /* Dark: the same two steps, inverted — a light rail on the near-black
        canvas would be brighter than the text it scrolls. */
   --scrollbar-thumb: #363634;
