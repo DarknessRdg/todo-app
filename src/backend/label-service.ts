@@ -1,12 +1,20 @@
 import { uuidV7 } from "@/lib/uuid";
 import { zodAsValidator } from "@/lib/validator";
 import type { IValidator } from "@/validators/validators";
+import { Tints, type Tint } from "@/lib/tint";
 import * as z from "zod";
 
 const labelZodScheme = z.object({
   id: z.string().nonempty({ error: "label-id-required" }),
   name: z.string().trim().nonempty({ error: "label-name-required" }),
+  /**
+   * The tint the label wears wherever it appears. Optional because labels
+   * made before colours existed have none; they read as gray.
+   */
+  colour: z.enum(Tints, { error: "label-colour-invalid" }).optional(),
 });
+
+const colourZodScheme = z.enum(Tints);
 
 export type LabelEntity = z.infer<typeof labelZodScheme>;
 
@@ -14,6 +22,7 @@ export interface LabelRepository {
   listAll(): Promise<LabelEntity[]>;
   create(label: LabelEntity): Promise<void>;
   rename(params: { id: string; name: string }): Promise<void>;
+  recolour(params: { id: string; colour: Tint }): Promise<void>;
   delete(id: string): Promise<void>;
   findByName(name: string): Promise<LabelEntity | undefined>;
 }
@@ -83,6 +92,21 @@ export class LabelService {
     if (existing !== undefined && existing.id !== params.id) return false;
 
     await this.repository.rename({ id: params.id, name });
+
+    return true;
+  };
+
+  /**
+   * Gives a label a colour from the palette, reporting whether it took.
+   *
+   * Checked here rather than trusted from the picker: the colour is stored on
+   * the label and read back as a class name, and one outside the palette
+   * would be a label drawn in no colour at all.
+   */
+  recolour = async (params: { id: string; colour: Tint }): Promise<boolean> => {
+    if (!colourZodScheme.safeParse(params.colour).success) return false;
+
+    await this.repository.recolour(params);
 
     return true;
   };

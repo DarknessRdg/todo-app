@@ -246,8 +246,8 @@ function TodoItem({ todo }: { todo: TodoEntity }) {
   // Resolved by id, so a renamed label reads its new name here without the row
   // being rewritten, and a deleted one simply stops appearing.
   const todoLabels = todo.labelIds
-    .map((id) => labels.find((label) => label.id === id)?.name)
-    .filter((name): name is string => name !== undefined);
+    .map((id) => labels.find((label) => label.id === id))
+    .filter((label) => label !== undefined);
   const subtasks = todo.subtasks;
   const subDone = subtasks.filter((s) => s.done).length;
 

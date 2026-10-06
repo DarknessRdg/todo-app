@@ -174,6 +174,43 @@ describe("labels page", () => {
     });
   });
 
+  describe("when I recolour a label", () => {
+    const openColours = async (user: User, label: LabelEntity) =>
+      user.click(
+        await screen.findByTestId(`labels.page.${label.id}.colour.button`)
+      );
+
+    it("Then the colour I picked is stored", async () => {
+      const user = setupUser();
+      const label = makeLabel({ colour: "gray" });
+      const { labelRepository } = renderPage([label]);
+
+      await openColours(user, label);
+      await user.click(
+        await screen.findByTestId(`labels.page.${label.id}.colour.green`)
+      );
+
+      await waitFor(() =>
+        expect(labelRepository.recolour).toHaveBeenCalledWith({
+          id: label.id,
+          colour: "green",
+        })
+      );
+    });
+
+    it("Then the colour it wears now is the one marked as chosen", async () => {
+      const user = setupUser();
+      const label = makeLabel({ colour: "pink" });
+      renderPage([label]);
+
+      await openColours(user, label);
+
+      expect(
+        await screen.findByTestId(`labels.page.${label.id}.colour.pink`)
+      ).toHaveAttribute("aria-checked", "true");
+    });
+  });
+
   describe("when I delete a label", () => {
     it("Then it asks before anything is destroyed", async () => {
       const user = setupUser();

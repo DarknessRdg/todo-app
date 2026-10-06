@@ -1,4 +1,5 @@
 import type { LabelService } from "@/backend/label-service";
+import type { Tint } from "@/lib/tint";
 import type { TodoService } from "@/backend/todo-service";
 import { toast } from "@/components/ui/sonner";
 import { Dependencies } from "@/di-container";
@@ -37,6 +38,24 @@ export function useLabelCreate() {
       queryClient.invalidateQueries({ queryKey: [QueryLabelKey] });
     },
     onError: reportAs("creating"),
+  });
+}
+
+/**
+ * Recolouring touches only the label list: chips read their colour from the
+ * label, by id, so no todo has to be written or refetched.
+ */
+export function useLabelRecolour() {
+  const labelService = useLabelService();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params: { id: string; colour: Tint }) =>
+      labelService.recolour(params),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [QueryLabelKey] });
+    },
+    onError: reportAs("recolouring"),
   });
 }
 

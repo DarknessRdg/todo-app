@@ -28,6 +28,7 @@ import {
   useProjectCreate,
   useProjectDelete,
   useProjectMove,
+  useProjectRecolour,
   useProjectRename,
   useProjects,
 } from "@/pages/inbox/use-projects";
@@ -51,6 +52,7 @@ export function SidebarProjects() {
   const create = useProjectCreate();
   const rename = useProjectRename();
   const move = useProjectMove();
+  const recolour = useProjectRecolour();
   const remove = useProjectDelete();
 
   /** Which project a new child is being named under — `TopLevel` for none. */
@@ -195,6 +197,7 @@ export function SidebarProjects() {
                     setRenaming(project.id);
                   },
                   onMove: (params) => move.mutate(params),
+                  onRecolour: (params) => recolour.mutate(params),
                   onDelete: setDeleting,
                 }}
               />

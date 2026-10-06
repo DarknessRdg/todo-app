@@ -122,13 +122,22 @@ export function PriorityBadge({
 
 export function ProjectBadge({
   project,
+  colour,
   className,
 }: {
   project: string;
+  /** Absent on projects made before colours, which read as plain chips. */
+  colour?: Tint;
   className?: string;
 }) {
   return (
-    <Badge variant="secondary" className={cn("gap-1.5 font-normal", className)}>
+    <Badge
+      variant="secondary"
+      className={cn(
+        "gap-1.5 font-normal",
+        colour && ["border-transparent", tintFill[colour]],
+        className
+      )}>
       <ProjectIcon className="size-3.5" />
       {project}
     </Badge>
@@ -190,7 +199,8 @@ export function LabelChips({
   max = 3,
   className,
 }: {
-  labels: string[];
+  /** In display order; a label with no colour reads as a plain chip. */
+  labels: { id: string; name: string; colour?: Tint }[];
   max?: number;
   className?: string;
 }) {
@@ -200,9 +210,15 @@ export function LabelChips({
   return (
     <div className={cn("flex flex-wrap items-center gap-1", className)}>
       {shown.map((label) => (
-        <Badge key={label} variant="secondary" className="gap-1.5 font-normal">
+        <Badge
+          key={label.id}
+          variant="secondary"
+          className={cn(
+            "gap-1.5 font-normal",
+            label.colour && ["border-transparent", tintFill[label.colour]]
+          )}>
           <LabelIcon className="size-3.5" />
-          {label}
+          {label.name}
         </Badge>
       ))}
       {extra > 0 ? (

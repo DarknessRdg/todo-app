@@ -10,9 +10,14 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui";
+import { tintName } from "@/components/colour-picker";
+import { Tints, tintSwatch, type Tint } from "@/lib/tint";
+import { cn } from "@/lib/utils";
 import type { ProjectEntity } from "@/backend/project-service";
 import { canMoveProject } from "@/lib/project-tree";
 import { testProp } from "@/lib/test-id";
@@ -31,12 +36,14 @@ export function ProjectRowMenu({
   projects,
   onRename,
   onMove,
+  onRecolour,
   onDelete,
 }: {
   project: ProjectEntity;
   projects: readonly ProjectEntity[];
   onRename: () => void;
   onMove: (parentId: string | undefined) => void;
+  onRecolour: (colour: Tint) => void;
   onDelete: () => void;
 }) {
   const testId = `sidebar.project.${project.id}`;
@@ -70,6 +77,34 @@ export function ProjectRowMenu({
           <RenameIcon />
           Rename
         </DropdownMenuItem>
+
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
+          Colour
+        </DropdownMenuLabel>
+        {/*
+          Swatches as radio items in a grid: still menu items, so the arrow
+          keys walk them like any other row, and the one the project wears is
+          announced as checked.
+        */}
+        <DropdownMenuRadioGroup
+          value={project.colour ?? "gray"}
+          onValueChange={(value) => onRecolour(value as Tint)}
+          className="grid grid-cols-9 gap-1 px-2 pb-1.5">
+          {Tints.map((tint) => (
+            <DropdownMenuPrimitive.RadioItem
+              key={tint}
+              value={tint}
+              aria-label={tintName[tint]}
+              title={tintName[tint]}
+              {...testProp(`${testId}.colour.${tint}.button`)}
+              className={cn(
+                "ring-offset-popover data-[highlighted]:ring-ring size-4 cursor-pointer rounded-full outline-none data-[highlighted]:ring-2 data-[highlighted]:ring-offset-1 data-[state=checked]:ring-2 data-[state=checked]:ring-foreground data-[state=checked]:ring-offset-2",
+                tintSwatch[tint]
+              )}
+            />
+          ))}
+        </DropdownMenuRadioGroup>
 
         {/*
           Flat rather than a submenu. A nested Radix menu is one more thing to

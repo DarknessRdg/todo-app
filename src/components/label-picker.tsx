@@ -1,4 +1,5 @@
 import { AddIcon, CheckmarkIcon, LabelIcon, RemoveIcon } from "@/icons";
+import { tintFill, tintText } from "@/lib/tint";
 import { useState } from "react";
 
 import type { LabelEntity } from "@/backend/label-service";
@@ -69,7 +70,10 @@ export function LabelPicker({
         <Badge
           key={label.id}
           variant="secondary"
-          className="gap-1 pr-1 font-normal">
+          className={cn(
+            "gap-1 pr-1 font-normal",
+            label.colour && ["border-transparent", tintFill[label.colour]]
+          )}>
           <LabelIcon className="size-3" />
           {label.name}
           <button
@@ -77,7 +81,7 @@ export function LabelPicker({
             aria-label={`Remove ${label.name}`}
             {...testProp(`${testId}.${label.id}.remove.button`)}
             onClick={() => toggle(label.id)}
-            className="text-muted-foreground hover:text-foreground rounded-full">
+            className="rounded-full opacity-70 hover:opacity-100">
             <RemoveIcon className="size-3" />
           </button>
         </Badge>
@@ -127,7 +131,12 @@ export function LabelPicker({
                     "hover:bg-accent flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm",
                     checked && "bg-accent"
                   )}>
-                  <LabelIcon className="text-muted-foreground size-3.5 shrink-0" />
+                  <LabelIcon
+                    className={cn(
+                      "size-3.5 shrink-0",
+                      tintText[label.colour ?? "gray"]
+                    )}
+                  />
                   <span className="truncate">{label.name}</span>
                   {checked && (
                     <CheckmarkIcon className="ml-auto size-3.5 shrink-0" />

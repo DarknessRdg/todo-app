@@ -1,4 +1,5 @@
 import { Tables, type AppIDB } from "@/backend/adapter/indexed-db/indexed-db";
+import type { Tint } from "@/lib/tint";
 import type {
   ProjectEntity,
   ProjectRepository,
@@ -35,6 +36,10 @@ export class ProjectRepositoryIndexedDB implements ProjectRepository {
     parentId: string | undefined;
   }) => {
     await this.write(id, (project) => ({ ...project, parentId }));
+  };
+
+  recolour = async ({ id, colour }: { id: string; colour: Tint }) => {
+    await this.write(id, (project) => ({ ...project, colour }));
   };
 
   delete = async (id: string) => {

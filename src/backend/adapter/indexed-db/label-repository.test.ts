@@ -76,6 +76,36 @@ describe("LabelRepositoryIndexedDB", () => {
     });
   });
 
+  describe("when I recolour a label", () => {
+    it("Then the stored label carries the new colour", async () => {
+      const { labels } = await openRepositories();
+      const label = makeLabel({ colour: "gray" });
+      await labels.create(label);
+
+      await labels.recolour({ id: label.id, colour: "green" });
+
+      expect((await labels.listAll())[0].colour).toBe("green");
+    });
+
+    it("Then its name is left as it was", async () => {
+      const { labels } = await openRepositories();
+      const label = makeLabel({ name: "Frontend" });
+      await labels.create(label);
+
+      await labels.recolour({ id: label.id, colour: "green" });
+
+      expect((await labels.listAll())[0].name).toBe("Frontend");
+    });
+
+    it("Then recolouring one that is not there creates nothing", async () => {
+      const { labels } = await openRepositories();
+
+      await labels.recolour({ id: makeLabel().id, colour: "green" });
+
+      expect(await labels.listAll()).toEqual([]);
+    });
+  });
+
   it("when I delete a label, Then it is gone from the store", async () => {
     const { labels } = await openRepositories();
     const label = makeLabel();

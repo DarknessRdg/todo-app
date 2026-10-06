@@ -1,5 +1,5 @@
 import { ProjectBadge } from "@/pages/inbox/todo-meta";
-import { useTodoProjectName } from "@/pages/inbox/use-todo-project";
+import { useTodoProject } from "@/pages/inbox/use-todo-project";
 
 /**
  * A todo's project badge, resolved from the stored project list.
@@ -14,9 +14,15 @@ export function TodoProjectBadge({
   projectId: string | undefined;
   className?: string;
 }) {
-  const name = useTodoProjectName(projectId);
+  const project = useTodoProject(projectId);
 
-  if (name === undefined) return null;
+  if (project === undefined) return null;
 
-  return <ProjectBadge project={name} className={className} />;
+  return (
+    <ProjectBadge
+      project={project.name}
+      colour={project.colour}
+      className={className}
+    />
+  );
 }

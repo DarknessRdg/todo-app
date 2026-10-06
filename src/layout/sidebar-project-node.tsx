@@ -1,4 +1,5 @@
 import { AddIcon, DisclosureIcon, ProjectIcon } from "@/icons";
+import { tintText, type Tint } from "@/lib/tint";
 import { Link } from "react-router";
 
 import type { ProjectEntity } from "@/backend/project-service";
@@ -17,6 +18,7 @@ export type ProjectNodeActions = {
   onAddChild: (parentId: string) => void;
   onRename: (project: ProjectEntity) => void;
   onMove: (params: { id: string; parentId: string | undefined }) => void;
+  onRecolour: (params: { id: string; colour: Tint }) => void;
   onDelete: (project: ProjectEntity) => void;
 };
 
@@ -97,7 +99,12 @@ export function SidebarProjectNode({
                 />
               </button>
             ) : (
-              <ProjectIcon className="text-muted-foreground/70 size-3.5 shrink-0" />
+              <ProjectIcon
+                className={cn(
+                  "size-3.5 shrink-0",
+                  tintText[node.colour ?? "gray"]
+                )}
+              />
             )}
 
             <span className="truncate">{node.name}</span>
@@ -133,6 +140,7 @@ export function SidebarProjectNode({
             projects={projects}
             onRename={() => actions.onRename(node)}
             onMove={(parentId) => actions.onMove({ id: node.id, parentId })}
+            onRecolour={(colour) => actions.onRecolour({ id: node.id, colour })}
             onDelete={() => actions.onDelete(node)}
           />
         </div>

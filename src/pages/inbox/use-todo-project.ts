@@ -6,9 +6,14 @@ import { useProjects } from "@/pages/inbox/use-projects";
  * rename reaches every todo at once.
  */
 export function useTodoProjectName(projectId: string | undefined) {
+  return useTodoProject(projectId)?.name;
+}
+
+/** The whole project a todo belongs to: its name and the colour it wears. */
+export function useTodoProject(projectId: string | undefined) {
   const { projects } = useProjects();
 
   if (projectId === undefined) return undefined;
 
-  return projects.find((project) => project.id === projectId)?.name;
+  return projects.find((project) => project.id === projectId);
 }
