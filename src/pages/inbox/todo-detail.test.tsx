@@ -37,6 +37,7 @@ const dueToday = "todo.detail.duedate.today";
 const projectOption = (id: string) => `todo.detail.project.option.${id}`;
 const readView = "todo.detail.description.read";
 const readOnlyToggle = "todo.detail.description.readonly.toggle";
+const copyButton = "todo.detail.description.copy.button";
 const editor = "todo.detail.description.editor";
 const saving = "todo.detail.description.saving";
 const saved = "todo.detail.description.saved";
@@ -870,6 +871,37 @@ describe("todo detail", () => {
 
       expect(readSetting("defaultTodoView")).toBe("write");
     });
+  });
+
+  describe("when I copy the description", () => {
+    it("Then its markdown is on the clipboard", async () => {
+      const user = setupUser();
+      const description =
+        "# Plan\n\n- **first** step\n- [a link](https://example.com)";
+      renderDetail(makeTodo({ description }));
+
+      await user.click(await screen.findByTestId(copyButton));
+
+      expect(await navigator.clipboard.readText()).toBe(description);
+    });
+
+    it("Then it works while reading as well as editing", async () => {
+      const user = setupUser();
+      renderDetail(makeTodo({ description: "the old notes" }));
+
+      await user.click(await screen.findByTestId(readOnlyToggle));
+      await user.click(screen.getByTestId(copyButton));
+
+      expect(await navigator.clipboard.readText()).toBe("the old notes");
+    });
+  });
+
+  it("when a todo has no description, Then there is nothing to copy", async () => {
+    renderDetail(makeTodo({ description: undefined }));
+
+    await screen.findByTestId(readView);
+
+    expect(screen.queryByTestId(copyButton)).not.toBeInTheDocument();
   });
 
   describe("when descriptions are set to open ready to read", () => {

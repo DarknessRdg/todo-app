@@ -19,6 +19,7 @@ import {
   CalendarIcon,
   Check,
   CircleDot,
+  Copy,
   FolderIcon,
   PencilLine,
   Plus,
@@ -58,6 +59,7 @@ import { testProp } from "@/lib/test-id";
 import { useTodoDetails } from "@/pages/inbox/use-todo-details.ts";
 import { TodoLookupFailed } from "@/components/todo-lookup-failed";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 
 /* -------------------------------------------------------------------------- */
 /* Header                                                                      */
@@ -94,7 +96,6 @@ export function TodoDetailTopBar({
 
 /** The todo itself: its checkbox, its name, and what it is at a glance. */
 export function TodoDetailHeading({ todo }: { todo: TodoEntity }) {
-
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-start gap-3">
@@ -847,6 +848,7 @@ function Description({ todo }: { todo: TodoEntity }) {
             description doing", and split apart they read as unrelated. */}
         <div className="flex items-center gap-2">
           <SaveState mutation={updateDescription} />
+          <CopyDescription description={todo.description} />
 
           {/*
             The button says which mode the description is *in*, not which one
@@ -891,6 +893,50 @@ function Description({ todo }: { todo: TodoEntity }) {
         updateDescription={updateDescription}
       />
     </section>
+  );
+}
+
+/**
+ * Puts the description on the clipboard as Markdown — the stored spelling, so
+ * what lands in a README or an issue is exactly what was saved, not whatever
+ * the browser makes of the rendered html.
+ *
+ * It copies what was *saved*: mid-edit, the unsaved writing is not the
+ * description yet. Nothing to copy, no button.
+ */
+function CopyDescription({ description }: { description?: string }) {
+  if (!description?.trim()) return null;
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(description);
+      toast.success("Copied as Markdown");
+    } catch {
+      toast.error("Could not copy", {
+        description: "The browser did not allow access to the clipboard.",
+      });
+    }
+  };
+
+  return (
+    <TooltipText
+      testId="todo.detail.description.copy.tooltip"
+      text="Copy as Markdown"
+      asChild>
+      <Button
+        testId="todo.detail.description.copy.button"
+        type="button"
+        variant="ghost"
+        size="sm"
+        aria-label="Copy as Markdown"
+        // Keeps the caret in the editor when copying mid-edit, so the click is
+        // not read as leaving it.
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={copy}
+        className="text-muted-foreground h-7 rounded-full px-2 [&_svg]:size-3.5">
+        <Copy />
+      </Button>
+    </TooltipText>
   );
 }
 
