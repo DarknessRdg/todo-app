@@ -15,7 +15,9 @@ import { toast } from "@/components/ui/sonner";
 import { Text } from "@/components/ui/text";
 import { useTodoCreate } from "@/pages/inbox/use-todo-create";
 import { DropdownIcon, DueDateIcon, SubmitIcon } from "@/icons";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { ScreenConfetti } from "@/components/screen-confetti";
+import { Timing } from "@/lib/timing";
 import { projectForCapture } from "@/lib/todo-capture";
 
 /**
@@ -40,6 +42,25 @@ export function NewInput({
 } = {}) {
   const { create, validateField } = useTodoCreate();
 
+  // The reward for a capture. Keyed so a second todo fires a fresh volley
+  // instead of finding the first one still falling and doing nothing.
+  const [volley, setVolley] = useState(0);
+  const [celebrating, setCelebrating] = useState(false);
+  const celebration = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined
+  );
+  useEffect(() => () => clearTimeout(celebration.current), []);
+
+  const celebrate = () => {
+    setVolley((n) => n + 1);
+    setCelebrating(true);
+    clearTimeout(celebration.current);
+    celebration.current = setTimeout(
+      () => setCelebrating(false),
+      Timing.celebrationVisibleMs
+    );
+  };
+
   const form = useAppForm({
     defaultValues: {
       title: "",
@@ -57,6 +78,7 @@ export function NewInput({
         projectId: projectForCapture(projectId, value.projectId),
       });
       toast.success("Captured", { description: value.title });
+      celebrate();
       formApi.reset();
     },
   });
@@ -161,6 +183,9 @@ export function NewInput({
           className="text-destructive mt-2 px-1 text-sm">
           {form.state.errors}
         </Text>
+      )}
+      {celebrating && (
+        <ScreenConfetti key={volley} testId="celebration.confetti" />
       )}
     </form.AppForm>
   );

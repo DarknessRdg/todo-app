@@ -26,6 +26,8 @@ const Defaults = {
   savedVisibleMs: 2400,
   /** How long a todo that was just added takes to settle into the list. */
   rowEnterMs: 260,
+  /** How long the screen confetti for a capture stays mounted. */
+  celebrationVisibleMs: 2400,
 } as const;
 
 /**
@@ -60,6 +62,12 @@ export const Timing = {
     return readDelay(
       import.meta.env.VITE_SAVED_VISIBLE_MS,
       Defaults.savedVisibleMs
+    );
+  },
+  get celebrationVisibleMs() {
+    return readDelay(
+      import.meta.env.VITE_CELEBRATION_VISIBLE_MS,
+      Defaults.celebrationVisibleMs
     );
   },
   get rowEnterMs() {

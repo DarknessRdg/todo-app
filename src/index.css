@@ -372,6 +372,17 @@
     animation: saved-notice ease forwards;
   }
 
+  /* Screen confetti, on capture: fired up from a bottom corner to a peak,
+     then drifting down past it. Ease-out on the way up and ease-in on the
+     way down is what reads as thrown paper rather than a sliding square. */
+  .celebration-piece {
+    opacity: 0;
+    animation-name: celebration-fly;
+    animation-fill-mode: forwards;
+    animation-timing-function: linear;
+    will-change: transform, opacity;
+  }
+
   /* Confetti particle — flies out from the checkbox on completion */
   .confetti-piece {
     animation: confetti-fly 1.3s cubic-bezier(0.2, 0.6, 0.3, 1) forwards;
@@ -400,6 +411,27 @@
   }
   100% {
     transform: translate(var(--tx), var(--ty)) scale(0.5) rotate(var(--rot));
+    opacity: 0;
+  }
+}
+
+@keyframes celebration-fly {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 1;
+    animation-timing-function: cubic-bezier(0.15, 0.7, 0.35, 1);
+  }
+  40% {
+    transform: translate(var(--peak-x), var(--peak-y))
+      rotate(calc(var(--rot) * 0.4));
+    opacity: 1;
+    animation-timing-function: cubic-bezier(0.45, 0, 0.8, 0.6);
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--end-x), var(--end-y)) rotate(var(--rot));
     opacity: 0;
   }
 }
