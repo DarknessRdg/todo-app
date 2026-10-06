@@ -24,6 +24,12 @@ const Defaults = {
    * spot, short enough that it does not become part of the furniture.
    */
   savedVisibleMs: 2400,
+  /** How long a todo that was just added takes to settle into the list. */
+  rowEnterMs: 260,
+  /** How long the screen confetti for a capture stays mounted. */
+  celebrationVisibleMs: 2400,
+  /** How long a captured todo takes to drop from the bar into its place. */
+  captureFlightMs: 520,
 } as const;
 
 /**
@@ -59,5 +65,20 @@ export const Timing = {
       import.meta.env.VITE_SAVED_VISIBLE_MS,
       Defaults.savedVisibleMs
     );
+  },
+  get celebrationVisibleMs() {
+    return readDelay(
+      import.meta.env.VITE_CELEBRATION_VISIBLE_MS,
+      Defaults.celebrationVisibleMs
+    );
+  },
+  get captureFlightMs() {
+    return readDelay(
+      import.meta.env.VITE_CAPTURE_FLIGHT_MS,
+      Defaults.captureFlightMs
+    );
+  },
+  get rowEnterMs() {
+    return readDelay(import.meta.env.VITE_ROW_ENTER_MS, Defaults.rowEnterMs);
   },
 };

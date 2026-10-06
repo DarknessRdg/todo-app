@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { AddIcon } from "@/icons";
 import { useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router";
 
@@ -28,6 +28,7 @@ import {
   useProjectCreate,
   useProjectDelete,
   useProjectMove,
+  useProjectRecolour,
   useProjectRename,
   useProjects,
 } from "@/pages/inbox/use-projects";
@@ -51,6 +52,7 @@ export function SidebarProjects() {
   const create = useProjectCreate();
   const rename = useProjectRename();
   const move = useProjectMove();
+  const recolour = useProjectRecolour();
   const remove = useProjectDelete();
 
   /** Which project a new child is being named under — `TopLevel` for none. */
@@ -161,7 +163,7 @@ export function SidebarProjects() {
           onClick={() => startAdding(TopLevel)}
           {...testProp("sidebar.project.create.button")}
           className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex size-5 items-center justify-center rounded-md transition-colors">
-          <Plus className="size-3.5" />
+          <AddIcon className="size-3.5" />
         </button>
       </SidebarGroupLabel>
 
@@ -195,6 +197,7 @@ export function SidebarProjects() {
                     setRenaming(project.id);
                   },
                   onMove: (params) => move.mutate(params),
+                  onRecolour: (params) => recolour.mutate(params),
                   onDelete: setDeleting,
                 }}
               />

@@ -285,6 +285,39 @@ describe("sidebar projects", () => {
     });
   });
 
+  describe("when I recolour a project", () => {
+    const swatch = (id: string, tint: string) =>
+      `sidebar.project.${id}.colour.${tint}.button`;
+
+    it("Then the colour I picked is stored", async () => {
+      const user = setupUser();
+      const work = makeProject({ colour: "gray" });
+      const { projectRepository } = renderProjects({ projects: [work] });
+
+      await user.click(await screen.findByTestId(rowMenu(work.id)));
+      await user.click(await screen.findByTestId(swatch(work.id, "blue")));
+
+      await waitFor(() =>
+        expect(projectRepository.recolour).toHaveBeenCalledWith({
+          id: work.id,
+          colour: "blue",
+        })
+      );
+    });
+
+    it("Then the colour it wears now is the one marked as chosen", async () => {
+      const user = setupUser();
+      const work = makeProject({ colour: "purple" });
+      renderProjects({ projects: [work] });
+
+      await user.click(await screen.findByTestId(rowMenu(work.id)));
+
+      expect(
+        await screen.findByTestId(swatch(work.id, "purple"))
+      ).toHaveAttribute("aria-checked", "true");
+    });
+  });
+
   describe("when I move a project", () => {
     it("Then it is filed under the one I chose", async () => {
       const user = setupUser();

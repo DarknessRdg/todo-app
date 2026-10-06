@@ -15,7 +15,7 @@ import { toast } from "@/components/ui/sonner";
 import { TooltipText } from "@/components/ui/tooltip";
 import { Text } from "@/components/ui/text";
 import { useTodoDelete } from "@/pages/inbox/use-todo-delete";
-import { Trash2Icon } from "lucide-react";
+import { DeleteIcon } from "@/icons";
 
 export function DeleteButton({ title, id }: { title: string; id: string }) {
   const { deleteTodoAsync, isPending } = useTodoDelete();
@@ -27,8 +27,8 @@ export function DeleteButton({ title, id }: { title: string; id: string }) {
     });
   };
 
-  const DeleteIcon = () =>
-    isPending ? <Spinner variant="circle" /> : <Trash2Icon />;
+  const TriggerIcon = () =>
+    isPending ? <Spinner variant="circle" /> : <DeleteIcon />;
 
   return (
     <AlertDialog>
@@ -39,7 +39,7 @@ export function DeleteButton({ title, id }: { title: string; id: string }) {
             variant="ghost"
             size="icon"
             className="text-destructive hover:text-destructive">
-            <DeleteIcon />
+            <TriggerIcon />
           </Button>
         </AlertDialogTrigger>
       </TooltipText>

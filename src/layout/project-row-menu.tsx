@@ -1,13 +1,23 @@
-import { FolderInput, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import {
+  DeleteIcon,
+  MoreActionsIcon,
+  MoveToProjectIcon,
+  RenameIcon,
+} from "@/icons";
 
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui";
+import { tintName } from "@/components/colour-picker";
+import { Tints, tintSwatch, type Tint } from "@/lib/tint";
+import { cn } from "@/lib/utils";
 import type { ProjectEntity } from "@/backend/project-service";
 import { canMoveProject } from "@/lib/project-tree";
 import { testProp } from "@/lib/test-id";
@@ -26,12 +36,14 @@ export function ProjectRowMenu({
   projects,
   onRename,
   onMove,
+  onRecolour,
   onDelete,
 }: {
   project: ProjectEntity;
   projects: readonly ProjectEntity[];
   onRename: () => void;
   onMove: (parentId: string | undefined) => void;
+  onRecolour: (colour: Tint) => void;
   onDelete: () => void;
 }) {
   const testId = `sidebar.project.${project.id}`;
@@ -56,15 +68,43 @@ export function ProjectRowMenu({
           aria-label={`More for ${project.name}`}
           {...testProp(`${testId}.menu.button`)}
           className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex size-5 shrink-0 items-center justify-center rounded-md opacity-0 transition-opacity group-focus-within/project:opacity-100 group-hover/project:opacity-100 data-[state=open]:opacity-100">
-          <MoreHorizontal className="size-3.5" />
+          <MoreActionsIcon className="size-3.5" />
         </button>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="start" className="min-w-44">
         <DropdownMenuItem testId={`${testId}.rename.button`} onSelect={onRename}>
-          <Pencil />
+          <RenameIcon />
           Rename
         </DropdownMenuItem>
+
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
+          Colour
+        </DropdownMenuLabel>
+        {/*
+          Swatches as radio items in a grid: still menu items, so the arrow
+          keys walk them like any other row, and the one the project wears is
+          announced as checked.
+        */}
+        <DropdownMenuRadioGroup
+          value={project.colour ?? "gray"}
+          onValueChange={(value) => onRecolour(value as Tint)}
+          className="grid grid-cols-9 gap-1 px-2 pb-1.5">
+          {Tints.map((tint) => (
+            <DropdownMenuPrimitive.RadioItem
+              key={tint}
+              value={tint}
+              aria-label={tintName[tint]}
+              title={tintName[tint]}
+              {...testProp(`${testId}.colour.${tint}.button`)}
+              className={cn(
+                "ring-offset-popover data-[highlighted]:ring-ring size-4 cursor-pointer rounded-full outline-none data-[highlighted]:ring-2 data-[highlighted]:ring-offset-1 data-[state=checked]:ring-2 data-[state=checked]:ring-foreground data-[state=checked]:ring-offset-2",
+                tintSwatch[tint]
+              )}
+            />
+          ))}
+        </DropdownMenuRadioGroup>
 
         {/*
           Flat rather than a submenu. A nested Radix menu is one more thing to
@@ -78,7 +118,7 @@ export function ProjectRowMenu({
             <DropdownMenuLabel
               {...testProp(`${moveTestId}.label`)}
               className="text-muted-foreground flex items-center gap-2 text-xs font-normal">
-              <FolderInput className="size-3.5" />
+              <MoveToProjectIcon className="size-3.5" />
               Move to
             </DropdownMenuLabel>
 
@@ -107,7 +147,7 @@ export function ProjectRowMenu({
           testId={`${testId}.delete.button`}
           variant="destructive"
           onSelect={onDelete}>
-          <Trash2 />
+          <DeleteIcon />
           Delete
         </DropdownMenuItem>
       </DropdownMenuContent>

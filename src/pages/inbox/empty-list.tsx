@@ -1,6 +1,6 @@
 import { Text } from "@/components/ui/text";
 import { testProp, type TestIdProps } from "@/lib/test-id";
-import { ArrowUp, Feather } from "lucide-react";
+import { CaptureIcon, PointUpIcon } from "@/icons";
 import type { ReactNode } from "react";
 
 /**
@@ -11,7 +11,7 @@ import type { ReactNode } from "react";
  */
 export function EmptyList({
   testId = "home.todo.empty",
-  icon = <Feather className="size-5" />,
+  icon = <CaptureIcon className="size-5" />,
   title = "Inbox zero",
   message = "Nothing to organize yet. Capture your first thought in the bar above — it takes about two seconds.",
 }: TestIdProps & {
@@ -33,7 +33,7 @@ export function EmptyList({
       <Text
         variant="eyebrow"
         className="text-muted-foreground/80 mt-4 inline-flex items-center gap-1.5">
-        <ArrowUp className="size-3.5" /> start typing
+        <PointUpIcon className="size-3.5" /> start typing
       </Text>
     </div>
   );

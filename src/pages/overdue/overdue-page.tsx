@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { CalendarClock } from "lucide-react";
+import { OverdueIcon } from "@/icons";
 
 import { EmptyList } from "@/pages/inbox/empty-list";
 import { todosOverdue } from "@/lib/todo-scope";
@@ -44,7 +44,7 @@ export function OverduePage() {
           empty={
             <EmptyList
               testId="overdue.todo.empty"
-              icon={<CalendarClock className="size-5" />}
+              icon={<OverdueIcon className="size-5" />}
               title="Nothing is late"
               message="Every dated todo is still ahead of you."
             />

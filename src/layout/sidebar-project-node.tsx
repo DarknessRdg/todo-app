@@ -1,4 +1,5 @@
-import { ChevronRight, Hash, Plus } from "lucide-react";
+import { AddIcon, DisclosureIcon, ProjectIcon } from "@/icons";
+import { tintText, type Tint } from "@/lib/tint";
 import { Link } from "react-router";
 
 import type { ProjectEntity } from "@/backend/project-service";
@@ -17,6 +18,7 @@ export type ProjectNodeActions = {
   onAddChild: (parentId: string) => void;
   onRename: (project: ProjectEntity) => void;
   onMove: (params: { id: string; parentId: string | undefined }) => void;
+  onRecolour: (params: { id: string; colour: Tint }) => void;
   onDelete: (project: ProjectEntity) => void;
 };
 
@@ -92,12 +94,17 @@ export function SidebarProjectNode({
                   setOpen(!open);
                 }}
                 className="text-muted-foreground/70 -ml-0.5 flex size-4 shrink-0 items-center justify-center rounded">
-                <ChevronRight
+                <DisclosureIcon
                   className={cn("size-3.5 transition-transform", open && "rotate-90")}
                 />
               </button>
             ) : (
-              <Hash className="text-muted-foreground/70 size-3.5 shrink-0" />
+              <ProjectIcon
+                className={cn(
+                  "size-3.5 shrink-0",
+                  tintText[node.colour ?? "gray"]
+                )}
+              />
             )}
 
             <span className="truncate">{node.name}</span>
@@ -124,7 +131,7 @@ export function SidebarProjectNode({
               {...testProp(`${testId}.add.button`)}
               onClick={() => actions.onAddChild(node.id)}
               className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex size-5 shrink-0 items-center justify-center rounded-md opacity-0 transition-opacity group-focus-within/project:opacity-100 group-hover/project:opacity-100">
-              <Plus className="size-3.5" />
+              <AddIcon className="size-3.5" />
             </button>
           )}
 
@@ -133,6 +140,7 @@ export function SidebarProjectNode({
             projects={projects}
             onRename={() => actions.onRename(node)}
             onMove={(parentId) => actions.onMove({ id: node.id, parentId })}
+            onRecolour={(colour) => actions.onRecolour({ id: node.id, colour })}
             onDelete={() => actions.onDelete(node)}
           />
         </div>

@@ -1,4 +1,5 @@
 import type { ProjectService } from "@/backend/project-service";
+import type { Tint } from "@/lib/tint";
 import type { TodoService } from "@/backend/todo-service";
 import { QueryTodoKey } from "@/pages/inbox/use-todo-list";
 import { QueryTodoDetailsKey } from "@/pages/inbox/use-todo-details";
@@ -42,6 +43,30 @@ export function useProjectCreate() {
 
       toast.error("Error", {
         description: "An internal error happened while creating your project",
+      });
+    },
+  });
+}
+
+/** Only the project list changes: badges read the colour from the project. */
+export function useProjectRecolour() {
+  const projectService = useContainer().get<ProjectService>(
+    Dependencies.ProjectService
+  );
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params: { id: string; colour: Tint }) =>
+      projectService.recolour(params),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [QueryProjectKey] });
+    },
+    onError: (error) => {
+      console.error(error);
+
+      toast.error("Error", {
+        description:
+          "An internal error happened while recolouring your project",
       });
     },
   });

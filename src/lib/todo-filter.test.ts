@@ -425,6 +425,14 @@ describe("parseTodoSort", () => {
   it("when the url says nothing, Then the default stands", () => {
     expect(parseTodoSort(null)).toBe(defaultTodoSort);
   });
+
+  /**
+   * `manual` was the default's name in the url before newest-first existed,
+   * and it meant "unsorted". A link saved then still opens an unsorted list.
+   */
+  it("when an old url says manual, Then it reads as the default", () => {
+    expect(parseTodoSort("manual")).toBe(defaultTodoSort);
+  });
 });
 
 describe("todoListViewToParams", () => {
@@ -469,13 +477,29 @@ describe("sortTodos", () => {
       createdAt: Date;
     };
 
-  it("when I do not choose a sort, Then the order the store gave is left alone", () => {
+  /**
+   * The store hands todos back oldest first (uuid v7 ids are chronological),
+   * so the newest is the last one it gave.
+   */
+  it("when I do not choose a sort, Then the newest todo comes first", () => {
     const todos = [
-      sortable({ title: "b", dueDate: at(1) }),
-      sortable({ title: "a", dueDate: at(2) }),
+      sortable({ title: "older", dueDate: at(1) }),
+      sortable({ title: "newer", dueDate: at(2) }),
     ];
 
-    expect(titles(sortTodos(todos, "manual"))).toEqual(["b", "a"]);
+    expect(titles(sortTodos(todos, defaultTodoSort))).toEqual([
+      "newer",
+      "older",
+    ]);
+  });
+
+  it("when I sort oldest first, Then the order the store gave is kept", () => {
+    const todos = [
+      sortable({ title: "older", dueDate: at(2) }),
+      sortable({ title: "newer", dueDate: at(1) }),
+    ];
+
+    expect(titles(sortTodos(todos, "oldest"))).toEqual(["older", "newer"]);
   });
 
   it("when I sort, Then the list I was given is not rearranged under me", () => {

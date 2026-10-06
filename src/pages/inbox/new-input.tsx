@@ -14,8 +14,11 @@ import {
 import { toast } from "@/components/ui/sonner";
 import { Text } from "@/components/ui/text";
 import { useTodoCreate } from "@/pages/inbox/use-todo-create";
-import { CalendarIcon, ChevronDownIcon, SendIcon } from "lucide-react";
-import { useState } from "react";
+import { DropdownIcon, DueDateIcon, SubmitIcon } from "@/icons";
+import { useEffect, useRef, useState } from "react";
+import { ScreenConfetti } from "@/components/screen-confetti";
+import { Timing } from "@/lib/timing";
+import { rememberCapture } from "@/lib/capture-flight";
 import { projectForCapture } from "@/lib/todo-capture";
 
 /**
@@ -40,6 +43,29 @@ export function NewInput({
 } = {}) {
   const { create, validateField } = useTodoCreate();
 
+  // The reward for a capture. Keyed so a second todo fires a fresh volley
+  // instead of finding the first one still falling and doing nothing.
+  const [volley, setVolley] = useState(0);
+  const [celebrating, setCelebrating] = useState(false);
+  const celebration = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined
+  );
+  useEffect(() => () => clearTimeout(celebration.current), []);
+
+  // Where the bar sits when Enter is pressed: the new row starts its
+  // entrance here, so the text reads as dropping into the list.
+  const bar = useRef<HTMLDivElement>(null);
+
+  const celebrate = () => {
+    setVolley((n) => n + 1);
+    setCelebrating(true);
+    clearTimeout(celebration.current);
+    celebration.current = setTimeout(
+      () => setCelebrating(false),
+      Timing.celebrationVisibleMs
+    );
+  };
+
   const form = useAppForm({
     defaultValues: {
       title: "",
@@ -57,6 +83,9 @@ export function NewInput({
         projectId: projectForCapture(projectId, value.projectId),
       });
       toast.success("Captured", { description: value.title });
+      const rect = bar.current?.getBoundingClientRect();
+      if (rect) rememberCapture(value.title, rect);
+      celebrate();
       formApi.reset();
     },
   });
@@ -86,7 +115,9 @@ export function NewInput({
   return (
     <form.AppForm>
       <form.FormSubmit>
-        <div className="bg-card focus-within:ring-ring flex items-center gap-2.5 rounded-2xl px-3.5 transition-shadow focus-within:ring-2">
+        <div
+          ref={bar}
+          className="bg-card focus-within:ring-ring flex items-center gap-2.5 rounded-2xl px-3.5 transition-shadow focus-within:ring-2">
           <TodoCheckerInput
             done={false}
             disabled
@@ -146,7 +177,7 @@ export function NewInput({
 
             <form.SubmitButton
               testId="home.todo.create.submit"
-              label={<SendIcon className="size-4" />}
+              label={<SubmitIcon className="size-4" />}
               size="icon"
               className="size-9 shrink-0 rounded-full"
               aria-label="Add task"
@@ -161,6 +192,9 @@ export function NewInput({
           className="text-destructive mt-2 px-1 text-sm">
           {form.state.errors}
         </Text>
+      )}
+      {celebrating && (
+        <ScreenConfetti key={volley} testId="celebration.confetti" />
       )}
     </form.AppForm>
   );
@@ -187,14 +221,14 @@ function DueDateButton({ initial }: { initial: Date }) {
           size="sm"
           className="text-muted-foreground hover:text-foreground h-8 gap-1.5 px-2"
           type="button">
-          <CalendarIcon className="size-4" />
+          <DueDateIcon className="size-4" />
           <span className="text-xs tabular-nums">
             {field.state.value?.toLocaleDateString(undefined, {
               month: "short",
               day: "numeric",
             })}
           </span>
-          <ChevronDownIcon className="size-3.5 opacity-60" />
+          <DropdownIcon className="size-3.5 opacity-60" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto overflow-hidden p-0" align="end">

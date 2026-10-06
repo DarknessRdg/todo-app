@@ -1,5 +1,6 @@
 import { Tables, type AppIDB } from "@/backend/adapter/indexed-db/indexed-db";
 import type { LabelEntity, LabelRepository } from "@/backend/label-service";
+import type { Tint } from "@/lib/tint";
 
 export class LabelRepositoryIndexedDB implements LabelRepository {
   private db: AppIDB;
@@ -27,6 +28,14 @@ export class LabelRepositoryIndexedDB implements LabelRepository {
     if (label === undefined) return;
 
     await this.db.put(Tables.Label, { ...label, name });
+  };
+
+  recolour = async ({ id, colour }: { id: string; colour: Tint }) => {
+    const label = await this.db.get(Tables.Label, id);
+    // Gone between the read and the write, as with a rename: leave it gone.
+    if (label === undefined) return;
+
+    await this.db.put(Tables.Label, { ...label, colour });
   };
 
   delete = async (id: string) => {

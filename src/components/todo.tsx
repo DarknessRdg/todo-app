@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { testProp, type TestIdProps } from "@/lib/test-id";
 import { TooltipText } from "@/components/ui/tooltip";
 import * as React from "react";
-import { CheckIcon } from "lucide-react";
+import { CheckmarkIcon } from "@/icons";
 import { cva } from "class-variance-authority";
 
 export function TodoTitle({
@@ -49,7 +49,7 @@ const todoCheckerVariants = cva(
 export function TodoChecker({ done }: { done: boolean }) {
   return (
     <div className={todoCheckerVariants({ done })}>
-      {done && <CheckIcon className="size-3.5" />}
+      {done && <CheckmarkIcon className="size-3.5" />}
     </div>
   );
 }

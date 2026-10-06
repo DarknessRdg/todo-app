@@ -10,6 +10,7 @@ function mockRepository(
     listAll: vi.fn<LabelRepository["listAll"]>().mockResolvedValue([]),
     create: vi.fn<LabelRepository["create"]>().mockResolvedValue(undefined),
     rename: vi.fn<LabelRepository["rename"]>().mockResolvedValue(undefined),
+    recolour: vi.fn<LabelRepository["recolour"]>().mockResolvedValue(undefined),
     delete: vi.fn<LabelRepository["delete"]>().mockResolvedValue(undefined),
     findByName: vi
       .fn<LabelRepository["findByName"]>()
@@ -83,6 +84,51 @@ describe("LabelService", () => {
 
         expect(repository.create).not.toHaveBeenCalled();
       });
+    });
+  });
+
+  describe("when I recolour a label", () => {
+    it("Then the colour I picked is stored", async () => {
+      const repository = mockRepository();
+      const label = makeLabel();
+
+      await serviceWith(repository).recolour({ id: label.id, colour: "green" });
+
+      expect(repository.recolour).toHaveBeenCalledWith({
+        id: label.id,
+        colour: "green",
+      });
+    });
+
+    it("Then it reports that it took", async () => {
+      const recoloured = await serviceWith(mockRepository()).recolour({
+        id: makeLabel().id,
+        colour: "green",
+      });
+
+      expect(recoloured).toBe(true);
+    });
+  });
+
+  describe("when I recolour a label with a colour outside the palette", () => {
+    it("Then nothing is stored", async () => {
+      const repository = mockRepository();
+
+      await serviceWith(repository).recolour({
+        id: makeLabel().id,
+        colour: "chartreuse" as never,
+      });
+
+      expect(repository.recolour).not.toHaveBeenCalled();
+    });
+
+    it("Then it reports the refusal", async () => {
+      const recoloured = await serviceWith(mockRepository()).recolour({
+        id: makeLabel().id,
+        colour: "chartreuse" as never,
+      });
+
+      expect(recoloured).toBe(false);
     });
   });
 

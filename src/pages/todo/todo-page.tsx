@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from "react-router";
-import { ArrowLeft } from "lucide-react";
+import { BackIcon } from "@/icons";
 import { TodoDetail } from "@/pages/inbox/todo-detail.tsx";
 import { Button } from "@/components/ui/button";
 
@@ -28,7 +28,7 @@ export function TodoPage() {
             size="sm"
             onClick={() => void navigate("/")}
             className="text-muted-foreground hover:text-foreground mb-6 -ml-2 gap-1.5">
-            <ArrowLeft className="size-4" />
+            <BackIcon className="size-4" />
             <span className="text-xs font-medium">Back to inbox</span>
           </Button>
 

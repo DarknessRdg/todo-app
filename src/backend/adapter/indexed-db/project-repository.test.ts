@@ -100,6 +100,25 @@ describe("ProjectRepositoryIndexedDB", () => {
     });
   });
 
+  describe("when I recolour a project", () => {
+    it("Then the stored project carries the new colour", async () => {
+      const garden = makeProject({ colour: "gray" });
+      const repository = await repositoryWith([garden]);
+
+      await repository.recolour({ id: garden.id, colour: "blue" });
+
+      expect((await repository.listAll())[0].colour).toBe("blue");
+    });
+
+    it("Then one that is no longer there is left alone rather than recreated", async () => {
+      const repository = await repositoryWith();
+
+      await repository.recolour({ id: "gone", colour: "blue" });
+
+      expect(await repository.listAll()).toEqual([]);
+    });
+  });
+
   describe("when I file a project under another", () => {
     it("Then it reads back under its new parent", async () => {
       const work = makeProject({ name: "Work" });

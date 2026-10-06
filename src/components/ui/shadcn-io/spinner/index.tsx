@@ -1,23 +1,23 @@
 import {
-  LoaderCircleIcon,
-  LoaderIcon,
-  LoaderPinwheelIcon,
-  type LucideProps,
-} from 'lucide-react';
+  type AppIconProps,
+  LoadingIcon,
+  LoadingRingIcon,
+  LoadingSpokesIcon,
+} from "@/icons";
 import { cn } from '@/lib/utils';
 
 type SpinnerVariantProps = Omit<SpinnerProps, 'variant'>;
 
 const Default = ({ className, ...props }: SpinnerVariantProps) => (
-  <LoaderIcon className={cn('animate-spin', className)} {...props} />
+  <LoadingIcon className={cn('animate-spin', className)} {...props} />
 );
 
 const Circle = ({ className, ...props }: SpinnerVariantProps) => (
-  <LoaderCircleIcon className={cn('animate-spin', className)} {...props} />
+  <LoadingRingIcon className={cn('animate-spin', className)} {...props} />
 );
 
 const Pinwheel = ({ className, ...props }: SpinnerVariantProps) => (
-  <LoaderPinwheelIcon className={cn('animate-spin', className)} {...props} />
+  <LoadingSpokesIcon className={cn('animate-spin', className)} {...props} />
 );
 
 const CircleFilled = ({
@@ -27,13 +27,13 @@ const CircleFilled = ({
 }: SpinnerVariantProps) => (
   <div className="relative" style={{ width: size, height: size }}>
     <div className="absolute inset-0 rotate-180">
-      <LoaderCircleIcon
+      <LoadingRingIcon
         className={cn('animate-spin', className, 'text-foreground opacity-20')}
         size={size}
         {...props}
       />
     </div>
-    <LoaderCircleIcon
+    <LoadingRingIcon
       className={cn('relative animate-spin', className)}
       size={size}
       {...props}
@@ -238,7 +238,7 @@ const Infinite = ({ size = 24, ...props }: SpinnerVariantProps) => (
   </svg>
 );
 
-export type SpinnerProps = LucideProps & {
+export type SpinnerProps = AppIconProps & {
   variant?:
     | 'default'
     | 'circle'

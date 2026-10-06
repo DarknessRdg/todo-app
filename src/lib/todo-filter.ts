@@ -288,18 +288,27 @@ function matchesDue(
  * learn to ignore a key, and the first place that forgot would offer to clear a
  * filter nobody set.
  *
- * `manual` is the store's own order, which uuid v7 makes chronological. It is
- * the default and writes nothing to the url, so sorting is strictly additive:
- * a list nobody has sorted reads exactly as it always did.
+ * `newest` and `oldest` read the store's own order, which uuid v7 makes
+ * chronological, front to back or back to front. `newest` is the default and
+ * writes nothing to the url: what was just captured is what the reader is
+ * looking for, and it lands at the top, right under the bar it was typed in.
  */
-export type TodoSort = "manual" | "due" | "priority" | "title";
+export type TodoSort = "newest" | "oldest" | "due" | "priority" | "title";
 
-export const defaultTodoSort: TodoSort = "manual";
+export const defaultTodoSort: TodoSort = "newest";
 
-const sorts: TodoSort[] = ["manual", "due", "priority", "title"];
+const sorts: TodoSort[] = ["newest", "oldest", "due", "priority", "title"];
+
+/**
+ * Names a sort used to go by. `manual` was the unsorted default before
+ * newest-first existed; a link saved then still opens the unsorted list.
+ */
+const formerSorts: Record<string, TodoSort> = { manual: "newest" };
 
 /** An unreadable value falls back rather than shuffling the list. */
 export function parseTodoSort(value: string | null | undefined): TodoSort {
+  if (value != null && value in formerSorts) return formerSorts[value];
+
   return sorts.find((sort) => sort === value) ?? defaultTodoSort;
 }
 
@@ -353,7 +362,8 @@ export function sortTodos<T extends SortableTodo>(
 ): T[] {
   const ordered = [...todos];
 
-  if (sort === "manual") return ordered;
+  if (sort === "oldest") return ordered;
+  if (sort === "newest") return ordered.reverse();
 
   return ordered.sort((a, b) => {
     if (sort === "title") {

@@ -1,13 +1,13 @@
 import {
-  ArrowUpRight,
-  CircleDot,
-  Github,
-  Info,
-  ListChecks,
-  Palette,
-  SquarePen,
-  type LucideIcon,
-} from "lucide-react";
+  AboutIcon,
+  type AppIcon,
+  AppearanceIcon,
+  ExternalLinkIcon,
+  ListsSettingsIcon,
+  ReportIssueIcon,
+  SourceCodeIcon,
+  TodosSettingsIcon,
+} from "@/icons";
 import type { ReactNode } from "react";
 import { Link, Navigate, useParams } from "react-router";
 
@@ -36,7 +36,7 @@ type Section = {
   title: string;
   /** What the group is about, said once at the top of its panel. */
   summary: string;
-  icon: LucideIcon;
+  icon: AppIcon;
 };
 
 const sections: Section[] = [
@@ -44,25 +44,25 @@ const sections: Section[] = [
     id: "appearance",
     title: "Appearance",
     summary: "How the app looks on this device.",
-    icon: Palette,
+    icon: AppearanceIcon,
   },
   {
     id: "lists",
     title: "Lists",
     summary: "What your todo lists put on screen, and what they leave out.",
-    icon: ListChecks,
+    icon: ListsSettingsIcon,
   },
   {
     id: "todos",
     title: "Todos",
     summary: "How a todo opens when you go into it.",
-    icon: SquarePen,
+    icon: TodosSettingsIcon,
   },
   {
     id: "about",
     title: "About",
     summary: "Who made this, and which build of it you are running.",
-    icon: Info,
+    icon: AboutIcon,
   },
 ];
 
@@ -415,7 +415,7 @@ function AboutSettings() {
         <ExternalLink
           testId="settings.about.author.link"
           href={AuthorProfile}
-          icon={Github}
+          icon={SourceCodeIcon}
           title={AuthorName}
           subtitle={`github.com/${AuthorHandle}`}
         />
@@ -430,7 +430,7 @@ function AboutSettings() {
         <ExternalLink
           testId="settings.about.issues.link"
           href={IssuesUrl}
-          icon={CircleDot}
+          icon={ReportIssueIcon}
           title="Issues"
           subtitle="github.com/DarknessRdg/todo-app/issues"
         />
@@ -469,7 +469,7 @@ function ExternalLink({
 }: {
   testId: string;
   href: string;
-  icon: LucideIcon;
+  icon: AppIcon;
   title: string;
   subtitle: string;
 }) {
@@ -495,7 +495,7 @@ function ExternalLink({
         </Text>
       </span>
 
-      <ArrowUpRight className="text-muted-foreground ml-auto size-4 shrink-0" />
+      <ExternalLinkIcon className="text-muted-foreground ml-auto size-4 shrink-0" />
     </a>
   );
 }

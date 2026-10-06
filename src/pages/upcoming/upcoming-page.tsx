@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { CalendarDays } from "lucide-react";
+import { UpcomingIcon } from "@/icons";
 
 import { EmptyList } from "@/pages/inbox/empty-list";
 import { todosUpcoming } from "@/lib/todo-scope";
@@ -46,7 +46,7 @@ export function UpcomingPage() {
           empty={
             <EmptyList
               testId="upcoming.todo.empty"
-              icon={<CalendarDays className="size-5" />}
+              icon={<UpcomingIcon className="size-5" />}
               title="Nothing scheduled"
               message="Nothing is due after today. Give a todo a date and it turns up here."
             />

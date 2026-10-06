@@ -1,12 +1,13 @@
 import {
-  CalendarClock,
-  CalendarDays,
-  CheckCircle2,
-  Inbox,
-  Sun,
-  Tag,
-  type LucideIcon,
-} from "lucide-react";
+  type AppIcon,
+  CompletedIcon,
+  InboxIcon,
+  LabelIcon,
+  OverdueIcon,
+  TodayIcon,
+  UpcomingIcon,
+} from "@/icons";
+import type { Tint } from "@/lib/tint";
 
 export type View = {
   /**
@@ -17,7 +18,12 @@ export type View = {
   title: string;
   /** The url this view owns. Rendered as a real href, not an onClick. */
   path: string;
-  icon: LucideIcon;
+  icon: AppIcon;
+  /**
+   * The view's colour, worn by its icon. It is how the sidebar is scanned
+   * without reading it: the red one is what you missed.
+   */
+  tint: Tint;
   /**
    * Further subtrees that belong to this view. A todo's own page is a row of
    * the inbox opened full screen, so `/todo/<id>` keeps Inbox highlighted.
@@ -29,16 +35,48 @@ export type View = {
 // counts here: a number in this file is a number nobody counted. The sidebar
 // derives the ones it can from the stored todos.
 export const views: View[] = [
-  { id: "inbox", title: "Inbox", path: "/", icon: Inbox, owns: ["/todo"] },
-  { id: "today", title: "Today", path: "/today", icon: Sun },
-  { id: "upcoming", title: "Upcoming", path: "/upcoming", icon: CalendarDays },
-  { id: "overdue", title: "Overdue", path: "/overdue", icon: CalendarClock },
-  { id: "completed", title: "Completed", path: "/completed", icon: CheckCircle2 },
+  {
+    id: "inbox",
+    title: "Inbox",
+    path: "/",
+    icon: InboxIcon,
+    tint: "blue",
+    owns: ["/todo"],
+  },
+  {
+    id: "today",
+    title: "Today",
+    path: "/today",
+    icon: TodayIcon,
+    tint: "orange",
+  },
+  {
+    id: "upcoming",
+    title: "Upcoming",
+    path: "/upcoming",
+    icon: UpcomingIcon,
+    tint: "purple",
+  },
+  {
+    id: "overdue",
+    title: "Overdue",
+    path: "/overdue",
+    icon: OverdueIcon,
+    tint: "red",
+  },
+  {
+    id: "completed",
+    title: "Completed",
+    path: "/completed",
+    icon: CompletedIcon,
+    tint: "green",
+  },
   {
     id: "labels",
     title: "Labels",
     path: "/labels",
-    icon: Tag,
+    icon: LabelIcon,
+    tint: "pink",
     // One label's todos live at `/label/<id>`, reached from this page.
     owns: ["/label"],
   },
@@ -55,7 +93,10 @@ export const views: View[] = [
 export function viewIsActive(view: View, pathname: string): boolean {
   if (pathname === view.path) return true;
 
-  const subtrees = [...(view.path === "/" ? [] : [view.path]), ...(view.owns ?? [])];
+  const subtrees = [
+    ...(view.path === "/" ? [] : [view.path]),
+    ...(view.owns ?? []),
+  ];
 
   return subtrees.some(
     (subtree) => pathname === subtree || pathname.startsWith(`${subtree}/`)

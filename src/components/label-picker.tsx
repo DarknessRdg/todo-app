@@ -1,4 +1,5 @@
-import { Check, Plus, Tag, X } from "lucide-react";
+import { AddIcon, CheckmarkIcon, LabelIcon, RemoveIcon } from "@/icons";
+import { tintFill, tintText } from "@/lib/tint";
 import { useState } from "react";
 
 import type { LabelEntity } from "@/backend/label-service";
@@ -69,16 +70,19 @@ export function LabelPicker({
         <Badge
           key={label.id}
           variant="secondary"
-          className="gap-1 pr-1 font-normal">
-          <Tag className="size-3" />
+          className={cn(
+            "gap-1 pr-1 font-normal",
+            label.colour && ["border-transparent", tintFill[label.colour]]
+          )}>
+          <LabelIcon className="size-3" />
           {label.name}
           <button
             type="button"
             aria-label={`Remove ${label.name}`}
             {...testProp(`${testId}.${label.id}.remove.button`)}
             onClick={() => toggle(label.id)}
-            className="text-muted-foreground hover:text-foreground rounded-full">
-            <X className="size-3" />
+            className="rounded-full opacity-70 hover:opacity-100">
+            <RemoveIcon className="size-3" />
           </button>
         </Badge>
       ))}
@@ -95,7 +99,7 @@ export function LabelPicker({
             aria-label="Add a label"
             {...testProp(`${testId}.add.button`)}
             className="text-muted-foreground hover:bg-accent hover:text-foreground flex h-6 items-center gap-1 rounded-md px-1.5 text-xs transition-colors">
-            <Plus className="size-3.5" />
+            <AddIcon className="size-3.5" />
             {selected.length === 0 && "Label"}
           </button>
         </PopoverTrigger>
@@ -127,9 +131,16 @@ export function LabelPicker({
                     "hover:bg-accent flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm",
                     checked && "bg-accent"
                   )}>
-                  <Tag className="text-muted-foreground size-3.5 shrink-0" />
+                  <LabelIcon
+                    className={cn(
+                      "size-3.5 shrink-0",
+                      tintText[label.colour ?? "gray"]
+                    )}
+                  />
                   <span className="truncate">{label.name}</span>
-                  {checked && <Check className="ml-auto size-3.5 shrink-0" />}
+                  {checked && (
+                    <CheckmarkIcon className="ml-auto size-3.5 shrink-0" />
+                  )}
                 </button>
               );
             })}
@@ -150,7 +161,7 @@ export function LabelPicker({
                 setQuery("");
               }}
               className="hover:bg-accent mt-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm">
-              <Plus className="text-muted-foreground size-3.5 shrink-0" />
+              <AddIcon className="text-muted-foreground size-3.5 shrink-0" />
               <span className="truncate">Create “{query.trim()}”</span>
             </button>
           )}

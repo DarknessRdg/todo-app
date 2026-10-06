@@ -2,6 +2,7 @@ import { canAddChild, canMoveProject } from "@/lib/project-tree";
 import { uuidV7 } from "@/lib/uuid";
 import { zodAsValidator } from "@/lib/validator";
 import type { IValidator } from "@/validators/validators";
+import { Tints, type Tint } from "@/lib/tint";
 import * as z from "zod";
 
 const projectZodScheme = z.object({
@@ -16,7 +17,11 @@ const projectZodScheme = z.object({
    * what to offer.
    */
   parentId: z.string().optional(),
+  /** The tint the project wears; projects made before colours read as gray. */
+  colour: z.enum(Tints, { error: "project-colour-invalid" }).optional(),
 });
+
+const colourZodScheme = z.enum(Tints);
 
 export type ProjectEntity = z.infer<typeof projectZodScheme>;
 
@@ -27,6 +32,7 @@ export interface ProjectRepository {
   rename(params: { id: string; name: string }): Promise<void>;
   /** Files a project under another, or takes it back to the top level. */
   move(params: { id: string; parentId: string | undefined }): Promise<void>;
+  recolour(params: { id: string; colour: Tint }): Promise<void>;
   delete(id: string): Promise<void>;
 }
 
@@ -131,6 +137,15 @@ export class ProjectService {
    * clears them through `TodoService`, because the two stores are separate and
    * neither can write the other's. See `useProjectDelete`.
    */
+  /** Gives a project a colour from the palette; see `LabelService.recolour`. */
+  recolour = async (params: { id: string; colour: Tint }): Promise<boolean> => {
+    if (!colourZodScheme.safeParse(params.colour).success) return false;
+
+    await this.repository.recolour(params);
+
+    return true;
+  };
+
   delete = async (id: string): Promise<void> => {
     const projects = await this.repository.listAll();
     const going = projects.find((project) => project.id === id);

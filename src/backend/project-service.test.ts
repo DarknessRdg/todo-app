@@ -137,6 +137,52 @@ describe("ProjectService", () => {
     });
   });
 
+  describe("when I recolour a project", () => {
+    it("Then the colour I picked is stored", async () => {
+      const garden = makeProject();
+      const repository = inMemoryProjectRepository([garden]);
+
+      await serviceWith(repository).recolour({ id: garden.id, colour: "blue" });
+
+      expect(repository.recolour).toHaveBeenCalledWith({
+        id: garden.id,
+        colour: "blue",
+      });
+    });
+
+    it("Then it reports that it took", async () => {
+      const garden = makeProject();
+
+      const recoloured = await serviceWith(
+        inMemoryProjectRepository([garden])
+      ).recolour({ id: garden.id, colour: "blue" });
+
+      expect(recoloured).toBe(true);
+    });
+  });
+
+  describe("when I recolour a project with a colour outside the palette", () => {
+    it("Then nothing is stored", async () => {
+      const repository = mockProjectRepository();
+
+      await serviceWith(repository).recolour({
+        id: makeProject().id,
+        colour: "chartreuse" as never,
+      });
+
+      expect(repository.recolour).not.toHaveBeenCalled();
+    });
+
+    it("Then it reports the refusal", async () => {
+      const recoloured = await serviceWith(mockProjectRepository()).recolour({
+        id: makeProject().id,
+        colour: "chartreuse" as never,
+      });
+
+      expect(recoloured).toBe(false);
+    });
+  });
+
   describe("when I rename a project", () => {
     it("Then the new name is persisted", async () => {
       const garden = makeProject({ name: "Garden" });

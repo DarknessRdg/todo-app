@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Sun } from "lucide-react";
+import { TodayIcon } from "@/icons";
 
 import { EmptyList } from "@/pages/inbox/empty-list";
 import { todosDueOn } from "@/lib/todo-scope";
@@ -59,7 +59,7 @@ export function TodayPage() {
           empty={
             <EmptyList
               testId="today.todo.empty"
-              icon={<Sun className="size-5" />}
+              icon={<TodayIcon className="size-5" />}
               title="Nothing due today"
               message="A clear day. Anything you capture here is due today by default."
             />

@@ -35,3 +35,28 @@ export function countDueByDay(
 
   return counts;
 }
+
+/**
+ * Where a due date stands relative to today, for colouring the date a todo
+ * carries.
+ *
+ * Compared by local calendar day, the same way the views are: a todo due at
+ * nine this morning is due *today* at two in the afternoon, not overdue, or
+ * the Today view and the badge on its own rows would disagree. A done todo is
+ * `settled` whatever its date, because a late finish is still a finish (see
+ * `todosOverdue`).
+ */
+export type DueState = "overdue" | "today" | "upcoming" | "settled";
+
+export function dueState(
+  todo: { dueDate: Date; done: boolean },
+  today: Date
+): DueState {
+  if (todo.done) return "settled";
+
+  const due = dayKey(todo.dueDate);
+  const now = dayKey(today);
+
+  if (due === now) return "today";
+  return due < now ? "overdue" : "upcoming";
+}

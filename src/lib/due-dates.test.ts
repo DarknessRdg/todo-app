@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { countDueByDay, dayKey } from "@/lib/due-dates";
+import { countDueByDay, dayKey, dueState } from "@/lib/due-dates";
 
 const at = (year: number, month: number, day: number, hour = 0) =>
   new Date(year, month - 1, day, hour);
@@ -49,5 +49,33 @@ describe("countDueByDay", () => {
     const counts = countDueByDay([{ dueDate: at(2026, 8, 10) }]);
 
     expect(counts.has("2026-08-11")).toBe(false);
+  });
+});
+
+describe("dueState", () => {
+  const today = at(2026, 8, 10, 14);
+
+  it("when the date is before today, Then it is overdue", () => {
+    expect(dueState({ dueDate: at(2026, 8, 9, 23), done: false }, today)).toBe(
+      "overdue"
+    );
+  });
+
+  it("when the date is today, earlier than now, Then it is due today rather than overdue", () => {
+    expect(dueState({ dueDate: at(2026, 8, 10, 9), done: false }, today)).toBe(
+      "today"
+    );
+  });
+
+  it("when the date is after today, Then it is upcoming", () => {
+    expect(dueState({ dueDate: at(2026, 8, 11), done: false }, today)).toBe(
+      "upcoming"
+    );
+  });
+
+  it("when the todo is done, Then a past date is settled rather than overdue", () => {
+    expect(dueState({ dueDate: at(2026, 8, 1), done: true }, today)).toBe(
+      "settled"
+    );
   });
 });

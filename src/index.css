@@ -4,20 +4,22 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* "Studio" system — white canvas, gray filled cards, ink primary, sage accent */
+  /* White canvas, cool-gray filled cards, ink primary, and a pastel tint set
+     that labels categories (see "Tints" below). One gray family, cool: a warm
+     card under a cool hover reads as two systems. */
   --background: #ffffff; /* white canvas */
   --foreground: #1f1f1f; /* Ink */
-  --card: #f4f4f4; /* Mist — recessed, filled card (no border) */
+  --card: #f5f6f8; /* cool gray, recessed, filled card (no border) */
   --card-foreground: #1f1f1f;
   --popover: #ffffff; /* elevated menus/dialogs */
   --popover-foreground: #1f1f1f;
   --primary: #1f1f1f; /* Ink — the single dark action / selected state */
   --primary-foreground: #ffffff;
-  --secondary: #f4f4f4; /* Mist chips / ghost buttons */
+  --secondary: #eef0f3; /* cool gray chips / ghost buttons */
   --secondary-foreground: #1f1f1f;
-  --muted: #f4f4f4;
-  --muted-foreground: #737373; /* mid gray */
-  --accent: #f6f7ed; /* Sage — the single tint (hero panel, highlights) */
+  --muted: #eef0f3;
+  --muted-foreground: #63676e; /* cool mid gray, AA on canvas and on cards */
+  --accent: #e9edf2; /* cool gray: the stats panel, selected and hover states */
   --accent-foreground: #1f1f1f;
   --destructive: #d64545;
   --destructive-foreground: #ffffff;
@@ -49,15 +51,15 @@
        as the callouts — it confirms, it does not alert — and deliberately the
        only place the app says "good" in colour. */
   --success: #3f7a52;
-  --border: #e7e7e7; /* soft divider / input hairline */
-  --input: #a8a8a8; /* control hairline — checkbox needs real contrast on mist */
+  --border: #e5e7eb; /* soft divider */
+  --input: #858a92; /* control hairline: 3:1 on a card, the non-text minimum */
   --ring: #1f1f1f; /* ink focus */
-  --card-hover: #edeee1; /* sage-tinted hover — warm, never cool */
+  --card-hover: #e9ecf0; /* cool gray hover: a step off the card, no hue */
   /* Scrollbars. A rail is chrome, not content: it sits a step above the
        divider hairline so it can be found, and only reaches ink-adjacent grey
        while it is under the pointer. Tune here — every scroll area reads it. */
-  --scrollbar-thumb: #d4d4d4;
-  --scrollbar-thumb-hover: #a8a8a8;
+  --scrollbar-thumb: #d3d6db;
+  --scrollbar-thumb-hover: #a0a4ab;
   --scrollbar-size: 10px;
   /* Modal backdrop. The scrim dims what is behind; the blur pushes it out of
        focus so the dialog reads as the only live surface. Tune here, not on
@@ -65,17 +67,40 @@
   --overlay: oklch(0% 0 0 / 45%);
   --overlay-blur: 6px;
   --chart-1: #1f1f1f;
-  --chart-2: #737373;
-  --chart-3: #a3a3a3;
-  --chart-4: #c7cbb0; /* deep sage */
-  --chart-5: #d4d4d4;
+  --chart-2: #63676e;
+  --chart-3: #a0a4ab;
+  --chart-4: #b4bcc8; /* cool slate */
+  --chart-5: #d3d6db;
+  /* Tints. Notion's property colours: a washed-out fill and a deep text colour
+     that reads on it at AA (every pair is at least 5:1, and the text colour
+     alone clears 5.6:1 on the canvas, so it also works as an icon colour).
+     They label *categories* (a priority, a label, a project, a due state)
+     and never decorate: ink is still the only action colour. */
+  --tint-gray: #eff1f4;
+  --tint-gray-foreground: #5a5e66;
+  --tint-brown: #f4eeee;
+  --tint-brown-foreground: #7d4e3a;
+  --tint-orange: #fbecdd;
+  --tint-orange-foreground: #9a4a0a;
+  --tint-yellow: #fbf3db;
+  --tint-yellow-foreground: #856000;
+  --tint-green: #edf3ec;
+  --tint-green-foreground: #346538;
+  --tint-blue: #e1f3fe;
+  --tint-blue-foreground: #1f6c9f;
+  --tint-purple: #f1eafa;
+  --tint-purple-foreground: #6940a5;
+  --tint-pink: #fae9f1;
+  --tint-pink-foreground: #a3346d;
+  --tint-red: #fdebec;
+  --tint-red-foreground: #9f2f2d;
   --sidebar: #ffffff;
   --sidebar-foreground: #1f1f1f;
   --sidebar-primary: #1f1f1f;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f4f4f4; /* gray active pill */
+  --sidebar-accent: #eef0f3; /* cool gray active pill */
   --sidebar-accent-foreground: #1f1f1f;
-  --sidebar-border: #ececec;
+  --sidebar-border: #e5e7eb;
   --sidebar-ring: #1f1f1f;
   --font-sans:
     "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
@@ -93,20 +118,21 @@
 }
 
 .dark {
-  /* "Studio" dark — deep neutral monochrome inversion, light primary */
-  --background: #0d0d0d; /* deep near-black canvas */
+  /* Dark: a cool near-black canvas, light primary, and the same tints dropped
+     to fills that carry light text. */
+  --background: #111214; /* near-black canvas, dark enough that cards lift off it */
   --foreground: #f4f4f4;
-  --card: #1c1c1c; /* filled card surface */
+  --card: #1e2023; /* filled card surface */
   --card-foreground: #f4f4f4;
-  --popover: #1c1c1c;
+  --popover: #1e2023;
   --popover-foreground: #f4f4f4;
   --primary: #f4f4f4; /* inverted — light action / selected state */
   --primary-foreground: #1f1f1f;
-  --secondary: #242424;
+  --secondary: #26282c;
   --secondary-foreground: #f4f4f4;
-  --muted: #242424;
-  --muted-foreground: #a3a3a3;
-  --accent: #242424; /* neutral gray — no color tint */
+  --muted: #26282c;
+  --muted-foreground: #9a9ea6;
+  --accent: #232830; /* cool slate: the stats panel and selected states */
   --accent-foreground: #f4f4f4;
   --destructive: #e5675f;
   --destructive-foreground: #ffffff;
@@ -128,31 +154,49 @@
   --callout-success: #86c99a;
   --callout-error: #e5675f;
   --success: #86c99a;
-  --border: #2a2a2a;
-  --input: #5c5c5c; /* control hairline — checkbox needs real contrast on card */
+  --border: #2a2c30;
+  --input: #6e737c; /* control hairline: 3:1 on a card */
   --ring: #f4f4f4;
-  --card-hover: #17170f; /* sage-tinted hover — warm, never cool */
+  --card-hover: #272a2f; /* cool slate hover, a step up from the card */
   /* Dark: the same two steps, inverted — a light rail on the near-black
        canvas would be brighter than the text it scrolls. */
-  --scrollbar-thumb: #333333;
-  --scrollbar-thumb-hover: #565656;
+  --scrollbar-thumb: #33363b;
+  --scrollbar-thumb-hover: #565a61;
   --scrollbar-size: 10px;
   /* Heavier on the near-black canvas: the same 45% over a dark page barely
        separates the dialog from what is behind it. */
   --overlay: oklch(0% 0 0 / 65%);
   --overlay-blur: 6px;
   --chart-1: #f4f4f4;
-  --chart-2: #a3a3a3;
-  --chart-3: #737373;
-  --chart-4: #aeb39a; /* sage */
-  --chart-5: #525252;
-  --sidebar: #0d0d0d;
+  --chart-2: #9a9ea6;
+  --chart-3: #63676e;
+  --chart-4: #8a94a3; /* cool slate */
+  --chart-5: #383b40;
+  --tint-gray: #2b2e33;
+  --tint-gray-foreground: #a7abb3;
+  --tint-brown: #3f2c24;
+  --tint-brown-foreground: #c79a85;
+  --tint-orange: #4a3020;
+  --tint-orange-foreground: #e09a63;
+  --tint-yellow: #463a24;
+  --tint-yellow-foreground: #d9ad5f;
+  --tint-green: #203629;
+  --tint-green-foreground: #70b48c;
+  --tint-blue: #16334a;
+  --tint-blue-foreground: #6db0e0;
+  --tint-purple: #33283f;
+  --tint-purple-foreground: #b28ae0;
+  --tint-pink: #43263a;
+  --tint-pink-foreground: #df82b2;
+  --tint-red: #472624;
+  --tint-red-foreground: #ec8580;
+  --sidebar: #111214;
   --sidebar-foreground: #f4f4f4;
   --sidebar-primary: #f4f4f4;
   --sidebar-primary-foreground: #1f1f1f;
-  --sidebar-accent: #242424;
+  --sidebar-accent: #26282c;
   --sidebar-accent-foreground: #f4f4f4;
-  --sidebar-border: #262626;
+  --sidebar-border: #26282c;
   --sidebar-ring: #f4f4f4;
   --radius: 0.875rem;
 }
@@ -198,6 +242,24 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-tint-gray: var(--tint-gray);
+  --color-tint-gray-foreground: var(--tint-gray-foreground);
+  --color-tint-brown: var(--tint-brown);
+  --color-tint-brown-foreground: var(--tint-brown-foreground);
+  --color-tint-orange: var(--tint-orange);
+  --color-tint-orange-foreground: var(--tint-orange-foreground);
+  --color-tint-yellow: var(--tint-yellow);
+  --color-tint-yellow-foreground: var(--tint-yellow-foreground);
+  --color-tint-green: var(--tint-green);
+  --color-tint-green-foreground: var(--tint-green-foreground);
+  --color-tint-blue: var(--tint-blue);
+  --color-tint-blue-foreground: var(--tint-blue-foreground);
+  --color-tint-purple: var(--tint-purple);
+  --color-tint-purple-foreground: var(--tint-purple-foreground);
+  --color-tint-pink: var(--tint-pink);
+  --color-tint-pink-foreground: var(--tint-pink-foreground);
+  --color-tint-red: var(--tint-red);
+  --color-tint-red-foreground: var(--tint-red-foreground);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -218,10 +280,10 @@
      on the settings page can draw the theme you are *not* in. Registered here
      rather than read from `--background`, which flips with the theme and would
      make both previews show the same one. */
-  --color-night: #0d0d0d;
-  --color-graphite: #1c1c1c;
+  --color-night: #111214;
+  --color-graphite: #1e2023;
   --color-sage: #f6f7ed;
-  --color-mist: #f4f4f4;
+  --color-mist: #f5f6f8;
   --color-card-hover: var(--card-hover);
   --color-overlay: var(--overlay);
 
@@ -310,6 +372,17 @@
     animation: saved-notice ease forwards;
   }
 
+  /* Screen confetti, on capture: fired up from a bottom corner to a peak,
+     then drifting down past it. Ease-out on the way up and ease-in on the
+     way down is what reads as thrown paper rather than a sliding square. */
+  .celebration-piece {
+    opacity: 0;
+    animation-name: celebration-fly;
+    animation-fill-mode: forwards;
+    animation-timing-function: linear;
+    will-change: transform, opacity;
+  }
+
   /* Confetti particle — flies out from the checkbox on completion */
   .confetti-piece {
     animation: confetti-fly 1.3s cubic-bezier(0.2, 0.6, 0.3, 1) forwards;
@@ -338,6 +411,27 @@
   }
   100% {
     transform: translate(var(--tx), var(--ty)) scale(0.5) rotate(var(--rot));
+    opacity: 0;
+  }
+}
+
+@keyframes celebration-fly {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 1;
+    animation-timing-function: cubic-bezier(0.15, 0.7, 0.35, 1);
+  }
+  40% {
+    transform: translate(var(--peak-x), var(--peak-y))
+      rotate(calc(var(--rot) * 0.4));
+    opacity: 1;
+    animation-timing-function: cubic-bezier(0.45, 0, 0.8, 0.6);
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--end-x), var(--end-y)) rotate(var(--rot));
     opacity: 0;
   }
 }

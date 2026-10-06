@@ -218,6 +218,9 @@ export function mockProjectRepository(
       .mockResolvedValue(undefined),
     rename: vi.fn<ProjectRepository["rename"]>().mockResolvedValue(undefined),
     move: vi.fn<ProjectRepository["move"]>().mockResolvedValue(undefined),
+    recolour: vi
+      .fn<ProjectRepository["recolour"]>()
+      .mockResolvedValue(undefined),
     delete: vi.fn<ProjectRepository["delete"]>().mockResolvedValue(undefined),
     ...overrides,
   };
@@ -251,6 +254,10 @@ export function inMemoryProjectRepository(
       const row = rows.find((it) => it.id === id);
       if (row) row.parentId = parentId;
     }),
+    recolour: vi.fn<ProjectRepository["recolour"]>(async ({ id, colour }) => {
+      const row = rows.find((it) => it.id === id);
+      if (row) row.colour = colour;
+    }),
     delete: vi.fn<ProjectRepository["delete"]>(async (id) => {
       const index = rows.findIndex((it) => it.id === id);
       if (index >= 0) rows.splice(index, 1);
@@ -270,6 +277,7 @@ export function mockLabelRepository(
     listAll: vi.fn<LabelRepository["listAll"]>().mockResolvedValue([]),
     create: vi.fn<LabelRepository["create"]>().mockResolvedValue(undefined),
     rename: vi.fn<LabelRepository["rename"]>().mockResolvedValue(undefined),
+    recolour: vi.fn<LabelRepository["recolour"]>().mockResolvedValue(undefined),
     delete: vi.fn<LabelRepository["delete"]>().mockResolvedValue(undefined),
     findByName: vi
       .fn<LabelRepository["findByName"]>()
@@ -297,6 +305,10 @@ export function inMemoryLabelRepository(
     rename: vi.fn<LabelRepository["rename"]>(async ({ id, name }) => {
       const row = rows.find((it) => it.id === id);
       if (row) row.name = name;
+    }),
+    recolour: vi.fn<LabelRepository["recolour"]>(async ({ id, colour }) => {
+      const row = rows.find((it) => it.id === id);
+      if (row) row.colour = colour;
     }),
     delete: vi.fn<LabelRepository["delete"]>(async (id) => {
       const index = rows.findIndex((row) => row.id === id);

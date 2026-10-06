@@ -45,47 +45,49 @@ import type { MarkdownSerializerState } from "prosemirror-markdown";
 import { createLowlight, common } from "lowlight";
 import { Markdown } from "tiptap-markdown";
 import {
-  AlignCenter,
-  AlignJustify,
-  AlignLeft,
-  AlignRight,
-  Ban,
-  Bold,
-  ChevronDown,
-  CircleCheck,
-  CircleX,
-  Code,
-  Info,
-  SquareCode,
-  Heading1,
-  Heading2,
-  Heading3,
-  Highlighter,
-  Image as ImageIcon,
-  Italic,
-  Columns3,
-  Link as LinkIcon,
-  List,
-  ListCollapse,
-  ListOrdered,
-  ListTodo,
-  Pilcrow,
-  PanelBottomOpen,
-  PanelRightOpen,
-  Quote,
-  Redo2,
-  Rows3,
-  Smile,
-  Strikethrough,
-  Trash2,
-  Table as TableIcon,
-  TriangleAlert,
-  Type as TypeIcon,
-  Underline as UnderlineIcon,
-  Undo2,
-  ZoomIn,
-  ZoomOut,
-} from "lucide-react";
+  AlignCenterIcon,
+  AlignJustifyIcon,
+  AlignLeftIcon,
+  AlignRightIcon,
+  BoldIcon,
+  BulletListIcon,
+  CalloutErrorIcon,
+  CalloutInfoIcon,
+  CalloutSuccessIcon,
+  CalloutWarningIcon,
+  ChecklistIcon,
+  CodeBlockIcon,
+  CollapsibleIcon,
+  DeleteBlockIcon,
+  DeleteColumnIcon,
+  DeleteRowIcon,
+  DropdownIcon,
+  EmojiIcon,
+  Heading1Icon,
+  Heading2Icon,
+  Heading3Icon,
+  HighlightIcon,
+  ImageGrowIcon,
+  ImageIcon,
+  ImageShrinkIcon,
+  InlineCodeIcon,
+  ItalicIcon,
+  LinkIcon,
+  LinkTextIcon,
+  NoColourIcon,
+  NumberedListIcon,
+  ParagraphIcon,
+  QuoteIcon,
+  RedoIcon,
+  StrikethroughIcon,
+  TableIcon,
+  UnderlineIcon,
+  UndoIcon,
+  InsertColumnLeftIcon,
+  InsertColumnRightIcon,
+  InsertRowAboveIcon,
+  InsertRowBelowIcon,
+} from "@/icons";
 import {
   useEffect,
   useRef,
@@ -720,9 +722,9 @@ const clampWidth = (width: number) =>
 /** Where an image sits in the column. `left` is the default and unwritten. */
 type ImageAlign = "left" | "center" | "right";
 const imageAlignments: { id: ImageAlign; label: string; icon: ReactNode }[] = [
-  { id: "left", label: "Align left", icon: <AlignLeft /> },
-  { id: "center", label: "Centre", icon: <AlignCenter /> },
-  { id: "right", label: "Align right", icon: <AlignRight /> },
+  { id: "left", label: "Align left", icon: <AlignLeftIcon /> },
+  { id: "center", label: "Centre", icon: <AlignCenterIcon /> },
+  { id: "right", label: "Align right", icon: <AlignRightIcon /> },
 ];
 
 /**
@@ -1040,14 +1042,14 @@ function ImageView({ node, updateAttributes, editor, getPos }: NodeViewProps) {
                 label="Smaller"
                 disabled={(width ?? FullWidth) <= MinWidth}
                 onClick={() => step(-1)}>
-                <ZoomOut />
+                <ImageShrinkIcon />
               </ToolbarButton>
               <ToolbarButton
                 testId={`${testId}.bigger.button`}
                 label="Bigger"
                 disabled={width === null}
                 onClick={() => step(1)}>
-                <ZoomIn />
+                <ImageGrowIcon />
               </ToolbarButton>
 
               <Divider />
@@ -1286,25 +1288,25 @@ function TableView({ editor, getPos }: NodeViewProps) {
             testId={`${testId}.row.before.button`}
             label="Add row above"
             onClick={run((chain) => chain.addRowBefore())}>
-            <PanelBottomOpen className="rotate-180" />
+            <InsertRowAboveIcon />
           </ToolbarButton>
           <ToolbarButton
             testId={`${testId}.row.after.button`}
             label="Add row below"
             onClick={run((chain) => chain.addRowAfter())}>
-            <PanelBottomOpen />
+            <InsertRowBelowIcon />
           </ToolbarButton>
           <ToolbarButton
             testId={`${testId}.column.before.button`}
             label="Add column left"
             onClick={run((chain) => chain.addColumnBefore())}>
-            <PanelRightOpen className="rotate-180" />
+            <InsertColumnLeftIcon />
           </ToolbarButton>
           <ToolbarButton
             testId={`${testId}.column.after.button`}
             label="Add column right"
             onClick={run((chain) => chain.addColumnAfter())}>
-            <PanelRightOpen />
+            <InsertColumnRightIcon />
           </ToolbarButton>
 
           <Divider />
@@ -1313,20 +1315,20 @@ function TableView({ editor, getPos }: NodeViewProps) {
             testId={`${testId}.row.delete.button`}
             label="Delete row"
             onClick={run((chain) => chain.deleteRow())}>
-            <Rows3 />
+            <DeleteRowIcon />
           </ToolbarButton>
           <ToolbarButton
             testId={`${testId}.column.delete.button`}
             label="Delete column"
             onClick={run((chain) => chain.deleteColumn())}>
-            <Columns3 />
+            <DeleteColumnIcon />
           </ToolbarButton>
           <ToolbarButton
             testId={`${testId}.delete.button`}
             label="Delete table"
             className="text-destructive hover:text-destructive"
             onClick={run((chain) => chain.deleteTable())}>
-            <Trash2 />
+            <DeleteBlockIcon />
           </ToolbarButton>
         </div>
       )}
@@ -1871,14 +1873,14 @@ function Toolbar({ editor }: { editor: Editor }) {
         label="Undo"
         disabled={!state.canUndo}
         onClick={() => editor.chain().focus().undo().run()}>
-        <Undo2 />
+        <UndoIcon />
       </ToolbarButton>
       <ToolbarButton
         testId="editor.toolbar.redo.button"
         label="Redo"
         disabled={!state.canRedo}
         onClick={() => editor.chain().focus().redo().run()}>
-        <Redo2 />
+        <RedoIcon />
       </ToolbarButton>
 
       <Divider />
@@ -1906,7 +1908,7 @@ function Toolbar({ editor }: { editor: Editor }) {
         label="Quote"
         active={state.blockquote}
         onClick={() => editor.chain().focus().toggleBlockquote().run()}>
-        <Quote />
+        <QuoteIcon />
       </ToolbarButton>
       <DetailsMenu editor={editor} variant={state.details} />
       <TableMenu editor={editor} inside={state.table} />
@@ -1918,21 +1920,21 @@ function Toolbar({ editor }: { editor: Editor }) {
         label="Bold"
         active={state.bold}
         onClick={() => editor.chain().focus().toggleBold().run()}>
-        <Bold />
+        <BoldIcon />
       </ToolbarButton>
       <ToolbarButton
         testId="editor.toolbar.italic.button"
         label="Italic"
         active={state.italic}
         onClick={() => editor.chain().focus().toggleItalic().run()}>
-        <Italic />
+        <ItalicIcon />
       </ToolbarButton>
       <ToolbarButton
         testId="editor.toolbar.strike.button"
         label="Strikethrough"
         active={state.strike}
         onClick={() => editor.chain().focus().toggleStrike().run()}>
-        <Strikethrough />
+        <StrikethroughIcon />
       </ToolbarButton>
       <ToolbarButton
         testId="editor.toolbar.underline.button"
@@ -1950,14 +1952,14 @@ function Toolbar({ editor }: { editor: Editor }) {
         label="Inline code"
         active={state.code}
         onClick={() => editor.chain().focus().toggleCode().run()}>
-        <Code />
+        <InlineCodeIcon />
       </ToolbarButton>
       <ToolbarButton
         testId="editor.toolbar.codeblock.button"
         label="Code block"
         active={state.codeBlock}
         onClick={() => editor.chain().focus().toggleCodeBlock().run()}>
-        <SquareCode />
+        <CodeBlockIcon />
       </ToolbarButton>
       <LinkButton editor={editor} active={state.link} />
       <ImageButton editor={editor} />
@@ -2045,7 +2047,7 @@ function ImageButton({ editor }: { editor: Editor }) {
           />
           <LinkField
             testId="editor.toolbar.image.alt.input"
-            icon={<TypeIcon className="size-3.5" />}
+            icon={<LinkTextIcon className="size-3.5" />}
             placeholder="Describe the image"
             value={alt}
             onChange={setAlt}
@@ -2089,7 +2091,7 @@ function TableMenu({ editor, inside }: { editor: Editor; inside: boolean }) {
           disabled={inside}
           width="wide">
           <TableIcon />
-          <ChevronDown className="size-3 opacity-50" />
+          <DropdownIcon className="size-3 opacity-50" />
         </ToolbarButton>
       </DropdownMenuTrigger>
 
@@ -2231,7 +2233,7 @@ function EmojiButton({ editor }: { editor: Editor }) {
       }}>
       <PopoverTrigger asChild>
         <ToolbarButton testId="editor.toolbar.emoji.button" label="Emoji">
-          <Smile />
+          <EmojiIcon />
         </ToolbarButton>
       </PopoverTrigger>
 
@@ -2312,22 +2314,22 @@ type ToolbarOption = {
 const blocks: Record<string, ToolbarOption> = {
   paragraph: {
     label: "Paragraph",
-    icon: <Pilcrow />,
+    icon: <ParagraphIcon />,
     apply: (editor) => editor.chain().focus().setParagraph().run(),
   },
   h1: {
     label: "Heading 1",
-    icon: <Heading1 />,
+    icon: <Heading1Icon />,
     apply: (editor) => editor.chain().focus().toggleHeading({ level: 1 }).run(),
   },
   h2: {
     label: "Heading 2",
-    icon: <Heading2 />,
+    icon: <Heading2Icon />,
     apply: (editor) => editor.chain().focus().toggleHeading({ level: 2 }).run(),
   },
   h3: {
     label: "Heading 3",
-    icon: <Heading3 />,
+    icon: <Heading3Icon />,
     apply: (editor) => editor.chain().focus().toggleHeading({ level: 3 }).run(),
   },
 };
@@ -2335,22 +2337,22 @@ const blocks: Record<string, ToolbarOption> = {
 const lists: Record<string, ToolbarOption> = {
   none: {
     label: "No list",
-    icon: <List />,
+    icon: <BulletListIcon />,
     apply: (editor) => editor.chain().focus().clearNodes().setParagraph().run(),
   },
   bulletlist: {
     label: "Bullet list",
-    icon: <List />,
+    icon: <BulletListIcon />,
     apply: (editor) => editor.chain().focus().toggleBulletList().run(),
   },
   orderedlist: {
     label: "Numbered list",
-    icon: <ListOrdered />,
+    icon: <NumberedListIcon />,
     apply: (editor) => editor.chain().focus().toggleOrderedList().run(),
   },
   tasklist: {
     label: "To-do list",
-    icon: <ListTodo />,
+    icon: <ChecklistIcon />,
     apply: (editor) => editor.chain().focus().toggleTaskList().run(),
   },
 };
@@ -2358,22 +2360,22 @@ const lists: Record<string, ToolbarOption> = {
 const alignments: Record<string, ToolbarOption> = {
   left: {
     label: "Align left",
-    icon: <AlignLeft />,
+    icon: <AlignLeftIcon />,
     apply: (editor) => editor.chain().focus().setTextAlign("left").run(),
   },
   center: {
     label: "Align center",
-    icon: <AlignCenter />,
+    icon: <AlignCenterIcon />,
     apply: (editor) => editor.chain().focus().setTextAlign("center").run(),
   },
   right: {
     label: "Align right",
-    icon: <AlignRight />,
+    icon: <AlignRightIcon />,
     apply: (editor) => editor.chain().focus().setTextAlign("right").run(),
   },
   justify: {
     label: "Justify",
-    icon: <AlignJustify />,
+    icon: <AlignJustifyIcon />,
     apply: (editor) => editor.chain().focus().setTextAlign("justify").run(),
   },
 };
@@ -2389,19 +2391,19 @@ const detailsLooks: Record<
   DetailsVariant,
   { label: string; icon: ReactNode; tone: string }
 > = {
-  plain: { label: "Collapsible", icon: <ListCollapse />, tone: "" },
-  info: { label: "Info", icon: <Info />, tone: "text-callout-info" },
+  plain: { label: "Collapsible", icon: <CollapsibleIcon />, tone: "" },
+  info: { label: "Info", icon: <CalloutInfoIcon />, tone: "text-callout-info" },
   warning: {
     label: "Warning",
-    icon: <TriangleAlert />,
+    icon: <CalloutWarningIcon />,
     tone: "text-callout-warning",
   },
   success: {
     label: "Success",
-    icon: <CircleCheck />,
+    icon: <CalloutSuccessIcon />,
     tone: "text-callout-success",
   },
-  error: { label: "Error", icon: <CircleX />, tone: "text-callout-error" },
+  error: { label: "Error", icon: <CalloutErrorIcon />, tone: "text-callout-error" },
 };
 
 /**
@@ -2438,7 +2440,7 @@ function DetailsMenu({
               ? detailsLooks.plain.icon
               : detailsLooks[variant].icon}
           </span>
-          <ChevronDown className="size-3 opacity-50" />
+          <DropdownIcon className="size-3 opacity-50" />
         </ToolbarButton>
       </DropdownMenuTrigger>
 
@@ -2468,7 +2470,7 @@ function DetailsMenu({
               testId="editor.toolbar.details.remove.button"
               onMouseDown={(event) => event.preventDefault()}
               onSelect={() => editor.chain().focus().unsetDetails().run()}>
-              <Ban />
+              <NoColourIcon />
               Remove
             </DropdownMenuItem>
           </>
@@ -2505,7 +2507,7 @@ function HighlightMenu({
           active={colour !== null}
           width="wide">
           <span className="relative flex flex-col items-center">
-            <Highlighter />
+            <HighlightIcon />
             <span
               className={cn(
                 "mt-px h-[3px] w-4 rounded-full",
@@ -2513,7 +2515,7 @@ function HighlightMenu({
               )}
             />
           </span>
-          <ChevronDown className="size-3 opacity-50" />
+          <DropdownIcon className="size-3 opacity-50" />
         </ToolbarButton>
       </DropdownMenuTrigger>
 
@@ -2542,7 +2544,7 @@ function HighlightMenu({
           testId="editor.toolbar.highlight.none.button"
           onMouseDown={(event) => event.preventDefault()}
           onSelect={() => editor.chain().focus().unsetHighlight().run()}>
-          <Ban />
+          <NoColourIcon />
           None
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -2607,7 +2609,7 @@ function ToolbarMenu({
       <DropdownMenuTrigger asChild>
         <ToolbarButton testId={`${testId}.menu`} label={label} width="wide">
           {icon}
-          <ChevronDown className="size-3 opacity-50" />
+          <DropdownIcon className="size-3 opacity-50" />
         </ToolbarButton>
       </DropdownMenuTrigger>
 
@@ -2790,7 +2792,7 @@ function LinkButton({ editor, active }: { editor: Editor; active: boolean }) {
           }}>
           <LinkField
             testId="editor.toolbar.link.text.input"
-            icon={<TypeIcon className="size-3.5" />}
+            icon={<LinkTextIcon className="size-3.5" />}
             placeholder="Text"
             value={text}
             onChange={setText}
