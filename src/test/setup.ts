@@ -2,6 +2,9 @@ import "@testing-library/jest-dom/vitest";
 
 import { faker } from "@faker-js/faker";
 import { cleanup, configure } from "@testing-library/react";
+// From motion-utils, the same object Motion reads, without loading Motion
+// itself into every spec file just to set a flag.
+import { MotionGlobalConfig } from "motion-utils";
 import { afterEach, vi } from "vitest";
 
 // Random fixtures are only acceptable if a failure can be replayed exactly.
@@ -11,6 +14,10 @@ faker.seed(seed);
 if (!process.env.FAKER_SEED) {
   console.info(`[faker] seed=${seed} (replay: FAKER_SEED=${seed})`);
 }
+
+// Motion animations finish instantly under test: a spec asserts where a row
+// ends up, never on the frames in between, and jsdom has no frames to give.
+MotionGlobalConfig.skipAnimations = true;
 
 // Elements are tagged `data-test-id`, not RTL's default `data-testid`.
 configure({ testIdAttribute: "data-test-id" });

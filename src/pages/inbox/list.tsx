@@ -1,4 +1,5 @@
 import { TodoCheckerInput, TodoTitle } from "@/components/todo";
+import { AnimatePresence, motion } from "motion/react";
 import { Text } from "@/components/ui/text";
 import { testProp, type TestIdProps } from "@/lib/test-id";
 import { Timing } from "@/lib/timing";
@@ -231,9 +232,28 @@ function TodoListContainer({ todoList }: { todoList?: TodoEntity[] }) {
 
   return (
     <div className="flex flex-col gap-3">
-      {todoList.map((it) => (
-        <TodoItem todo={it} key={it.id} />
-      ))}
+      {/*
+        `initial={false}`: the rows already there when the list mounts are the
+        list, not news, so they appear still. Only a row that arrives after,
+        a todo just captured or one reopened from Done, animates in, and the
+        rows below it glide down to make room (`layout`) instead of jumping.
+      */}
+      <AnimatePresence initial={false}>
+        {todoList.map((it) => (
+          <motion.div
+            key={it.id}
+            layout="position"
+            initial={{ opacity: 0, y: -12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{
+              duration: Timing.rowEnterMs / 1000,
+              ease: [0.16, 1, 0.3, 1],
+              layout: { type: "spring", stiffness: 500, damping: 40 },
+            }}>
+            <TodoItem todo={it} />
+          </motion.div>
+        ))}
+      </AnimatePresence>
     </div>
   );
 }

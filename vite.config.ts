@@ -100,6 +100,7 @@ export default defineConfig(({ command }) => ({
       VITE_COMPLETION_RESORT_MS: "0",
       VITE_CONFETTI_VISIBLE_MS: "0",
       VITE_SAVED_VISIBLE_MS: "0",
+      VITE_ROW_ENTER_MS: "0",
     },
   },
 }));

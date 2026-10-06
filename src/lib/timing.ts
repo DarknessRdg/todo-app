@@ -24,6 +24,8 @@ const Defaults = {
    * spot, short enough that it does not become part of the furniture.
    */
   savedVisibleMs: 2400,
+  /** How long a todo that was just added takes to settle into the list. */
+  rowEnterMs: 260,
 } as const;
 
 /**
@@ -59,5 +61,8 @@ export const Timing = {
       import.meta.env.VITE_SAVED_VISIBLE_MS,
       Defaults.savedVisibleMs
     );
+  },
+  get rowEnterMs() {
+    return readDelay(import.meta.env.VITE_ROW_ENTER_MS, Defaults.rowEnterMs);
   },
 };
