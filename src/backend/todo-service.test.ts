@@ -55,6 +55,33 @@ describe("TodoService", () => {
 
       expect(repository.create.mock.calls[0][0].priority).toBe("urgent");
     });
+
+    it("Then a title of only whitespace is rejected instead of persisted", async () => {
+      const repository = mockTodoRepository();
+
+      await serviceWith(repository).create(makeCreateTodo({ title: "   " }));
+
+      expect(repository.create).not.toHaveBeenCalled();
+    });
+
+    it("Then the title is stored trimmed", async () => {
+      const repository = mockTodoRepository();
+
+      await serviceWith(repository).create(
+        makeCreateTodo({ title: "  padded  " })
+      );
+
+      expect(repository.create.mock.calls[0][0].title).toBe("padded");
+    });
+  });
+
+  /** What the capture bar asks before it lets a todo through. */
+  it("when I check a title of only whitespace, Then it is reported as missing", () => {
+    const service = serviceWith(mockTodoRepository());
+
+    expect(
+      service.validateField(makeCreateTodo({ title: "   " }), "title")
+    ).toBe("title-required");
   });
 
   describe("when I set a todo's priority", () => {

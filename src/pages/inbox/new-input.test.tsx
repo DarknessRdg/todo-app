@@ -83,6 +83,33 @@ describe("new todo input", () => {
    * The page's own promise, not a default: `/today` says what you capture there
    * is due today, so it pins the date the way the project page pins a project.
    */
+  describe("when I capture a title of only spaces", () => {
+    afterEach(() => vi.unstubAllEnvs());
+
+    it("Then nothing is created", async () => {
+      const user = setupUser();
+      const { repository } = renderNewInput();
+
+      await user.type(screen.getByTestId(input), "   ");
+      await user.click(screen.getByTestId(submit));
+
+      expect(repository.create).not.toHaveBeenCalled();
+    });
+
+    it("Then nothing is celebrated", async () => {
+      vi.stubEnv("VITE_CELEBRATION_VISIBLE_MS", "60000");
+      const user = setupUser();
+      renderNewInput();
+
+      await user.type(screen.getByTestId(input), "   ");
+      await user.click(screen.getByTestId(submit));
+
+      expect(
+        screen.queryByTestId("celebration.confetti")
+      ).not.toBeInTheDocument();
+    });
+  });
+
   describe("when I set a priority before capturing", () => {
     it("Then the todo is created carrying it", async () => {
       const user = setupUser();

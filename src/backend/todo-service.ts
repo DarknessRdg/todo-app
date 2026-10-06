@@ -12,7 +12,10 @@ const subtaskZodScheme = z.object({
 });
 
 const createTodoZodScheme = z.object({
-  title: z.string().nonempty({ error: "title-required" }),
+  // `.trim()` guards the rule (a title of spaces is no title); the value
+  // itself is trimmed by `create`, since the validator never hands back
+  // zod's transformed output.
+  title: z.string().trim().nonempty({ error: "title-required" }),
   dueDate: z.date().optional(),
   /**
    * The description, as Markdown. This is the record of truth: portable,
@@ -133,6 +136,7 @@ export class TodoService {
       subtasks: [],
       labelIds: [],
       ...partial,
+      title: partial.title.trim(),
     });
 
     return validation.onValidAsync(async (todo) => {
