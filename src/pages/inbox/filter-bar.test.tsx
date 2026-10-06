@@ -407,6 +407,20 @@ describe("inbox filter bar", () => {
       await waitFor(() => expect(currentLocation()).toContain("sort=due"));
     });
 
+    it("Then oldest first is on offer, and the url carries it", async () => {
+      const user = setupUser();
+      const todo = makeTodo({ done: false });
+      const { currentLocation } = renderInbox([todo]);
+
+      await waitFor(() => expect(isListed(todo)).toBe(true));
+      await user.click(screen.getByTestId("home.filter.sort.menu"));
+      await user.click(
+        await screen.findByTestId("home.filter.sort.oldest.button")
+      );
+
+      await waitFor(() => expect(currentLocation()).toContain("sort=oldest"));
+    });
+
     /**
      * Sorting hides nothing, so it must not put the list into the state that
      * offers to clear filters nobody set.

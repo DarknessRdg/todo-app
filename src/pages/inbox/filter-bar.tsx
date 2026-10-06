@@ -376,7 +376,8 @@ function labelTriggerText(selected: string[], labels: LabelEntity[]): string {
 export type FilterControl = "due" | "priority" | "labels" | "done" | "subtasks";
 
 const sortOptions: { id: TodoSort; label: string }[] = [
-  { id: "manual", label: "Default order" },
+  { id: "newest", label: "Newest first" },
+  { id: "oldest", label: "Oldest first" },
   { id: "due", label: "Due date" },
   { id: "priority", label: "Priority" },
   { id: "title", label: "Title" },

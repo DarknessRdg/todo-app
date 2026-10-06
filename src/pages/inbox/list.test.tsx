@@ -67,6 +67,19 @@ function shownCounts() {
 
 describe("todo list", () => {
   describe("when the page loads", () => {
+    /** The store keeps todos in the order they were made, oldest first. */
+    it("Then the newest todo is listed first", async () => {
+      const older = makeTodo({ done: false, title: "Written first" });
+      const newer = makeTodo({ done: false, title: "Written second" });
+      renderInbox([older, newer]);
+
+      const newest = await screen.findByTestId(rowTitle(newer));
+
+      expect(
+        newest.compareDocumentPosition(screen.getByTestId(rowTitle(older)))
+      ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+
     it("Then every count reflects the stored todos", async () => {
       const todos = [
         makeTodo({ done: false }),
