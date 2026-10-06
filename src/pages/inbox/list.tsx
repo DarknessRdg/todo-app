@@ -1,5 +1,11 @@
 import { TodoCheckerInput, TodoTitle } from "@/components/todo";
-import { AnimatePresence, motion } from "motion/react";
+import {
+  AnimatePresence,
+  motion,
+  useAnimate,
+  useReducedMotion,
+} from "motion/react";
+import { takeCapture, type CaptureOrigin } from "@/lib/capture-flight";
 import { Text } from "@/components/ui/text";
 import { testProp, type TestIdProps } from "@/lib/test-id";
 import { Timing } from "@/lib/timing";
@@ -16,7 +22,7 @@ import {
   SubtaskIndicator,
 } from "@/pages/inbox/todo-meta.tsx";
 import { useNavigate } from "react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { DisclosureIcon } from "@/icons";
 import { cn } from "@/lib/utils";
 import { flagKey } from "@/lib/persisted-flag";
@@ -222,6 +228,13 @@ function Section({
 }
 
 function TodoListContainer({ todoList }: { todoList?: TodoEntity[] }) {
+  // False through the first render, so the rows the list opens with are never
+  // mistaken for arrivals, and cannot claim a capture made on another page.
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+  }, []);
+
   if (!todoList?.length) {
     return (
       <Text variant="muted" className="text-muted-foreground/70 px-1 py-3">
@@ -240,21 +253,78 @@ function TodoListContainer({ todoList }: { todoList?: TodoEntity[] }) {
       */}
       <AnimatePresence initial={false}>
         {todoList.map((it) => (
-          <motion.div
-            key={it.id}
-            layout="position"
-            initial={{ opacity: 0, y: -12, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{
-              duration: Timing.rowEnterMs / 1000,
-              ease: [0.16, 1, 0.3, 1],
-              layout: { type: "spring", stiffness: 500, damping: 40 },
-            }}>
-            <TodoItem todo={it} />
-          </motion.div>
+          <ArrivingRow key={it.id} todo={it} arriving={mounted.current} />
         ))}
       </AnimatePresence>
     </div>
+  );
+}
+
+/**
+ * A row, and how it comes into the list.
+ *
+ * One that was just captured flies in from the capture bar: it starts where
+ * the bar is, raised a touch as if still being held, and drops into its own
+ * slot while settling flat. That is the text firming up into a card. Any other
+ * arrival (reopened from Done, let back in by a filter) just fades down a few
+ * pixels. Rows that were there when the list mounted do neither; see the
+ * `AnimatePresence` above.
+ */
+function ArrivingRow({
+  todo,
+  arriving,
+}: {
+  todo: TodoEntity;
+  /** Whether the list was already on screen when this row joined it. */
+  arriving: boolean;
+}) {
+  const [scope, animate] = useAnimate<HTMLDivElement>();
+  const reduceMotion = useReducedMotion();
+  // Read once, at mount: the ledger hands each capture to one row only.
+  const [origin] = useState<CaptureOrigin | undefined>(() =>
+    arriving ? takeCapture(todo.title) : undefined
+  );
+
+  // Before paint, so the row is never seen in its own slot first.
+  useLayoutEffect(() => {
+    if (origin === undefined || reduceMotion || !scope.current) return;
+
+    const slot = scope.current.getBoundingClientRect();
+    const x = origin.left - slot.left;
+    const y = origin.top - slot.top;
+    const seconds = Timing.captureFlightMs / 1000;
+
+    animate(
+      scope.current,
+      {
+        x: [x, 0],
+        y: [y, 0],
+        scale: [1.03, 1],
+        boxShadow: [
+          "0 12px 28px -12px rgb(15 23 42 / 0.35)",
+          "0 0 0 0 rgb(15 23 42 / 0)",
+        ],
+      },
+      { duration: seconds, ease: [0.2, 0.9, 0.3, 1] }
+    );
+    // Mount only: the flight happens once, from where the bar was then.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <motion.div
+      ref={scope}
+      layout="position"
+      className="rounded-2xl"
+      initial={origin ? false : { opacity: 0, y: -12, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{
+        duration: Timing.rowEnterMs / 1000,
+        ease: [0.16, 1, 0.3, 1],
+        layout: { type: "spring", stiffness: 500, damping: 40 },
+      }}>
+      <TodoItem todo={todo} />
+    </motion.div>
   );
 }
 

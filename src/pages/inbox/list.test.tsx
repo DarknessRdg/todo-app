@@ -10,7 +10,7 @@ import {
   inMemoryTodoRepository,
   renderWithContainer,
 } from "@/test/container";
-import { makeSubtask, makeTodo } from "@/test/todo-factory";
+import { makeCreateTodo, makeSubtask, makeTodo } from "@/test/todo-factory";
 import { writeSetting } from "@/lib/settings";
 import { todosInProject } from "@/lib/todo-scope";
 
@@ -108,6 +108,51 @@ describe("todo list", () => {
       expect(screen.queryByTestId(doneSection)).not.toBeInTheDocument();
       expect(shownCounts().heroDone).toBe("0");
       expect(shownCounts().percentage).toBe("0%");
+    });
+  });
+
+  /**
+   * The capture bar and the list are siblings on the page; what is under test
+   * is the hand-off between them, so the whole page is mounted.
+   */
+  describe("when I capture a todo", () => {
+    const capture = async (
+      user: ReturnType<typeof setupUser>,
+      repository: ReturnType<typeof inMemoryTodoRepository>
+    ) => {
+      // Pasted, not typed: one input event rather than one per character,
+      // and how the title arrives is not what this spec is about.
+      await user.click(await screen.findByTestId("home.todo.create.input"));
+      await user.paste(makeCreateTodo().title);
+      await user.click(screen.getByTestId("home.todo.create.submit"));
+      await waitFor(() => expect(repository.create).toHaveBeenCalled());
+
+      return repository.create.mock.calls[0][0];
+    };
+
+    it("Then it is listed", async () => {
+      const user = setupUser();
+      const { repository } = renderInbox([makeTodo({ done: false })]);
+
+      const captured = await capture(user, repository);
+
+      expect(
+        await screen.findByTestId(rowTitle(captured))
+      ).toBeInTheDocument();
+    });
+
+    it("Then it lands above the todos that were already there", async () => {
+      const user = setupUser();
+      const earlier = makeTodo({ done: false });
+      const { repository } = renderInbox([earlier]);
+      await screen.findByTestId(rowTitle(earlier));
+
+      const captured = await capture(user, repository);
+      const row = await screen.findByTestId(rowTitle(captured));
+
+      expect(
+        row.compareDocumentPosition(screen.getByTestId(rowTitle(earlier)))
+      ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     });
   });
 

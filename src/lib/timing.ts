@@ -28,6 +28,8 @@ const Defaults = {
   rowEnterMs: 260,
   /** How long the screen confetti for a capture stays mounted. */
   celebrationVisibleMs: 2400,
+  /** How long a captured todo takes to drop from the bar into its place. */
+  captureFlightMs: 520,
 } as const;
 
 /**
@@ -68,6 +70,12 @@ export const Timing = {
     return readDelay(
       import.meta.env.VITE_CELEBRATION_VISIBLE_MS,
       Defaults.celebrationVisibleMs
+    );
+  },
+  get captureFlightMs() {
+    return readDelay(
+      import.meta.env.VITE_CAPTURE_FLIGHT_MS,
+      Defaults.captureFlightMs
     );
   },
   get rowEnterMs() {

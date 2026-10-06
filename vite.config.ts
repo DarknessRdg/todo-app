@@ -102,6 +102,7 @@ export default defineConfig(({ command }) => ({
       VITE_SAVED_VISIBLE_MS: "0",
       VITE_ROW_ENTER_MS: "0",
       VITE_CELEBRATION_VISIBLE_MS: "0",
+      VITE_CAPTURE_FLIGHT_MS: "0",
     },
   },
 }));

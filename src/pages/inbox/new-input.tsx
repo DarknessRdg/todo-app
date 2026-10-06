@@ -18,6 +18,7 @@ import { DropdownIcon, DueDateIcon, SubmitIcon } from "@/icons";
 import { useEffect, useRef, useState } from "react";
 import { ScreenConfetti } from "@/components/screen-confetti";
 import { Timing } from "@/lib/timing";
+import { rememberCapture } from "@/lib/capture-flight";
 import { projectForCapture } from "@/lib/todo-capture";
 
 /**
@@ -51,6 +52,10 @@ export function NewInput({
   );
   useEffect(() => () => clearTimeout(celebration.current), []);
 
+  // Where the bar sits when Enter is pressed: the new row starts its
+  // entrance here, so the text reads as dropping into the list.
+  const bar = useRef<HTMLDivElement>(null);
+
   const celebrate = () => {
     setVolley((n) => n + 1);
     setCelebrating(true);
@@ -78,6 +83,8 @@ export function NewInput({
         projectId: projectForCapture(projectId, value.projectId),
       });
       toast.success("Captured", { description: value.title });
+      const rect = bar.current?.getBoundingClientRect();
+      if (rect) rememberCapture(value.title, rect);
       celebrate();
       formApi.reset();
     },
@@ -108,7 +115,9 @@ export function NewInput({
   return (
     <form.AppForm>
       <form.FormSubmit>
-        <div className="bg-card focus-within:ring-ring flex items-center gap-2.5 rounded-2xl px-3.5 transition-shadow focus-within:ring-2">
+        <div
+          ref={bar}
+          className="bg-card focus-within:ring-ring flex items-center gap-2.5 rounded-2xl px-3.5 transition-shadow focus-within:ring-2">
           <TodoCheckerInput
             done={false}
             disabled
