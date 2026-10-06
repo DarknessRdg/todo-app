@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { CheckCircle2 } from "lucide-react";
+import { CompletedIcon } from "@/icons";
 
 import { EmptyList } from "@/pages/inbox/empty-list";
 import { todosCompleted } from "@/lib/todo-scope";
@@ -42,7 +42,7 @@ export function CompletedPage() {
           empty={
             <EmptyList
               testId="completed.todo.empty"
-              icon={<CheckCircle2 className="size-5" />}
+              icon={<CompletedIcon className="size-5" />}
               title="Nothing finished yet"
               message="Tick something off and it will be kept here."
             />

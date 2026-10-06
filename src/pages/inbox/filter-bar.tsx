@@ -36,15 +36,15 @@ import {
 import type { LabelEntity } from "@/backend/label-service";
 import { dayFromKey } from "@/lib/todo-filter";
 import {
-  ArrowUpDown,
-  CalendarRange,
-  ChevronDown,
-  ListChecks,
-  Search,
-  SignalHigh,
-  Tag,
-  X,
-} from "lucide-react";
+  DropdownIcon,
+  DueDateIcon,
+  LabelIcon,
+  PriorityIcon,
+  RemoveIcon,
+  SearchIcon,
+  SortIcon,
+  SubtasksIcon,
+} from "@/icons";
 import { useState } from "react";
 
 /* -------------------------------------------------------------------------- */
@@ -123,7 +123,7 @@ export function FilterBar({
       {...testProp("home.filter")}
       className="flex flex-wrap items-center gap-2">
       <div className="relative flex min-w-52 grow items-center sm:grow-0">
-        <Search className="text-muted-foreground pointer-events-none absolute left-3 size-3.5" />
+        <SearchIcon className="text-muted-foreground pointer-events-none absolute left-3 size-3.5" />
         <Input
           testId="home.filter.search.input"
           value={filter.query}
@@ -165,7 +165,7 @@ export function FilterBar({
         <FilterToggle
           testId="home.filter.subtasks.toggle"
           label="Open subtasks"
-          icon={<ListChecks className="size-3.5" />}
+          icon={<SubtasksIcon className="size-3.5" />}
           pressed={filter.openSubtasks}
           onPressedChange={(openSubtasks) => set({ openSubtasks })}
         />
@@ -178,7 +178,7 @@ export function FilterBar({
           size="sm"
           className="text-muted-foreground hover:text-foreground h-9 gap-1.5"
           onClick={() => onChange(emptyTodoFilter)}>
-          <X className="size-3.5" />
+          <RemoveIcon className="size-3.5" />
           Clear
         </Button>
       )}
@@ -206,9 +206,9 @@ function DueMenu({
         <FilterTrigger
           testId="home.filter.due.menu"
           active={filter.due.kind !== "any"}>
-          <CalendarRange className="size-3.5" />
+          <DueDateIcon className="size-3.5" />
           {active?.label ?? pickedDayLabel(filter.due)}
-          <ChevronDown className="size-3 opacity-50" />
+          <DropdownIcon className="size-3 opacity-50" />
         </FilterTrigger>
       </DropdownMenuTrigger>
 
@@ -292,9 +292,9 @@ function LabelPicker({
         <FilterTrigger
           testId="home.filter.label.menu"
           active={selected.length > 0}>
-          <Tag className="size-3.5" />
+          <LabelIcon className="size-3.5" />
           {labelTriggerText(selected, labels)}
-          <ChevronDown className="size-3 opacity-50" />
+          <DropdownIcon className="size-3 opacity-50" />
         </FilterTrigger>
       </PopoverTrigger>
 
@@ -345,7 +345,7 @@ function LabelPicker({
             {...testProp("home.filter.label.clear.button")}
             onClick={() => onChange([])}
             className="text-muted-foreground hover:text-foreground mt-2 flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-sm">
-            <X className="size-3.5" />
+            <RemoveIcon className="size-3.5" />
             Clear labels
           </button>
         )}
@@ -397,9 +397,9 @@ function SortMenu({
         <FilterTrigger
           testId="home.filter.sort.menu"
           active={value !== defaultTodoSort}>
-          <ArrowUpDown className="size-3.5" />
+          <SortIcon className="size-3.5" />
           {value === defaultTodoSort ? "Sort" : chosen?.label}
-          <ChevronDown className="size-3 opacity-50" />
+          <DropdownIcon className="size-3 opacity-50" />
         </FilterTrigger>
       </DropdownMenuTrigger>
 
@@ -433,9 +433,9 @@ function PriorityMenu({
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <FilterTrigger testId={`${testId}.menu`} active={value !== undefined}>
-          <SignalHigh className="size-3.5" />
+          <PriorityIcon className="size-3.5" />
           {chosen?.label ?? "Priority"}
-          <ChevronDown className="size-3 opacity-50" />
+          <DropdownIcon className="size-3 opacity-50" />
         </FilterTrigger>
       </DropdownMenuTrigger>
 

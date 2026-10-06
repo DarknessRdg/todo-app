@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { TooltipText } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { isEditingRichText } from "@/lib/rich-text";
-import { Maximize2 } from "lucide-react";
+import { OpenFullPageIcon } from "@/icons";
 import type { PropsWithChildren } from "react";
 
 type TodoModalContentProps = {
@@ -53,7 +53,7 @@ export function TodoModalContent({
             className="text-muted-foreground hover:text-foreground mr-8 size-8"
             onClick={() => void navigate(`/todo/${id}`)}
             aria-label="Open full screen">
-            <Maximize2 className="size-4" />
+            <OpenFullPageIcon className="size-4" />
           </Button>
         </TooltipText>
       }>

@@ -1,4 +1,4 @@
-import { RotateCw } from "lucide-react";
+import { RetryIcon } from "@/icons";
 
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
@@ -32,7 +32,7 @@ export function TodoLookupFailed({ onRetry, testId }: TodoLookupFailedProps) {
         testId={testId === undefined ? undefined : `${testId}.retry.button`}
         onClick={onRetry}
         className="mt-3 gap-1.5 rounded-full">
-        <RotateCw className="size-4" />
+        <RetryIcon className="size-4" />
         Try again
       </Button>
     </div>

@@ -3,18 +3,18 @@ import { cn } from "@/lib/utils.ts";
 import { testProp, type TestIdProps } from "@/lib/test-id";
 import { priorityLabel, type TodoPriority } from "@/lib/priority";
 import {
-  AlertTriangle,
-  CalendarIcon,
-  CheckCircle2,
-  CircleDot,
-  FolderIcon,
-  ListChecks,
-  SignalHigh,
-  SignalLow,
-  SignalMedium,
-  Tag,
-  type LucideIcon,
-} from "lucide-react";
+  type AppIcon,
+  DoneStatusIcon,
+  DueDateIcon,
+  LabelIcon,
+  OpenStatusIcon,
+  PriorityHighIcon,
+  PriorityLowIcon,
+  PriorityMediumIcon,
+  PriorityUrgentIcon,
+  ProjectIcon,
+  SubtasksIcon,
+} from "@/icons";
 
 /**
  * A stable number from an id, so the display ticket key below is the same one
@@ -53,14 +53,14 @@ export function shortId(id: string) {
 export function StatusBadge({ done }: { done: boolean }) {
   return done ? (
     <Badge className="bg-accent text-accent-foreground gap-1.5 border-transparent font-normal">
-      <CheckCircle2 className="size-3.5" />
+      <DoneStatusIcon className="size-3.5" />
       Done
     </Badge>
   ) : (
     <Badge
       variant="secondary"
       className="text-muted-foreground gap-1.5 font-normal">
-      <CircleDot className="size-3.5" />
+      <OpenStatusIcon className="size-3.5" />
       Open
     </Badge>
   );
@@ -74,11 +74,11 @@ const PRIORITY_STYLES: Record<TodoPriority, string> = {
   urgent: "bg-foreground text-background",
 };
 
-const PRIORITY_ICONS: Record<TodoPriority, LucideIcon> = {
-  low: SignalLow,
-  medium: SignalMedium,
-  high: SignalHigh,
-  urgent: AlertTriangle,
+const PRIORITY_ICONS: Record<TodoPriority, AppIcon> = {
+  low: PriorityLowIcon,
+  medium: PriorityMediumIcon,
+  high: PriorityHighIcon,
+  urgent: PriorityUrgentIcon,
 };
 
 /**
@@ -124,7 +124,7 @@ export function ProjectBadge({
 }) {
   return (
     <Badge variant="secondary" className={cn("gap-1.5 font-normal", className)}>
-      <FolderIcon className="size-3.5" />
+      <ProjectIcon className="size-3.5" />
       {project}
     </Badge>
   );
@@ -139,7 +139,7 @@ export function DueBadge({
 }) {
   return (
     <Badge variant="secondary" className={cn("gap-1.5 font-normal", className)}>
-      <CalendarIcon className="size-3.5" />
+      <DueDateIcon className="size-3.5" />
       {formatDateShort(date)}
     </Badge>
   );
@@ -161,7 +161,7 @@ export function LabelChips({
     <div className={cn("flex flex-wrap items-center gap-1", className)}>
       {shown.map((label) => (
         <Badge key={label} variant="secondary" className="gap-1.5 font-normal">
-          <Tag className="size-3.5" />
+          <LabelIcon className="size-3.5" />
           {label}
         </Badge>
       ))}
@@ -195,7 +195,7 @@ export function SubtaskIndicator({
         className
       )}
       title={`${done} of ${total} subtasks done`}>
-      <ListChecks className="size-3.5" />
+      <SubtasksIcon className="size-3.5" />
       {done}/{total}
     </span>
   );

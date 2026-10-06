@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { AddIcon } from "@/icons";
 import { useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router";
 
@@ -161,7 +161,7 @@ export function SidebarProjects() {
           onClick={() => startAdding(TopLevel)}
           {...testProp("sidebar.project.create.button")}
           className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex size-5 items-center justify-center rounded-md transition-colors">
-          <Plus className="size-3.5" />
+          <AddIcon className="size-3.5" />
         </button>
       </SidebarGroupLabel>
 

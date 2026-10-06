@@ -1,6 +1,6 @@
 import * as React from "react";
 import * as CheckboxPrimitive from "@radix-ui/react-checkbox";
-import { CheckIcon } from "lucide-react";
+import { CheckmarkIcon } from "@/icons";
 
 import { cn } from "@/lib/utils";
 import { testProp, type TestIdProps } from "@/lib/test-id";
@@ -44,7 +44,7 @@ function Checkbox({
       <CheckboxPrimitive.Indicator
         data-slot="checkbox-indicator"
         className="flex items-center justify-center text-current transition-none">
-        <CheckIcon className="animate-check-pop size-3.5" />
+        <CheckmarkIcon className="animate-check-pop size-3.5" />
       </CheckboxPrimitive.Indicator>
     </CheckboxPrimitive.Root>
   );

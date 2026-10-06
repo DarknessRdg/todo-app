@@ -1,4 +1,4 @@
-import { ChevronRight, Hash, Plus } from "lucide-react";
+import { AddIcon, DisclosureIcon, ProjectIcon } from "@/icons";
 import { Link } from "react-router";
 
 import type { ProjectEntity } from "@/backend/project-service";
@@ -92,12 +92,12 @@ export function SidebarProjectNode({
                   setOpen(!open);
                 }}
                 className="text-muted-foreground/70 -ml-0.5 flex size-4 shrink-0 items-center justify-center rounded">
-                <ChevronRight
+                <DisclosureIcon
                   className={cn("size-3.5 transition-transform", open && "rotate-90")}
                 />
               </button>
             ) : (
-              <Hash className="text-muted-foreground/70 size-3.5 shrink-0" />
+              <ProjectIcon className="text-muted-foreground/70 size-3.5 shrink-0" />
             )}
 
             <span className="truncate">{node.name}</span>
@@ -124,7 +124,7 @@ export function SidebarProjectNode({
               {...testProp(`${testId}.add.button`)}
               onClick={() => actions.onAddChild(node.id)}
               className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex size-5 shrink-0 items-center justify-center rounded-md opacity-0 transition-opacity group-focus-within/project:opacity-100 group-hover/project:opacity-100">
-              <Plus className="size-3.5" />
+              <AddIcon className="size-3.5" />
             </button>
           )}
 

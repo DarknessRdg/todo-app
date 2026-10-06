@@ -16,7 +16,7 @@ import {
 } from "@/pages/inbox/todo-meta.tsx";
 import { useNavigate } from "react-router";
 import { useEffect, useRef, useState } from "react";
-import { ChevronRight } from "lucide-react";
+import { DisclosureIcon } from "@/icons";
 import { cn } from "@/lib/utils";
 import { flagKey } from "@/lib/persisted-flag";
 import { useStickyToggle } from "@/hooks/use-sticky-toggle";
@@ -200,7 +200,7 @@ function Section({
           aria-label={`${open ? "Collapse" : "Expand"} ${label}`}
           {...testProp(testId === undefined ? undefined : `${testId}.toggle`)}
           className="group -ml-1 flex items-center gap-1.5 rounded-md px-1 py-0.5 transition-colors">
-          <ChevronRight
+          <DisclosureIcon
             className={cn(
               "text-muted-foreground size-4 shrink-0 transition-transform duration-200",
               open && "rotate-90"

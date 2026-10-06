@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { ListPlus, Pencil, Tag, Trash2 } from "lucide-react";
+import { AssignTodosIcon, DeleteIcon, LabelIcon, RenameIcon } from "@/icons";
 import { useRef, useState } from "react";
 
 import type { LabelEntity } from "@/backend/label-service";
@@ -128,7 +128,7 @@ export function LabelsPage() {
       ) : labels.length === 0 ? (
         <EmptyList
           testId="labels.page.empty"
-          icon={<Tag className="size-5" />}
+          icon={<LabelIcon className="size-5" />}
           title="No labels yet"
           message="Labels cut across projects — one can sit on any todo, anywhere. Name your first one above."
         />
@@ -146,7 +146,7 @@ export function LabelsPage() {
                 />
               ) : (
                 <>
-                  <Tag className="text-muted-foreground size-4 shrink-0" />
+                  <LabelIcon className="text-muted-foreground size-4 shrink-0" />
                   {/*
                     A real link, not a click handler: this page manages labels,
                     and reading the todos carrying one is a different page with
@@ -173,7 +173,7 @@ export function LabelsPage() {
                       aria-label={`Add todos to ${label.name}`}
                       className="text-muted-foreground hover:text-foreground size-8"
                       onClick={() => setAssigning(label)}>
-                      <ListPlus className="size-4" />
+                      <AssignTodosIcon className="size-4" />
                     </Button>
                   </TooltipText>
 
@@ -185,7 +185,7 @@ export function LabelsPage() {
                       aria-label={`Rename ${label.name}`}
                       className="text-muted-foreground hover:text-foreground size-8"
                       onClick={() => setRenaming(label.id)}>
-                      <Pencil className="size-4" />
+                      <RenameIcon className="size-4" />
                     </Button>
                   </TooltipText>
 
@@ -197,7 +197,7 @@ export function LabelsPage() {
                       aria-label={`Delete ${label.name}`}
                       className="text-muted-foreground hover:text-destructive size-8"
                       onClick={() => setDeleting(label)}>
-                      <Trash2 className="size-4" />
+                      <DeleteIcon className="size-4" />
                     </Button>
                   </TooltipText>
                 </>
@@ -481,7 +481,7 @@ function RenameField({
         event.preventDefault();
         submit();
       }}>
-      <Tag className="text-muted-foreground size-4 shrink-0" />
+      <LabelIcon className="text-muted-foreground size-4 shrink-0" />
       <Input
         testId={`labels.page.${label.id}.rename.input`}
         autoFocus

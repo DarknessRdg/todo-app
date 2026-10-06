@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { testProp, type TestIdProps } from "@/lib/test-id";
 import { Progress } from "@/components/ui/progress";
 import type { TodoEntity } from "@/backend/todo-service";
-import { CheckCircle2, Circle, CalendarClock } from "lucide-react";
+import { DoneStatusIcon, DueDateIcon, OpenCountIcon } from "@/icons";
 
 function isSameDay(a: Date, b: Date) {
   return (
@@ -65,19 +65,19 @@ export function OverviewPanel({
         <div className="grid grid-cols-2 gap-2.5">
           <Stat
             testId="home.overview.open.count"
-            icon={<Circle className="size-4" />}
+            icon={<OpenCountIcon className="size-4" />}
             value={openCount}
             label="Open"
           />
           <Stat
             testId="home.overview.done.count"
-            icon={<CheckCircle2 className="size-4" />}
+            icon={<DoneStatusIcon className="size-4" />}
             value={doneCount}
             label="Done"
           />
           <Stat
             testId="home.overview.duetoday.count"
-            icon={<CalendarClock className="size-4" />}
+            icon={<DueDateIcon className="size-4" />}
             value={dueTodayCount}
             label="Due today"
           />

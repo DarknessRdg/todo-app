@@ -20,7 +20,7 @@ import {
   isTodoFilterActive,
   type TodoFilter,
 } from "@/lib/todo-filter";
-import { SearchX } from "lucide-react";
+import { NoMatchesIcon } from "@/icons";
 import { useCallback, useMemo } from "react";
 
 /** A due filter as one string, so it can be compared by value in a dep list. */
@@ -95,7 +95,7 @@ function InboxList({ todos }: { todos: TodoEntity[] | undefined }) {
         isTodoFilterActive(filter) ? (
           <EmptyList
             testId="home.todo.empty.filtered"
-            icon={<SearchX className="size-5" />}
+            icon={<NoMatchesIcon className="size-5" />}
             title="Nothing matches"
             message="No todo fits the filters above. Widen them, or clear them to see the lot."
           />

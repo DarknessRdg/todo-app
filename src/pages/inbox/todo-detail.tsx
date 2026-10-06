@@ -15,18 +15,18 @@ import {
   shortId,
 } from "@/pages/inbox/todo-meta.tsx";
 import {
-  BookOpen,
-  CalendarIcon,
-  Check,
-  CircleDot,
-  Copy,
-  FolderIcon,
-  PencilLine,
-  Plus,
-  SignalHigh,
-  Tag,
-  Trash2Icon,
-} from "lucide-react";
+  AddIcon,
+  CheckmarkIcon,
+  CopyIcon,
+  DeleteIcon,
+  DueDateIcon,
+  LabelIcon,
+  PriorityIcon,
+  ProjectIcon,
+  ReadingIcon,
+  StatusIcon,
+  WritingIcon,
+} from "@/icons";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ConfettiBurst } from "@/components/confetti-burst";
 import { InlineEdit } from "@/components/inline-edit";
@@ -477,23 +477,25 @@ function PropertiesPanel({
         Properties
       </Text>
 
-      <PropertyRow icon={<CircleDot className="size-3.5" />} label="Status">
+      <PropertyRow icon={<StatusIcon className="size-3.5" />} label="Status">
         <StatusBadge done={todo.done} />
       </PropertyRow>
 
-      <PropertyRow icon={<SignalHigh className="size-3.5" />} label="Priority">
+      <PropertyRow
+        icon={<PriorityIcon className="size-3.5" />}
+        label="Priority">
         <TodoPriorityPicker todo={todo} />
       </PropertyRow>
 
-      <PropertyRow icon={<FolderIcon className="size-3.5" />} label="Project">
+      <PropertyRow icon={<ProjectIcon className="size-3.5" />} label="Project">
         <TodoProjectPicker todo={todo} />
       </PropertyRow>
 
-      <PropertyRow icon={<Tag className="size-3.5" />} label="Labels">
+      <PropertyRow icon={<LabelIcon className="size-3.5" />} label="Labels">
         <TodoLabelPicker todo={todo} />
       </PropertyRow>
 
-      <PropertyRow icon={<CalendarIcon className="size-3.5" />} label="Due">
+      <PropertyRow icon={<DueDateIcon className="size-3.5" />} label="Due">
         <DueDatePicker todo={todo} />
       </PropertyRow>
 
@@ -880,7 +882,7 @@ function Description({ todo }: { todo: TodoEntity }) {
               // screen saying different things. Radix supplies the pressed
               // state.
               className="text-muted-foreground data-[state=on]:text-foreground data-[state=on]:hover:bg-accent data-[state=on]:hover:text-foreground -mr-1.5 h-7 gap-1.5 rounded-full px-2.5 text-xs font-medium [&_svg]:size-3.5">
-              {readOnly ? <BookOpen /> : <PencilLine />}
+              {readOnly ? <ReadingIcon /> : <WritingIcon />}
               {readOnly ? "Reading" : "Editing"}
             </Toggle>
           </TooltipText>
@@ -934,7 +936,7 @@ function CopyDescription({ description }: { description?: string }) {
         onMouseDown={(event) => event.preventDefault()}
         onClick={copy}
         className="text-muted-foreground h-7 rounded-full px-2 [&_svg]:size-3.5">
-        <Copy />
+        <CopyIcon />
       </Button>
     </TooltipText>
   );
@@ -997,7 +999,7 @@ function SaveState({
       // there invisible, or vanish mid-fade.
       style={{ animationDuration: `${Timing.savedVisibleMs}ms` }}
       className="text-success animate-saved-notice flex items-center gap-1 text-xs font-medium">
-      <Check className="size-3.5" />
+      <CheckmarkIcon className="size-3.5" />
       Saved
     </span>
   );
@@ -1223,14 +1225,14 @@ function Subtasks({ todo }: { todo: TodoEntity }) {
               aria-label="Delete subtask"
               onClick={() => remove.mutate(subtask.id)}
               className="text-muted-foreground hover:text-destructive size-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100">
-              <Trash2Icon className="size-3.5" />
+              <DeleteIcon className="size-3.5" />
             </Button>
           </div>
         ))}
       </div>
 
       <form onSubmit={submit} className="mt-1 flex items-center gap-2">
-        <Plus className="text-muted-foreground size-4 shrink-0" />
+        <AddIcon className="text-muted-foreground size-4 shrink-0" />
         <Input
           testId="todo.detail.subtask.add.input"
           value={title}

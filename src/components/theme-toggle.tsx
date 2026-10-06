@@ -1,4 +1,4 @@
-import { Moon, Sun } from "lucide-react";
+import { DarkThemeIcon, LightThemeIcon } from "@/icons";
 import { useTheme } from "@/hooks/use-theme";
 import { testProp, type TestIdProps } from "@/lib/test-id";
 import { cn } from "@/lib/utils";
@@ -72,7 +72,7 @@ function ThemeSwitchFace({
           ? "border-primary/40 bg-primary/10 text-primary"
           : "border-border bg-muted text-amber-500"
       )}>
-      <Sun
+      <LightThemeIcon
         className={cn(
           "absolute size-4 transition-all duration-300",
           isDark
@@ -80,7 +80,7 @@ function ThemeSwitchFace({
             : "scale-100 rotate-0 opacity-100"
         )}
       />
-      <Moon
+      <DarkThemeIcon
         className={cn(
           "absolute size-4 transition-all duration-300",
           isDark

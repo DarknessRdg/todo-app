@@ -1,4 +1,9 @@
-import { FolderInput, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import {
+  DeleteIcon,
+  MoreActionsIcon,
+  MoveToProjectIcon,
+  RenameIcon,
+} from "@/icons";
 
 import {
   DropdownMenu,
@@ -56,13 +61,13 @@ export function ProjectRowMenu({
           aria-label={`More for ${project.name}`}
           {...testProp(`${testId}.menu.button`)}
           className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex size-5 shrink-0 items-center justify-center rounded-md opacity-0 transition-opacity group-focus-within/project:opacity-100 group-hover/project:opacity-100 data-[state=open]:opacity-100">
-          <MoreHorizontal className="size-3.5" />
+          <MoreActionsIcon className="size-3.5" />
         </button>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="start" className="min-w-44">
         <DropdownMenuItem testId={`${testId}.rename.button`} onSelect={onRename}>
-          <Pencil />
+          <RenameIcon />
           Rename
         </DropdownMenuItem>
 
@@ -78,7 +83,7 @@ export function ProjectRowMenu({
             <DropdownMenuLabel
               {...testProp(`${moveTestId}.label`)}
               className="text-muted-foreground flex items-center gap-2 text-xs font-normal">
-              <FolderInput className="size-3.5" />
+              <MoveToProjectIcon className="size-3.5" />
               Move to
             </DropdownMenuLabel>
 
@@ -107,7 +112,7 @@ export function ProjectRowMenu({
           testId={`${testId}.delete.button`}
           variant="destructive"
           onSelect={onDelete}>
-          <Trash2 />
+          <DeleteIcon />
           Delete
         </DropdownMenuItem>
       </DropdownMenuContent>

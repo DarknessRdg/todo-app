@@ -1,4 +1,4 @@
-import { Check, FolderIcon, Plus } from "lucide-react";
+import { AddIcon, CheckmarkIcon, ProjectIcon } from "@/icons";
 import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -102,7 +102,7 @@ export function ProjectSelect({
             "text-muted-foreground hover:text-foreground h-8 gap-1.5 px-2",
             className
           )}>
-          <FolderIcon className="size-4" />
+          <ProjectIcon className="size-4" />
           <span className="text-xs">{selected?.name ?? placeholder}</span>
         </Button>
       </PopoverTrigger>
@@ -163,7 +163,7 @@ export function ProjectSelect({
             aria-label="Create project"
             disabled={draft.trim() === "" || create.isPending}
             className="size-8 shrink-0">
-            <Plus className="size-4" />
+            <AddIcon className="size-4" />
           </Button>
         </form>
       </PopoverContent>
@@ -190,7 +190,7 @@ function ProjectOption({
       <Text variant="small" as="span" className="font-normal">
         {name}
       </Text>
-      {selected && <Check className="size-3.5 shrink-0" />}
+      {selected && <CheckmarkIcon className="size-3.5 shrink-0" />}
     </button>
   );
 }

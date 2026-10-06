@@ -1,6 +1,6 @@
 import * as React from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
-import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
+import { CheckmarkIcon, DropdownIcon, ScrollUpIcon } from "@/icons";
 
 import { cn } from "@/lib/utils";
 import { testProp, type TestIdProps } from "@/lib/test-id";
@@ -87,7 +87,7 @@ function SelectTrigger({
       {...testProp(testId)}>
       {children}
       <SelectPrimitive.Icon asChild>
-        <ChevronDownIcon className="size-4 opacity-50" />
+        <DropdownIcon className="size-4 opacity-50" />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   );
@@ -164,7 +164,7 @@ function SelectItem({
       {...testProp(testId)}>
       <span className="absolute right-2 flex size-3.5 items-center justify-center">
         <SelectPrimitive.ItemIndicator>
-          <CheckIcon className="size-4" />
+          <CheckmarkIcon className="size-4" />
         </SelectPrimitive.ItemIndicator>
       </span>
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
@@ -197,7 +197,7 @@ function SelectScrollUpButton({
         className
       )}
       {...props}>
-      <ChevronUpIcon className="size-4" />
+      <ScrollUpIcon className="size-4" />
     </SelectPrimitive.ScrollUpButton>
   );
 }
@@ -214,7 +214,7 @@ function SelectScrollDownButton({
         className
       )}
       {...props}>
-      <ChevronDownIcon className="size-4" />
+      <DropdownIcon className="size-4" />
     </SelectPrimitive.ScrollDownButton>
   );
 }

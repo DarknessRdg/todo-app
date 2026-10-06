@@ -17,7 +17,7 @@ import { testProp } from "@/lib/test-id";
 import { SidebarProjects } from "@/layout/sidebar-projects";
 import { views, viewIsActive } from "@/layout/views";
 import { useTodoList } from "@/pages/inbox/use-todo-list";
-import { Settings } from "lucide-react";
+import { SettingsIcon } from "@/icons";
 import { Link, useLocation } from "react-router";
 
 export function AppSidebar({ className }: { className?: string } = {}) {
@@ -105,7 +105,7 @@ export function AppSidebar({ className }: { className?: string } = {}) {
               data-active={settingsActive}
               {...testProp("sidebar.settings.link")}
               className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground flex h-9 grow items-center gap-2 rounded-lg px-2.5 text-sm transition-colors">
-              <Settings className="size-4" />
+              <SettingsIcon className="size-4" />
               Settings
             </Link>
 

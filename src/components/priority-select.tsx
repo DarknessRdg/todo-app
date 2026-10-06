@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Check } from "lucide-react";
+import { CheckmarkIcon } from "@/icons";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -139,7 +139,7 @@ function PriorityOption({
       ) : (
         <PriorityBadge priority={badge} />
       )}
-      {selected ? <Check className="size-3.5 shrink-0" /> : null}
+      {selected ? <CheckmarkIcon className="size-3.5 shrink-0" /> : null}
     </button>
   );
 }

@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useParams } from "react-router";
-import { Tag } from "lucide-react";
+import { LabelIcon } from "@/icons";
 
 import { EmptyList } from "@/pages/inbox/empty-list";
 import { NotFound } from "@/pages/not-found/not-found";
@@ -70,7 +70,7 @@ export function LabelPage() {
           empty={
             <EmptyList
               testId="label.todo.empty"
-              icon={<Tag className="size-5" />}
+              icon={<LabelIcon className="size-5" />}
               title="Nothing carries this label"
               message="Put it on a todo from the todo's own detail, or from the labels page."
             />

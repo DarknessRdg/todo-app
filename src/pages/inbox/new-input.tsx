@@ -14,7 +14,7 @@ import {
 import { toast } from "@/components/ui/sonner";
 import { Text } from "@/components/ui/text";
 import { useTodoCreate } from "@/pages/inbox/use-todo-create";
-import { CalendarIcon, ChevronDownIcon, SendIcon } from "lucide-react";
+import { DropdownIcon, DueDateIcon, SubmitIcon } from "@/icons";
 import { useState } from "react";
 import { projectForCapture } from "@/lib/todo-capture";
 
@@ -146,7 +146,7 @@ export function NewInput({
 
             <form.SubmitButton
               testId="home.todo.create.submit"
-              label={<SendIcon className="size-4" />}
+              label={<SubmitIcon className="size-4" />}
               size="icon"
               className="size-9 shrink-0 rounded-full"
               aria-label="Add task"
@@ -187,14 +187,14 @@ function DueDateButton({ initial }: { initial: Date }) {
           size="sm"
           className="text-muted-foreground hover:text-foreground h-8 gap-1.5 px-2"
           type="button">
-          <CalendarIcon className="size-4" />
+          <DueDateIcon className="size-4" />
           <span className="text-xs tabular-nums">
             {field.state.value?.toLocaleDateString(undefined, {
               month: "short",
               day: "numeric",
             })}
           </span>
-          <ChevronDownIcon className="size-3.5 opacity-60" />
+          <DropdownIcon className="size-3.5 opacity-60" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto overflow-hidden p-0" align="end">
